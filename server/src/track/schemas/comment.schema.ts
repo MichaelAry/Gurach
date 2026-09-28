@@ -3,18 +3,27 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type CommentDocument = HydratedDocument<Comment>;
 
-@Schema()
+@Schema({
+  toJSON: {
+    versionKey: false,
+    transform: (_doc, ret: Record<string, any>) => {
+      ret.id = ret._id;
+      delete ret._id;
+      return ret;
+    },
+  },
+})
 export class Comment {
-  @Prop()
-  username?: string;
+  @Prop({ required: true })
+  username: string;
 
-  @Prop()
-  text?: string;
+  @Prop({ required: true })
+  text: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Track' })
+  @Prop({ required: true, type: Types.ObjectId, ref: 'Track' })
   track_id: Types.ObjectId;
 
-  @Prop()
+  @Prop({ min: 1, max: 10 })
   rating?: number;
 }
 

@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateCommentDto } from './dto/create-comment.dto.js';
 import { CreateTrackDto } from './dto/create-track.dto.js';
 import { TrackService } from './track.service.js';
@@ -8,8 +20,27 @@ export class TrackController {
   constructor(private trackService: TrackService) {}
 
   @Post()
-  create(@Body() dto: CreateTrackDto) {
-    return this.trackService.create(dto);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'picture', maxCount: 1 },
+      { name: 'audio', maxCount: 1 },
+    ]),
+  )
+  create(
+    @Body() dto: CreateTrackDto,
+    @UploadedFiles()
+    files: {
+      picture?: Express.Multer.File[];
+      audio?: Express.Multer.File[];
+    },
+  ) {
+    const { picture, audio } = files;
+
+    if (!picture?.[0] || !audio?.[0]) {
+      throw new BadRequestException('picture and audio are required');
+    }
+
+    return this.trackService.create(dto, picture[0], audio[0]);
   }
 
   @Get()
@@ -23,8 +54,13 @@ export class TrackController {
   }
 
   @Get('comments')
-  getAllComments() {
-    return this.trackService.getAllComments();
+  getAllComments(@Query('trackId') trackId?: string) {
+    return this.trackService.getAllComments(trackId);
+  }
+
+  @Delete('comments/:id')
+  deleteComment(@Param('id') id: string) {
+    return this.trackService.deleteComment(id);
   }
 
   @Get(':id')

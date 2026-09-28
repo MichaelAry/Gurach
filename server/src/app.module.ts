@@ -5,7 +5,7 @@ import { TrackModule } from './track/track.module.js';
   imports: [
     TrackModule,
     MongooseModule.forRoot(
-      'mongodb://root:example@localhost:27017/nest?authSource=admin',
+      'mongodb://michael:1111@localhost:27017/nest?authSource=admin',
     ),
   ],
 })

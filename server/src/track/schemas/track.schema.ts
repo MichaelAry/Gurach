@@ -3,7 +3,16 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type TrackDocument = HydratedDocument<Track>;
 
-@Schema()
+@Schema({
+  toJSON: {
+    versionKey: false,
+    transform: (_doc, ret: Record<string, any>) => {
+      ret.id = ret._id;
+      delete ret._id;
+      return ret;
+    },
+  },
+})
 export class Track {
   @Prop({ required: true })
   name: string;
