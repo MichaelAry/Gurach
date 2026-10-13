@@ -44,8 +44,21 @@ export class TrackController {
   }
 
   @Get()
-  getAll() {
-    return this.trackService.getAll();
+  getAll(@Query('count') count?: string, @Query('offset') offset?: string) {
+    return this.trackService.getAll(
+      count !== undefined ? Number(count) : undefined,
+      offset !== undefined ? Number(offset) : undefined,
+    );
+  }
+
+  @Get('search')
+  search(
+    @Query('query') query?: string,
+    @Query('name') name?: string,
+    @Query('artist') artist?: string,
+    @Query('text') text?: string,
+  ) {
+    return this.trackService.search({ query, name, artist, text });
   }
 
   @Post('comments')
@@ -71,5 +84,10 @@ export class TrackController {
   @Delete(':id')
   deleteOne(@Param('id') id: string) {
     return this.trackService.deleteOne(id);
+  }
+
+  @Post('/:id/listen')
+  listen(@Param('id') id: string) {
+    return this.trackService.listen(id);
   }
 }

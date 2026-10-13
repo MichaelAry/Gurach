@@ -1,59 +1,176 @@
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 
 export enum FileType {
   AUDIO = 'audio',
-  IMAGE = 'image',
+  PICTURE = 'picture',
+}
+
+export interface FileTypeConfig {
+  dir: string;
+  defaultExt: string;
+  mimeTypes: Readonly<Record<string, string>>;
+}
+
+export interface StoredFile {
+  name: string;
+  dir: string;
+  ext: string;
+  size: number;
+  mimeType: string;
+}
+
+const FILE_TYPE_CONFIG: Record<FileType, FileTypeConfig> = {
+  [FileType.AUDIO]: {
+    dir: 'audio',
+    defaultExt: '.flac',
+    mimeTypes: {
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.oga': 'audio/ogg',
+      '.m4a': 'audio/mp4',
+      '.aac': 'audio/aac',
+      '.flac': 'audio/flac',
+    },
+  },
+  [FileType.PICTURE]: {
+    dir: 'picture',
+    defaultExt: '.jpg',
+    mimeTypes: {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.avif': 'image/avif',
+      '.gif': 'image/gif',
+    },
+  },
+};
+
+const UUID_SOURCE =
+  '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+
+const MAX_NAME_ATTEMPTS = 5;
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 @Injectable()
 export class FileService {
-  private readonly staticDir = path.resolve(__dirname, '..', 'static');
+  private readonly logger = new Logger(FileService.name);
 
-  private generateFileName(originalName?: string): string {
-    const ext = path.extname(originalName ?? '').toLowerCase();
-    return `${randomUUID()}${ext}`;
-  }
+  private readonly staticDir = path.resolve(
+    process.env.STATIC_DIR ?? path.join(process.cwd(), 'static'),
+  );
 
-  async createFile(type: FileType, file: any) {
-    try {
-      const typeDir = path.join(this.staticDir, type);
-      await fs.mkdir(typeDir, { recursive: true });
+  async createFile(
+    type: FileType,
+    file: Express.Multer.File | Buffer,
+  ): Promise<StoredFile> {
+    const config = this.getConfig(type);
+    const data = Buffer.isBuffer(file) ? file : file.buffer;
 
-      let fileName = this.generateFileName(file?.originalname);
-      let filePath = path.join(typeDir, fileName);
-
-      while (await this.fileExists(filePath)) {
-        fileName = this.generateFileName(file?.originalname);
-        filePath = path.join(typeDir, fileName);
-      }
-
-      await fs.writeFile(filePath, file?.buffer ?? file);
-      return { name: fileName, path: filePath };
-    } catch (error) {
-      throw new HttpException((error as Error).message, HttpStatus.INTERNAL_SERVER_ERROR);
+    if (!Buffer.isBuffer(data)) {
+      throw new BadRequestException('File buffer is missing');
     }
+
+    const dir = path.join(this.staticDir, config.dir);
+    await fs.mkdir(dir, { recursive: true });
+
+    const ext = this.resolveExt(config, file);
+    const mimeType = config.mimeTypes[ext] ?? 'application/octet-stream';
+
+    for (let attempt = 0; attempt < MAX_NAME_ATTEMPTS; attempt++) {
+      const name = `${randomUUID()}${ext}`;
+      const filePath = path.join(dir, name);
+
+      try {
+        await fs.writeFile(filePath, data, { flag: 'wx' });
+
+        return {
+          name,
+          dir: config.dir,
+          ext,
+          size: data.length,
+          mimeType,
+        };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          this.rethrow(error);
+        }
+      }
+    }
+
+    throw new HttpException(
+      'Failed to allocate a unique file name',
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 
-  async removeFile(fileName: string, type?: FileType) {
+  async removeFile(name: string, type: FileType): Promise<void> {
     try {
-      const filePath = path.join(this.staticDir, type ?? '', fileName);
-      await fs.unlink(filePath);
+      await fs.unlink(this.resolveStoredPath(name, type));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw new HttpException((error as Error).message, HttpStatus.INTERNAL_SERVER_ERROR);
+        this.rethrow(error);
       }
     }
   }
 
-  private async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
+  resolveStoredPath(name: string, type: FileType): string {
+    const config = this.getConfig(type);
+    const ext = path.extname(name).toLowerCase();
+
+    const storedNameRe = new RegExp(`^${UUID_SOURCE}${escapeRegex(ext)}$`);
+
+    if (
+      path.basename(name) !== name ||
+      !config.mimeTypes[ext] ||
+      !storedNameRe.test(name)
+    ) {
+      throw new BadRequestException(`Invalid file name: "${name}"`);
     }
+
+    return path.join(this.staticDir, config.dir, name);
+  }
+
+  private getConfig(type: FileType): FileTypeConfig {
+    const config = FILE_TYPE_CONFIG[type];
+
+    if (!config) {
+      throw new BadRequestException(`Unsupported file type: "${type}"`);
+    }
+
+    return config;
+  }
+
+  private resolveExt(
+    config: FileTypeConfig,
+    file: Express.Multer.File | Buffer,
+  ): string {
+    const originalName = Buffer.isBuffer(file) ? undefined : file.originalname;
+    const ext = path.extname(originalName ?? '').toLowerCase();
+
+    return config.mimeTypes[ext] ? ext : config.defaultExt;
+  }
+
+  private rethrow(error: unknown): never {
+    if (error instanceof HttpException) throw error;
+
+    this.logger.error(error);
+    throw new HttpException(
+      'Internal server error',
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 }

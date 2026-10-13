@@ -20,17 +20,17 @@ export class Track {
   @Prop()
   artist?: string;
 
-  @Prop()
-  picture?: string;
+  @Prop({ type: String, required: true })
+  audio: string;
 
-  @Prop()
-  audio?: string;
+  @Prop({ type: String })
+  picture: string;
 
   @Prop()
   text?: string;
 
-  @Prop({ default: 0 })
-  listens?: number;
+  @Prop({ type: Number, default: 0 })
+  listens: number;
 
   @Prop()
   duration?: number;
