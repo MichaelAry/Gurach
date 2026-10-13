@@ -10,18 +10,14 @@ type TrackItem = {
   href?: string
 }
 
-// deterministic pseudo-random -> stable spectrogram pattern across renders
 const rand = (i: number, salt = 0) => {
   const n = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453
   return n - Math.floor(n)
 }
 
-// rows within FULL_REACH of the cursor show the whole label; the reveal then
-// eases out smoothly until FADE_REACH, beyond which only the first letter shows
 const FULL_REACH = 6
 const FADE_REACH = 15
 
-// shared text style for ghost + visible overlay so widths match exactly
 const labelSx = {
   fontWeight: 700,
   fontSize: '0.7rem',
@@ -31,10 +27,6 @@ const labelSx = {
   color: '#000',
 }
 
-// Label that slides out leftward. The full label width and the width of its
-// first letter are both measured from hidden copies, so when collapsed exactly
-// the first letter is visible (not a pixel of the second), and when expanded
-// the window is exactly the text length.
 const AnchorLabel = ({ label, eased }: { label: string; eased: number }) => {
   const firstRef = useRef<HTMLSpanElement>(null)
   const [firstW, setFirstW] = useState(8)
@@ -46,7 +38,6 @@ const AnchorLabel = ({ label, eased }: { label: string; eased: number }) => {
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
-    // re-measure once web fonts are ready (glyph widths may change)
     document.fonts?.ready.then(measure)
     return () => ro.disconnect()
   }, [label])
@@ -60,12 +51,10 @@ const AnchorLabel = ({ label, eased }: { label: string; eased: number }) => {
         flexShrink: 0,
       }}
     >
-      {/* Ghost of the full label: only sizes the container */}
       <Typography variant="caption" sx={{ ...labelSx, visibility: 'hidden', display: 'block' }}>
         {label}
       </Typography>
 
-      {/* Ghost of the first letter (incl. its letter-spacing): measured */}
       <Typography
         ref={firstRef}
         component="span"
@@ -82,8 +71,6 @@ const AnchorLabel = ({ label, eased }: { label: string; eased: number }) => {
         {label.charAt(0)}
       </Typography>
 
-      {/* Reveal window: right-anchored, grows leftward from the first
-          letter's width up to the full label width */}
       <Box
         sx={{
           position: 'absolute',
@@ -120,7 +107,7 @@ export const Navbar = () => {
     <Box
       sx={{
         position: 'fixed',
-        right: 50,
+        right: 0,
         top: '50%',
         transform: 'translateY(-50%)',
         display: 'flex',
@@ -145,12 +132,10 @@ export const Navbar = () => {
         const baseWidth = item.isAnchor ? 52 : 8 + seed * 40
         const baseHeight = item.isAnchor ? 3 : 1 + Math.round(seed * 2)
 
-        // full reveal inside FULL_REACH rows, smooth fall-off up to FADE_REACH
         const dist = hoveredIdx === null ? Infinity : Math.abs(idx - hoveredIdx)
         const t = Math.min(1, Math.max(0, (FADE_REACH - dist) / (FADE_REACH - FULL_REACH)))
-        const eased = t * t * (3 - 2 * t) // smoothstep
+        const eased = t * t * (3 - 2 * t)
 
-        // 3D bulge — restrained
         let translateX = 0
         let translateZ = 0
         let scaleX = 1
@@ -198,8 +183,6 @@ export const Navbar = () => {
               `,
               transition: 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease',
 
-              // oversized invisible sensor — cursor entering anywhere in this
-              // rectangle counts as hovering this row
               '&::before': {
                 content: '""',
                 position: 'absolute',
