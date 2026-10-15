@@ -1,10 +1,14 @@
+import { PlayerBar } from '@/components/player/PlayerBar'
+import { PlayerProvider } from '@/components/player/PlayerProvider'
 import Navbar from '@/components/navbar'
 import { BackButton } from '@/features/navigation/components/BackButton'
 import { Box } from '@mui/material'
+import { Suspense } from 'react'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    // Плеер живёт на всех страницах (main): контекст + <audio> + нижний бар
+    <PlayerProvider>
       <Box
         sx={{
           position: 'fixed',
@@ -21,12 +25,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           userSelect: 'none',
         }}
       >
-        <BackButton />
+        <Suspense fallback={null}>
+          <BackButton />
+        </Suspense>
 
         <Navbar />
       </Box>
 
-      <main>{children}</main>
-    </>
+      {/* paddingBottom — чтобы контент не уходил под fixed-бар плеера */}
+      <main style={{ paddingBottom: 96 }}>{children}</main>
+
+      <PlayerBar />
+    </PlayerProvider>
   )
 }

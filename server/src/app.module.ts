@@ -9,13 +9,19 @@ const STATIC_DIR = path.resolve(
   process.env.STATIC_DIR ?? path.join(process.cwd(), 'static'),
 );
 
+/**
+ * Строка подключения к MongoDB из docker-compose.yml.
+ * Переопределяется переменной окружения MONGODB_URI.
+ */
+const MONGODB_URI =
+  process.env.MONGODB_URI ??
+  'mongodb://michael:1111@localhost:27017/nest?authSource=admin';
+
 @Module({
   imports: [
     TrackModule,
     FileModule,
-    MongooseModule.forRoot(
-      'mongodb://michael:1111@localhost:27017/nest?authSource=admin',
-    ),
+    MongooseModule.forRoot(MONGODB_URI),
     ServeStaticModule.forRoot({
       rootPath: STATIC_DIR,
       serveRoot: '/static',

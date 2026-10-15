@@ -86,7 +86,7 @@ export class TrackService {
       throw new BadRequestException('"offset" must be non-negative');
     }
 
-    return this.trackModel.find().skip(skip).limit(limit).exec();
+    return this.trackModel.find().skip(skip).limit(limit).populate('comments').exec();
   }
 
   async getOne(id: string): Promise<TrackDocument> {

@@ -1,16 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
+import { trackApiTransform } from '../../common/api-json.util.js';
 
 export type TrackDocument = HydratedDocument<Track>;
 
 @Schema({
   toJSON: {
     versionKey: false,
-    transform: (_doc, ret: Record<string, any>) => {
-      ret.id = ret._id;
-      delete ret._id;
-      return ret;
-    },
+    transform: trackApiTransform,
   },
 })
 export class Track {

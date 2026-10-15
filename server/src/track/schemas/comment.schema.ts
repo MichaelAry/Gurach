@@ -1,16 +1,15 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
+import { createApiTransform } from '../../common/api-json.util.js';
 
 export type CommentDocument = HydratedDocument<Comment>;
 
 @Schema({
+  // timestamps: true добавляет createdAt/updatedAt — клиент показывает дату комментария
+  timestamps: true,
   toJSON: {
     versionKey: false,
-    transform: (_doc, ret: Record<string, any>) => {
-      ret.id = ret._id;
-      delete ret._id;
-      return ret;
-    },
+    transform: createApiTransform(),
   },
 })
 export class Comment {
@@ -25,6 +24,10 @@ export class Comment {
 
   @Prop({ min: 1, max: 10 })
   rating?: number;
+
+  createdAt?: Date;
+
+  updatedAt?: Date;
 }
 
 export const CommentSchema = SchemaFactory.createForClass(Comment);
