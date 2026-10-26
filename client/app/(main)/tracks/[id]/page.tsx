@@ -12,6 +12,7 @@ import {
 import { notFound } from 'next/navigation'
 
 import { getTrack } from '@/features/tracks/api/getTrack'
+import { formatListens } from '@/features/tracks/utils/formatListens'
 import { PlayTrackButton } from '@/features/tracks/components/PlayTrackButton'
 
 interface TrackPageProps {
@@ -43,7 +44,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
   if (!track) notFound()
 
   const comments = track.comments ?? []
-  const listensFormatted = new Intl.NumberFormat('ru-RU').format(track.listens)
+  const listensFormatted = formatListens(track.listens)
 
   return (
     <Box sx={{ px: 3, pb: 2 }}>
@@ -94,7 +95,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
             </Typography>
           </Stack>
 
-          <Typography color="text.secondary">{listensFormatted} прослушиваний</Typography>
+          <Typography color="text.secondary">{listensFormatted}</Typography>
 
           {/* Кнопка проигрывания — клиентский компонент из контекста плеера */}
           <Box>

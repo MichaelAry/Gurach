@@ -15,7 +15,7 @@ export function UploadTracksButton() {
         '&:hover': { bgcolor: 'primary.dark' },
       }}
     >
-      Upload
+      Загрузить
     </Button>
   )
 }

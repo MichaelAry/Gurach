@@ -6,8 +6,8 @@ import { Box, Card, Stack, Typography } from '@mui/material'
 
 export async function generateMetadata() {
   return {
-    title: 'Tracks',
-    description: 'List of all tracks',
+    title: 'Треки',
+    description: 'Список всех треков',
   }
 }
 
@@ -20,7 +20,7 @@ export default async function TracksPage() {
       <Card sx={{ width: '100%', p: 2 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h1" sx={{ fontSize: '1.5rem' }}>
-            Tracks list
+            Список треков
           </Typography>
           <UploadTracksButton />
         </Stack>
@@ -28,7 +28,7 @@ export default async function TracksPage() {
 
       <Box sx={{ width: '100%', mt: 2 }}>
         {tracks.length === 0 ? (
-          <Typography sx={{ color: 'text.secondary' }}>No tracks yet.</Typography>
+          <Typography sx={{ color: 'text.secondary' }}>Треков пока нет.</Typography>
         ) : (
           <TrackList tracks={tracks} />
         )}

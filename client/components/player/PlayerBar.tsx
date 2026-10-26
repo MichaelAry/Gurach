@@ -20,7 +20,7 @@ function formatTime(seconds: number): string {
  * Бар есть всегда — пока ничего не выбрано, показывает подсказку.
  */
 export function PlayerBar() {
-  const { current, playing, currentTime, duration, toggle, next, prev, seek } =
+  const { current, queue, playing, currentTime, duration, toggle, next, prev, seek } =
     usePlayer()
 
   const hasTrack = Boolean(current?._id)
@@ -68,14 +68,29 @@ export function PlayerBar() {
           )}
         </Box>
 
-        {/* Название */}
+        {/* Название + позиция в очереди */}
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography noWrap sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
             {current?.name ?? 'Выберите трек'}
           </Typography>
-          <Typography noWrap sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-            {current?.artist ?? 'Плеер готов к работе'}
-          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+              {current?.artist ?? 'Плеер готов к работе'}
+            </Typography>
+            {/* Позиция в очереди видна только когда очередь длиннее одного трека */}
+            {hasTrack && queue.length > 1 && (
+              <Typography
+                sx={{
+                  fontSize: '0.7rem',
+                  color: 'text.secondary',
+                  flexShrink: 0,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {queue.findIndex((t) => t._id === current?._id) + 1} / {queue.length}
+              </Typography>
+            )}
+          </Stack>
         </Box>
 
         {/* Управление */}

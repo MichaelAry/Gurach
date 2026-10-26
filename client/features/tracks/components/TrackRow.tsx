@@ -6,6 +6,7 @@ import type { ITrack } from '@/types/track'
 import { Card, Stack, Typography } from '@mui/material'
 import Link from 'next/link'
 import { useListenCount } from './ListenCountsProvider'
+import { formatListens } from '../utils/formatListens'
 import { PlayButton } from './PlayButton'
 
 interface TrackRowProps {
@@ -70,7 +71,7 @@ export function TrackRow({ track, queue }: TrackRowProps) {
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {listens} listens
+          {formatListens(listens)}
         </Typography>
       </Card>
     </Link>

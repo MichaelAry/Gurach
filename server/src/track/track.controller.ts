@@ -51,14 +51,24 @@ export class TrackController {
     );
   }
 
+  private toNumber(value?: string): number | undefined {
+    return value !== undefined ? Number(value) : undefined;
+  }
+
   @Get('search')
   search(
     @Query('query') query?: string,
     @Query('name') name?: string,
     @Query('artist') artist?: string,
     @Query('text') text?: string,
+    @Query('count') count?: string,
+    @Query('offset') offset?: string,
   ) {
-    return this.trackService.search({ query, name, artist, text });
+    return this.trackService.search(
+      { query, name, artist, text },
+      this.toNumber(count),
+      this.toNumber(offset),
+    );
   }
 
   @Post('comments')

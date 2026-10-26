@@ -7,7 +7,12 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Gurach',
-  description: 'Music player',
+  description: 'Музыкальный плеер',
+  openGraph: {
+    title: 'Gurach',
+    description: 'Музыкальный плеер',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

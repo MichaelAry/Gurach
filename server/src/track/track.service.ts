@@ -58,7 +58,12 @@ export class TrackService {
       stored.push({ name: pictureFile.name, type: FileType.PICTURE });
 
       const track = await this.trackModel.create({
-        ...dto,
+        // Маппим явным образом: иначе лишние поля dto (например, 'picture')
+        // могли бы попасть в документ в обход файлового слоя.
+        name: dto.name,
+        artist: dto.artist,
+        text: dto.text,
+        duration: dto.duration,
         listens: 0,
         audio: audioFile.name,
         picture: pictureFile.name,
@@ -75,16 +80,8 @@ export class TrackService {
     }
   }
 
-  async getAll(count = 10, offset = 0): Promise<TrackDocument[]> {
-    const limit = Number(count);
-    const skip = Number(offset);
-
-    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
-      throw new BadRequestException('"count" must be between 1 and 100');
-    }
-    if (!Number.isFinite(skip) || skip < 0) {
-      throw new BadRequestException('"offset" must be non-negative');
-    }
+  async getAll(count?: number, offset?: number): Promise<TrackDocument[]> {
+    const { limit, skip } = this.parsePagination(count, offset, 10);
 
     return this.trackModel.find().skip(skip).limit(limit).populate('comments').exec();
   }
@@ -114,6 +111,9 @@ export class TrackService {
     }
 
     await this.commentModel.deleteMany({ track_id: track._id }).exec();
+
+    // Медиа-файлы удаляем после успешного удаления документа
+    this.removeStoredFiles(track.audio, track.picture);
 
     return track;
   }
@@ -176,18 +176,24 @@ export class TrackService {
   async listen(id: string): Promise<void> {
     this.assertValidId(id);
 
-    const track = await this.trackModel.findById(id).exec();
+    // Атомарный инкремент: без race-условий read-modify-write.
+    // Документ не найден → 404, как и раньше.
+    const updated = await this.trackModel
+      .findByIdAndUpdate(id, { $inc: { listens: 1 } })
+      .exec();
 
-    if (!track) {
+    if (!updated) {
       throw new NotFoundException(`Track with id "${id}" was not found`);
     }
-
-    track.listens += 1;
-    await track.save();
   }
 
-  async search(params: SearchParams): Promise<TrackDocument[]> {
+  async search(
+    params: SearchParams,
+    count?: number,
+    offset?: number,
+  ): Promise<TrackDocument[]> {
     const { query, name, artist, text } = params;
+    const { limit, skip } = this.parsePagination(count, offset);
 
     const filter: Record<string, unknown> = {};
 
@@ -212,7 +218,51 @@ export class TrackService {
       );
     }
 
-    return this.trackModel.find(filter).exec();
+    return this.trackModel.find(filter).skip(skip).limit(limit).exec();
+  }
+
+  /**
+   * Валидация и разбор пагинации (count/offset) — общая для getAll и search.
+   * Дефолт лимита применяется, когда параметр не передан
+   * (у getAll — 10, у search — 100, как раньше, только с потолком в 100).
+   */
+  private parsePagination(
+    count: number | undefined,
+    offset: number | undefined,
+    defaultLimit = 100,
+  ) {
+    const limit = count ?? defaultLimit;
+    const skip = offset ?? 0;
+
+    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
+      throw new BadRequestException('"count" must be between 1 and 100');
+    }
+    if (!Number.isFinite(skip) || skip < 0) {
+      throw new BadRequestException('"offset" must be non-negative');
+    }
+
+    return { limit, skip };
+  }
+
+  /**
+   * Удаляет медиа-файлы трека с диска. У старых треков audio/picture могут
+   * быть пустыми или храниться не в формате FileService — ошибки удаления
+   * не должны блокировать удаление трека, поэтому глотаются.
+   */
+  private removeStoredFiles(
+    audio?: string | null,
+    picture?: string | null,
+  ): void {
+    if (audio) {
+      void this.fileService
+        .removeFile(audio, FileType.AUDIO)
+        .catch(() => undefined);
+    }
+    if (picture) {
+      void this.fileService
+        .removeFile(picture, FileType.PICTURE)
+        .catch(() => undefined);
+    }
   }
 
   private assertValidId(id: string, field = 'id'): void {

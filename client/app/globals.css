@@ -33,6 +33,15 @@ html {
   }
 }
 
+/* Фокус для клавиатурной навигации на обычных ссылках
+   (строки треков — <Link> вокруг <Card>, у них нет MUI-ripple).
+   Мышный клик outline не показывает — только :focus-visible. */
+a:focus-visible {
+  outline: 2px solid var(--mono-600);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* CSS-переменные — та же шкала, что mono в theme/index.ts */
 :root {
   --mono-25: #fafbfc;

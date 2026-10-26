@@ -4,13 +4,13 @@ export default function UploadPage() {
   return (
     <Box sx={{ p: 3, maxWidth: 600, width: '100%', mx: 'auto' }}>
       <Typography variant="h1" sx={{ fontSize: '1.5rem', mb: 2 }}>
-        Upload your tracks
+        Загрузка треков
       </Typography>
 
       <Box
         component="input"
         type="file"
-        accept=".mp3,.wav,.ogg,.m4a"
+        accept=".mp3,.wav,.ogg,.m4a,.flac,.aac"
         sx={{
           display: 'block',
           mb: 2,
@@ -31,11 +31,11 @@ export default function UploadPage() {
           width: '100%',
         }}
       >
-        Upload
+        Загрузить
       </Button>
 
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-        Supports MP3, WAV, OGG, M4A files
+        Поддерживаются файлы MP3, WAV, OGG, M4A, FLAC, AAC
       </Typography>
     </Box>
   )
