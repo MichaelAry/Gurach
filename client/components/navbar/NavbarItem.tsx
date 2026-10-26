@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import type { CSSProperties } from 'react'
 
 import { AnchorLabel } from '@/components/navbar/AnchorLabel'
 import { Box } from '@mui/material'
@@ -53,12 +54,35 @@ export const NavbarItem = ({ item, idx, hoveredIdx, onEnter, onLeave }: Props) =
 
   const veryNear = hoveredIdx !== null && Math.abs(idx - hoveredIdx) <= 1
 
+  // ── Динамика вынесена из sx в inline-style ──────────────────────────────
+  // sx ниже — полностью статический объект, поэтому Emotion сгенерирует
+  // одинаковый класс на сервере и клиенте. Любые «живые» значения
+  // (transform, opacity, размеры) идут через style и не участвуют
+  // в хэше класса → рассинхрона гидратации быть не может.
+  const dynamicOuterStyle: CSSProperties = {
+    transform: `
+      translateX(${translateX}px)
+      translateZ(${translateZ}px)
+      scaleX(${scaleX})
+      scaleY(${scaleY})
+      rotateX(${rotateX}deg)
+    `,
+  }
+
+  const dynamicBarStyle: CSSProperties = {
+    height: `${baseHeight}px`,
+    width: `${Number((8 + seed * 40).toFixed(4))}px`,
+    opacity: String(Number((veryNear ? 1 : 0.6 + eased * 0.3).toFixed(4))),
+    boxShadow: veryNear ? '0 0 0 1px rgba(0, 0, 0, 0.08)' : 'none',
+  }
+
   return (
     <Box
       onMouseEnter={() => onEnter(idx)}
       onMouseLeave={onLeave}
       component={item.isAnchor ? Link : 'div'}
       href={item.isAnchor ? item.href : undefined}
+      style={dynamicOuterStyle}
       sx={{
         position: 'relative',
         display: 'flex',
@@ -69,13 +93,6 @@ export const NavbarItem = ({ item, idx, hoveredIdx, onEnter, onLeave }: Props) =
         cursor: item.isAnchor ? 'pointer' : 'default',
         height: '9px',
         transformOrigin: 'right center',
-        transform: `
-          translateX(${translateX}px)
-          translateZ(${translateZ}px)
-          scaleX(${scaleX})
-          scaleY(${scaleY})
-          rotateX(${rotateX}deg)
-        `,
         transition: 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease',
 
         '&::before': {
@@ -94,13 +111,10 @@ export const NavbarItem = ({ item, idx, hoveredIdx, onEnter, onLeave }: Props) =
       {item.isAnchor && <AnchorLabel label={item.label ?? ''} eased={eased} />}
 
       <Box
+        style={dynamicBarStyle}
         sx={{
-          height: `${baseHeight}px`,
-          width: `${baseWidth}px`,
           backgroundColor: '#000',
-          opacity: veryNear ? 1 : 0.6 + eased * 0.3,
           borderRadius: '1px',
-          boxShadow: veryNear ? '0 0 0 1px rgba(0, 0, 0, 0.08)' : 'none',
           transition: 'opacity 0.3s ease, box-shadow 0.3s ease',
           pointerEvents: 'none',
         }}

@@ -1,6 +1,7 @@
 'use client'
 
 import type { ITrack } from '@/types/track'
+import { useBumpListen } from '@/features/tracks/components/ListenCountsProvider'
 import {
   createContext,
   useCallback,
@@ -53,6 +54,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Какой трек уже "засчитан" в прослушивания (чтобы не дублировать при паузе)
   const countedRef = useRef<string | null>(null)
+
+  // Оптимистичный счётчик прослушиваний из ListenCountsProvider —
+  // он всегда есть выше по дереву (AppThemeProvider в app/layout.tsx).
+  const bumpListen = useBumpListen()
 
   // Новый трек → выставить источник и запустить воспроизведение.
   // Здесь только работа с внешней системой (<audio>); состояния (playing,
@@ -129,9 +134,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!id || countedRef.current === id) return
     countedRef.current = id
 
-    // Клиентский запрос к Nest через Next route handler (см. app/api/tracks/[id]/listen)
+    // Оптимистично обновляем счётчик в клиентском сторе,
+    // затем информируем сервер через Next route handler (см. app/api/tracks/[id]/listen)
+    bumpListen(id)
     void fetch(`/api/tracks/${id}/listen`, { method: 'POST' }).catch(() => undefined)
-  }, [current?._id])
+  }, [current?._id, bumpListen])
 
   const handlePause = useCallback(() => setPlaying(false), [])
 

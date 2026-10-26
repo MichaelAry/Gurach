@@ -22,7 +22,11 @@ export function PlayTrackButton({ track }: { track: ITrack }) {
       startIcon={isPlaying ? <PauseRounded /> : <PlayArrowRounded />}
       disabled={!track.audio}
       onClick={() => play(track)}
-      sx={{ bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#222' } }}
+      sx={{
+        bgcolor: 'primary.main',
+        color: 'primary.contrastText',
+        '&:hover': { bgcolor: 'primary.dark' },
+      }}
     >
       {isPlaying ? 'Пауза' : track.audio ? 'Слушать' : 'Аудио недоступно'}
     </Button>

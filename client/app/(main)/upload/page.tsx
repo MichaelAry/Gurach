@@ -2,7 +2,7 @@ import { Box, Button, Typography } from '@mui/material'
 
 export default function UploadPage() {
   return (
-    <Box sx={{ p: 3, maxWidth: 600 }}>
+    <Box sx={{ p: 3, maxWidth: 600, width: '100%', mx: 'auto' }}>
       <Typography variant="h1" sx={{ fontSize: '1.5rem', mb: 2 }}>
         Upload your tracks
       </Typography>
@@ -20,23 +20,21 @@ export default function UploadPage() {
           borderRadius: 1,
           width: '100%',
           cursor: 'pointer',
+          color: 'text.primary',
         }}
       />
 
       <Button
         variant="contained"
         sx={{
-          bgcolor: '#000',
-          color: '#fff',
           mb: 2,
           width: '100%',
-          '&:hover': { bgcolor: '#222' },
         }}
       >
         Upload
       </Button>
 
-      <Typography variant="body2" sx={{ color: '#737373' }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
         Supports MP3, WAV, OGG, M4A files
       </Typography>
     </Box>

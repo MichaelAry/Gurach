@@ -13,9 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body>
-        {/* Провайдер — клиентский компонент: тему НЕ передаём пропсом,
-            иначе React не сможет её сериализовать (500 на всех страницах). */}
+      <body suppressHydrationWarning>
         <AppRouterCacheProvider>
           <AppThemeProvider>{children}</AppThemeProvider>
         </AppRouterCacheProvider>

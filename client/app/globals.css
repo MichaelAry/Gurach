@@ -1,6 +1,19 @@
-* {
-  margin: 0;
-  padding: 0;
+/**
+ * Глобальные стили — минимальные.
+ *
+ * Baseline-сброс и типографика приходят из MUI CssBaseline (app/layout.tsx),
+ * а цвета — из MUI-темы (theme/index.ts). Здесь остаётся только то, что
+ * CssBaseline не покрывает, и CSS-переменные той же шкалы «холодного
+ * графита», что и mono-палитра темы — для не-MUI стилей (если появятся).
+ *
+ * Старый шаблонный css (центрирование body, глобальные стили button/input,
+ * обводки, отступы секций) удалён: он конфликтовал с CssBaseline и MUI,
+ * а `text-align: center` на body ломал ширину контента.
+ */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -8,130 +21,31 @@ html {
   scroll-behavior: smooth;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #fafafa;
-  color: #1a1a1a;
-  line-height: 1.6;
-  text-align: center;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+/* Компенсация вертикального скроллбара:
+   без него содержимое сдвигается немного влево от видимого центра окна,
+   потому что справа отгрызается полоса прокрутки.
+   both-edges резервирует одинаковое место с обеих сторон,
+   убирая визуальный перекос. Не поддерживается в старых браузерах —
+   просто игнорируется. */
+@supports (scrollbar-gutter: stable both-edges) {
+  html {
+    scrollbar-gutter: stable both-edges;
+  }
 }
 
-/* Main content will be centered within body */
-main {
-  width: 100%;
-  max-width: 800px;
-  padding: 0 1rem;
-}
-
-/* Monochrome color palette variables */
+/* CSS-переменные — та же шкала, что mono в theme/index.ts */
 :root {
-  --gray-50: #fafafa;
-  --gray-100: #f5f5f5;
-  --gray-200: #e5e5e5;
-  --gray-300: #d4d4d4;
-  --gray-400: #a3a3a3;
-  --gray-500: #737373;
-  --gray-600: #525252;
-  --gray-700: #404040;
-  --gray-800: #262626;
-  --gray-900: #1a1a1a;
-}
-
-/* Headings - monochrome */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-weight: 700;
-  line-height: 1.2;
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-  color: var(--gray-900);
-}
-
-/* Links - monochrome */
-a {
-  color: var(--gray-600);
-  text-decoration: none;
-}
-
-a:hover {
-  color: var(--gray-800);
-}
-
-/* Images - centered */
-img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 0 auto;
-}
-
-/* Buttons - monochrome style */
-button {
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 1rem;
-  padding: 0.75rem 1.5rem;
-  border: 2px solid var(--gray-600);
-  background: transparent;
-  color: var(--gray-600);
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-button:hover {
-  background: var(--gray-600);
-  color: var(--gray-50);
-}
-
-button:focus-visible {
-  outline: 2px solid var(--gray-50);
-  outline-offset: 2px;
-}
-
-/* Focus visible */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--gray-200);
-  outline-offset: 2px;
-}
-
-/* Subtle section styling */
-section {
-  padding: 2rem 0;
-}
-
-/* Improve form elements - monochrome */
-input[type='text'],
-input[type='email'],
-input[type='password'],
-textarea {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--gray-300);
-  border-radius: 4px;
-  font-size: 1rem;
-  background: var(--gray-50);
-  color: var(--gray-900);
-  transition: border-color 0.2s;
-}
-
-input[type='text']:focus,
-input[type='email']:focus,
-input[type='password']:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--gray-500);
+  --mono-25: #fafbfc;
+  --mono-50: #f4f5f8;
+  --mono-100: #e8eaef;
+  --mono-200: #d5d8e0;
+  --mono-300: #b4b9c6;
+  --mono-400: #8c91a1;
+  --mono-500: #6a6f7e;
+  --mono-600: #505463;
+  --mono-700: #3c3f4b;
+  --mono-800: #2a2c36;
+  --mono-900: #1b1d24;
 }
 
 /* Reduce motion for accessibility */
@@ -143,5 +57,6 @@ textarea:focus {
   *::before,
   *::after {
     transition-duration: 0s;
+    animation-duration: 0s;
   }
 }

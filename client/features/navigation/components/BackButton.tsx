@@ -25,7 +25,7 @@ export function BackButton({ fallback = '/tracks' }: Props) {
       onClick={handleBack}
       aria-label="Go back"
       sx={{
-        color: '#000',
+        color: 'text.primary',
         '&:hover': { bgcolor: 'action.hover' },
       }}
     >

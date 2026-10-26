@@ -109,7 +109,14 @@ export function PlayerBar() {
         <Stack
           direction="row"
           spacing={1}
-          sx={{ flex: 2, minWidth: 160, alignItems: 'center' }}
+          sx={{
+            flex: 2,
+            minWidth: 160,
+            alignItems: 'center',
+            // на узких экранах ползунок не помещается — прячем,
+            // обложка + транспорт остаются
+            display: { xs: 'none', sm: 'flex' },
+          }}
         >
           <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', minWidth: 32 }}>
             {formatTime(currentTime)}

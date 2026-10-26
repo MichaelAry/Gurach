@@ -10,9 +10,9 @@ export function UploadTracksButton() {
       href="/upload"
       variant="contained"
       sx={{
-        bgcolor: '#000',
-        color: '#fff',
-        '&:hover': { bgcolor: '#222' },
+        bgcolor: 'primary.main',
+        color: 'primary.contrastText',
+        '&:hover': { bgcolor: 'primary.dark' },
       }}
     >
       Upload

@@ -7,5 +7,5 @@ export const labelSx = {
   letterSpacing: '1.5px',
   textTransform: 'uppercase' as const,
   whiteSpace: 'nowrap' as const,
-  color: '#000',
+  color: 'text.primary',
 }

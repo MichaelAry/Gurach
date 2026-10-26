@@ -16,7 +16,8 @@ export default async function TracksPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Card sx={{ width: 900, p: 2 }}>
+      {/* Ширину задаёт центральная колонка layout — страница на всю её ширину */}
+      <Card sx={{ width: '100%', p: 2 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h1" sx={{ fontSize: '1.5rem' }}>
             Tracks list
@@ -25,7 +26,7 @@ export default async function TracksPage() {
         </Stack>
       </Card>
 
-      <Box sx={{ width: 900, mt: 2 }}>
+      <Box sx={{ width: '100%', mt: 2 }}>
         {tracks.length === 0 ? (
           <Typography sx={{ color: 'text.secondary' }}>No tracks yet.</Typography>
         ) : (

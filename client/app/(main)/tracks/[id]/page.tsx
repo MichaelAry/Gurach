@@ -6,12 +6,10 @@ import {
   Box,
   Button,
   Card,
-  Skeleton,
   Stack,
   Typography,
 } from '@mui/material'
 import { notFound } from 'next/navigation'
-import { Suspense } from 'react'
 
 import { getTrack } from '@/features/tracks/api/getTrack'
 import { PlayTrackButton } from '@/features/tracks/components/PlayTrackButton'
@@ -49,7 +47,8 @@ export default async function TrackPage({ params }: TrackPageProps) {
 
   return (
     <Box sx={{ px: 3, pb: 2 }}>
-      <Card sx={{ p: 2, maxWidth: 680 }}>
+      {/* Карточка уже колонки — центрируется явно, а не прижимается влево */}
+      <Card sx={{ p: 2, maxWidth: 680, mx: 'auto', width: '100%' }}>
         <Stack direction="column" spacing={3}>
           {/* У старых треков в БД picture может не быть — рендерим только при наличии */}
           {track.picture ? (
@@ -171,29 +170,3 @@ export default async function TrackPage({ params }: TrackPageProps) {
   )
 }
 
-/**
- * Скелетон на время, пока `getTrack` ходит в Nest.
- * Благодаря Suspense-обёртке Next.js стримит страницу:
- * статическая оболочка приходит сразу, данные — как придут.
- *
- * Чтобы это заработало, оберни <TrackPage /> в Suspense на уровне layout
- * или используй loading.tsx рядом с page.tsx (см. п.6).
- */
-export function TrackSkeleton() {
-  return (
-    <Box sx={{ px: 3, pb: 2 }}>
-      <Card sx={{ p: 2, maxWidth: 680 }}>
-        <Stack direction="column" spacing={3}>
-          <Skeleton variant="rounded" height={200} />
-          <Skeleton variant="text" width="60%" height={48} />
-          <Skeleton variant="text" width="40%" />
-          <Skeleton variant="text" width="30%" />
-        </Stack>
-      </Card>
-    </Box>
-  )
-}
-
-// Экспорт Suspense-обёртки не нужен — используем файл loading.tsx (п.6).
-// Suspense оставлен в импортах, если решишь оборачивать вручную.
-void Suspense

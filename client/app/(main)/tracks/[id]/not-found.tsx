@@ -1,6 +1,6 @@
 // app/(main)/tracks/[id]/not-found.tsx
-import Link from 'next/link'
 import { Box, Button, Stack, Typography } from '@mui/material'
+import Link from 'next/link'
 
 export default function NotFound() {
   return (
@@ -12,10 +12,11 @@ export default function NotFound() {
         <Typography color="text.secondary">
           Возможно, он был удалён или ссылка неверна.
         </Typography>
-        <Link href="/tracks" passHref legacyBehavior>
-          <Button variant="outlined" component="a">
-            К списку треков
-          </Button>
+        {/* Link-обёртка вместо component={Link}: not-found — серверный компонент,
+            а function-проп клиентскому Button передавать нельзя
+            ("Functions cannot be passed directly to Client Components") */}
+        <Link href="/tracks" style={{ textDecoration: 'none' }}>
+          <Button variant="outlined">К списку треков</Button>
         </Link>
       </Stack>
     </Box>

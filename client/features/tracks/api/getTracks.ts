@@ -1,6 +1,6 @@
 // features/tracks/api/getTracks.ts
-import { cacheLife, cacheTag } from 'next/cache'
 import type { ITrack } from '@/types/track'
+import { cacheLife, cacheTag } from 'next/cache'
 
 const API_URL = process.env.API_URL ?? 'http://localhost:5000'
 
@@ -9,22 +9,26 @@ const API_URL = process.env.API_URL ?? 'http://localhost:5000'
  * `cacheTag('tracks')` позволяет инвалидировать кэш после загрузки нового трека
  * через revalidateTag('tracks') в server action.
  *
- * Если бэкенд недоступен (например, во время build), возвращает пустой массив.
+ * ВАЖНО: при ошибке мы бросаем исключение, а не возвращаем [].
+ * Иначе `'use cache'` закэширует пустой массив как «успешный» результат
+ * (особенно если бэкенд был недоступен во время `next build`),
+ * и вы будете видеть пустой список ещё 5 минут после старта.
  */
 export async function getTracks(): Promise<ITrack[]> {
   'use cache'
   cacheLife('minutes')
   cacheTag('tracks')
 
-  try {
-    const res = await fetch(`${API_URL}/tracks`)
-    if (!res.ok) {
-      console.error(`[getTracks] Upstream error: ${res.status}`)
-      return []
-    }
-    return res.json()
-  } catch (error) {
-    console.error('[getTracks] Fetch failed:', error)
-    return []
+  const res = await fetch(`${API_URL}/tracks`, {
+    cache: 'force-cache',
+  })
+
+  if (!res.ok) {
+    // Бросаем — это предотвращает кэширование «пустого успеха».
+    throw new Error(
+      `[getTracks] Upstream error: ${res.status} ${res.statusText} (${API_URL}/tracks)`,
+    )
   }
+
+  return res.json() as Promise<ITrack[]>
 }
