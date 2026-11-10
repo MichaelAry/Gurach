@@ -59,7 +59,7 @@ export default function MainLayout({
             display: 'flex',
           }}
         >
-          <Box sx={{ width: '100%', maxWidth: 1000, margin: 'auto' }}>
+          <Box sx={{ width: '100%', maxWidth: 1000, margin: 'auto', '&:has([data-home-page])': { maxWidth: 1200 } }}>
             {children}
           </Box>
         </main>

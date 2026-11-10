@@ -10,6 +10,20 @@ export class AccountListen {
   @Prop({ required: true }) resultingListens: number;
 }
 export const AccountListenSchema = SchemaFactory.createForClass(AccountListen);
-AccountListenSchema.index({ userId: 1, playbackId: 1 }, { unique: true, name: 'account_listen_playback_unique' });
-AccountListenSchema.index({ userId: 1, _id: -1 }, { name: 'account_listen_history' });
-AccountListenSchema.index({ userId: 1, trackId: 1 }, { name: 'account_listen_tracks' });
+AccountListenSchema.index(
+  { userId: 1, playbackId: 1 },
+  { unique: true, name: 'account_listen_playback_unique' },
+);
+AccountListenSchema.index(
+  { userId: 1, _id: -1 },
+  { name: 'account_listen_history' },
+);
+AccountListenSchema.index(
+  { userId: 1, trackId: 1 },
+  { name: 'account_listen_tracks' },
+);
+
+AccountListenSchema.index(
+  { listenedAt: -1, trackId: 1 },
+  { name: 'listen_week_tracks' },
+);

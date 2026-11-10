@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-test('logs in, returns locally, displays identity and clears session on logout', async ({ page, context }) => {
+test('logs in, opens home, displays identity and clears session on logout', async ({ page, context }) => {
   await page.goto('/login?returnTo=/tracks')
   await page.getByLabel('Имя пользователя').fill('fixture_user')
   await page.getByLabel('Пароль').fill('wrong password')
@@ -8,7 +8,7 @@ test('logs in, returns locally, displays identity and clears session on logout',
   await expect(page.getByLabel('Имя пользователя')).toHaveValue('fixture_user')
   await page.getByLabel('Пароль').fill('fixture password long')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page).toHaveURL(/\/tracks$/)
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByText('Пользователь теста', { exact: true })).toBeVisible()
   const cookie = (await context.cookies()).find((value) => value.name === 'gurach_session')
   expect(cookie?.httpOnly).toBe(true)
@@ -26,7 +26,7 @@ test('rejects CSRF, discards unsafe return destinations and clears an invalid se
   await page.getByLabel('Имя пользователя').fill('fixture_user')
   await page.getByLabel('Пароль').fill('fixture password long')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page).toHaveURL(/\/tracks$/)
+  await expect(page).toHaveURL(/\/$/)
   await context.addCookies([{ name: 'gurach_session', value: 'z'.repeat(43), domain: '127.0.0.1', path: '/', httpOnly: true }])
   await page.reload()
   await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible()
@@ -43,7 +43,7 @@ test('does not reuse the previous identity across logout and login', async ({ pa
     await page.getByLabel('Имя пользователя').fill(username)
     await page.getByLabel('Пароль').fill('fixture password long')
     await page.getByRole('button', { name: 'Войти', exact: true }).click()
-    await expect(page).toHaveURL(/\/tracks$/)
+    await expect(page).toHaveURL(/\/$/)
     await expect(page.getByText(displayName, { exact: true })).toBeVisible()
     await expect(page.getByText(previous, { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Выйти', exact: true }).click()

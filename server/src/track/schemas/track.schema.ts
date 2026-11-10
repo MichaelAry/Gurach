@@ -8,7 +8,12 @@ export type TrackLifecycle = (typeof TRACK_LIFECYCLE)[number];
 
 @Schema({ versionKey: false })
 export class Track {
-  @Prop({ type: String, enum: TRACK_LIFECYCLE, default: 'active', required: true })
+  @Prop({
+    type: String,
+    enum: TRACK_LIFECYCLE,
+    default: 'active',
+    required: true,
+  })
   lifecycle: TrackLifecycle;
 
   @Prop({ required: true })
@@ -36,7 +41,6 @@ export class Track {
   @Prop()
   duration?: number;
 
-
   /** Updated transactionally by comment writes to conflict with track deletion. */
   @Prop({ type: Number, default: 0, min: 0 })
   commentWriteRevision: number;
@@ -44,3 +48,8 @@ export class Track {
 
 export const TrackSchema = SchemaFactory.createForClass(Track);
 TrackSchema.index({ lifecycle: 1, _id: 1 }, { name: 'track_lifecycle_id' });
+
+TrackSchema.index(
+  { ownerId: 1, lifecycle: 1, _id: -1 },
+  { name: 'track_owner_activity' },
+);

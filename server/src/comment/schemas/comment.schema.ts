@@ -40,3 +40,8 @@ export class Comment {
 
 export const CommentSchema = SchemaFactory.createForClass(Comment);
 CommentSchema.index({ track_id: 1, _id: 1 }, { name: 'comment_track_id_id' });
+
+CommentSchema.index(
+  { authorId: 1, _id: -1 },
+  { name: 'comment_author_activity' },
+);

@@ -1,3 +1,4 @@
+import { HomeModule } from './home/home.module.js';
 import { FriendsModule } from './friends/friends.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AccountModule } from './account/account.module.js';
@@ -16,6 +17,7 @@ import { AuthModule } from './auth/auth.module.js';
 
 @Module({
   imports: [
+    HomeModule,
     AccountModule,
     FriendsModule,
     UsersModule,

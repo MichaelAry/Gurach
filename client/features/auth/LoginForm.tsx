@@ -3,7 +3,6 @@ import { useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Alert, Button, Card, Stack, TextField, Typography } from '@mui/material'
 import Link from 'next/link'
-import { safeReturnPath } from './return-path'
 
 export function LoginForm() {
   const router = useRouter()
@@ -27,7 +26,7 @@ export function LoginForm() {
         return
       }
       setPassword('')
-      router.replace(safeReturnPath(params.get('returnTo')))
+      router.replace('/')
       router.refresh()
     } catch { setError('Не удалось связаться с сервером. Проверьте соединение.') }
     finally { setPending(false) }
