@@ -19,7 +19,22 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+    "test:e2e": "npm run test:integration",
+    "test:isolated": "node ../scripts/test-db.mjs",
+    "typecheck": "tsc --noEmit --incremental false",
+    "tools:build": "tsc -p tsconfig.tools.json",
+    "tools:check-config": "npm run tools:build && node .tools/src/scripts/check-config.js",
+    "openapi:generate": "npm run tools:build && node .tools/src/scripts/openapi.js",
+    "contracts:check": "npm run tools:build && node scripts/check-contracts.mjs",
+    "db:audit": "npm run tools:build && node .tools/src/scripts/migrate.js db:audit",
+    "db:migrate:plan": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:plan",
+    "db:migrate:apply": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:apply",
+    "db:migrate:verify": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:verify",
+    "db:migrate:rollback": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:rollback",
+    "media:reconcile": "npm run tools:build && node .tools/src/scripts/media-reconcile.js",
+    "maintenance:once": "npm run tools:build && node .tools/src/scripts/maintenance-once.js",
+    "test:integration": "vitest run --config ./vitest.config.e2e.ts",
+    "auth:provision": "npm run tools:build && node .tools/src/scripts/auth-provision.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -28,9 +43,18 @@
     "@nestjs/observe": "^0.3.0",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/serve-static": "^12.0.0",
+    "@nestjs/swagger": "12.1.1",
+    "@nestjs/throttler": "^6.7.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "dotenv": "^18.0.9",
+    "file-type": "22.3.0",
+    "mongodb": "7.6.0",
     "mongoose": "^9.10.2",
+    "multer": "2.0.2",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",
@@ -41,14 +65,18 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.0.0",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.12",
+    "openapi-response-validator": "12.1.3",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "typescript": "^6.0.2",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.12"
+  },
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "npm": ">=11.19.0 <12"
   }
 }
