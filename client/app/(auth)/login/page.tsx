@@ -1,5 +1,6 @@
-import { Typography } from '@mui/material'
+import { Suspense } from 'react'
+import { LoginForm } from '@/features/auth/LoginForm'
 
 export default function LoginPage() {
-  return <Typography variant="h4">Вход</Typography>
+  return <Suspense fallback={null}><LoginForm /></Suspense>
 }
