@@ -1,215 +1,352 @@
+import { PermissionService } from '../auth/permission.service.js';
+import type { Actor } from '../auth/session.service.js';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import mongoose, { Types } from 'mongoose';
+import type { Connection, Model } from 'mongoose';
+import { randomUUID } from 'node:crypto';
 import { FileService, FileType } from '../file/file.service.js';
-import { CreateCommentDto } from './dto/create-comment.dto.js';
+import { MediaValidatorService } from '../file/media-validator.service.js';
+import {
+  decodeCursor,
+  decodeScopedCursor,
+  encodeCursor,
+  encodeScopedCursor,
+} from '../common/cursor.js';
 import { CreateTrackDto } from './dto/create-track.dto.js';
-import { Comment, CommentDocument } from './schemas/comment.schema.js';
+import {
+  DeletionAccepted,
+  ListenResult,
+  TrackDetail,
+  TrackListPage,
+  TrackSearchPage,
+} from '../contracts/track.contract.js';
+import type { ListTracksQuery } from './dto/list-tracks-query.dto.js';
+import { searchCursorScope, type SearchTracksQuery } from './dto/search-tracks-query.dto.js';
+import { toTrackDetail, toTrackListItem, type TrackListRecord } from './mappers/track.mapper.js';
 import { Track, TrackDocument } from './schemas/track.schema.js';
+import { CacheEvent, CacheEventDocument } from '../maintenance/schemas/cache-event.schema.js';
+import { MediaOperation, MediaOperationDocument } from '../maintenance/schemas/media-operation.schema.js';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export interface SearchParams {
-  query?: string;
-  name?: string;
-  artist?: string;
-  text?: string;
-}
-
 @Injectable()
 export class TrackService {
+  private readonly logger = new Logger(TrackService.name);
   constructor(
     @InjectModel(Track.name) private trackModel: Model<TrackDocument>,
-    @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
+    @InjectModel(MediaOperation.name) private operationModel: Model<MediaOperationDocument>,
+    @InjectModel(CacheEvent.name) private cacheEventModel: Model<CacheEventDocument>,
+    @InjectConnection() private connection: Connection,
     private fileService: FileService,
+    private mediaValidator: MediaValidatorService,
   ) {}
 
   async create(
     dto: CreateTrackDto,
-    picture?: Express.Multer.File,
-    audio?: Express.Multer.File,
-  ): Promise<TrackDocument> {
+    picture: Express.Multer.File,
+    audio: Express.Multer.File,
+    operationId: string,
+    actor?: Actor,
+  ): Promise<TrackDetail> {
+    const identity = new PermissionService().requireActor(actor);
     if (!audio) {
       throw new BadRequestException('Audio file is required');
     }
     if (!picture) {
       throw new BadRequestException('Picture file is required');
     }
+    if (!operationId || !/^[a-f0-9-]{36}$/i.test(operationId)) {
+      throw new BadRequestException('Upload operation identity is missing or invalid');
+    }
 
-    const stored: { name: string; type: FileType }[] = [];
+    const trackId = new Types.ObjectId();
+    let intentCreated = false;
+    let committed = false;
+    let leaseToken: string | undefined;
 
     try {
-      const audioFile = await this.fileService.createFile(
-        FileType.AUDIO,
-        audio,
-      );
-      stored.push({ name: audioFile.name, type: FileType.AUDIO });
+      const [audioValidation, coverValidation] = await Promise.allSettled([
+        this.mediaValidator.validateAudio(audio.path, audio.originalname),
+        this.mediaValidator.validateCover(picture.path, picture.originalname),
+      ]);
+      if (audioValidation.status === 'rejected') throw audioValidation.reason;
+      if (coverValidation.status === 'rejected') throw coverValidation.reason;
+      const audioMetadata = audioValidation.value;
+      const coverMetadata = coverValidation.value;
+      const audioFile = this.fileService.allocateFile(FileType.AUDIO, audio.originalname);
+      const pictureFile = this.fileService.allocateFile(FileType.PICTURE, picture.originalname);
+      const validatedMetadata = {
+        audioDurationSeconds: audioMetadata.durationSeconds,
+        audioSizeBytes: audio.size,
+        audioMimeType: audioFile.mimeType,
+        audioCodec: audioMetadata.codec,
+        audioContainer: audioMetadata.container,
+        pictureSizeBytes: picture.size,
+        pictureMimeType: pictureFile.mimeType,
+        pictureWidth: coverMetadata.width,
+        pictureHeight: coverMetadata.height,
+        pictureFormat: coverMetadata.format,
+        picturePages: coverMetadata.pages,
+      };
 
-      const pictureFile = await this.fileService.createFile(
-        FileType.PICTURE,
-        picture,
-      );
-      stored.push({ name: pictureFile.name, type: FileType.PICTURE });
-
-      const track = await this.trackModel.create({
-        // Маппим явным образом: иначе лишние поля dto (например, 'picture')
-        // могли бы попасть в документ в обход файлового слоя.
-        name: dto.name,
-        artist: dto.artist,
-        text: dto.text,
-        duration: dto.duration,
-        listens: 0,
-        audio: audioFile.name,
-        picture: pictureFile.name,
+      await this.operationModel.create({
+        operationId,
+        kind: 'upload',
+        trackId,
+        audioKey: audioFile.name,
+        pictureKey: pictureFile.name,
+        stageDirectory: operationId,
+        metadata: validatedMetadata,
+        ownerId: new Types.ObjectId(identity.id),
+        state: 'uploading',
+        attempts: 0,
+        nextAttemptAt: new Date(),
       });
+      intentCreated = true;
 
-      return track;
+      leaseToken = randomUUID();
+      const leased = await this.operationModel.updateOne(
+        { operationId, trackId, state: 'uploading' },
+        {
+          $set: {
+            state: 'publishing',
+            leaseOwner: `http:${operationId}`,
+            leaseToken,
+            leaseUntil: new Date(Date.now() + 30_000),
+          },
+        },
+      ).exec();
+      if (leased.matchedCount !== 1) throw new Error('Upload operation could not acquire its publication lease');
+
+      await this.fileService.publishStagedFile(FileType.AUDIO, audio.path, audio.originalname, audioFile.name);
+      await this.fileService.publishStagedFile(FileType.PICTURE, picture.path, picture.originalname, pictureFile.name);
+
+      let createdTrack: TrackDocument | undefined;
+      const session = await this.connection.startSession();
+      try {
+        await session.withTransaction(async () => {
+          const track = new this.trackModel({
+            _id: trackId,
+            ownerId: new Types.ObjectId(identity.id),
+            // Map explicitly so DTO fields cannot bypass the file layer.
+            name: dto.name,
+            artist: dto.artist,
+            text: dto.text,
+            duration: audioMetadata.durationSeconds,
+            listens: 0,
+            audio: audioFile.name,
+            picture: pictureFile.name,
+            lifecycle: 'active',
+          });
+          await track.save({ session });
+
+          const completed = await this.operationModel.updateOne(
+            { operationId, trackId, state: 'publishing', leaseToken },
+            {
+              $set: { state: 'done', nextAttemptAt: new Date() },
+              $unset: { leaseOwner: '', leaseToken: '', leaseUntil: '' },
+            },
+            { session },
+          ).exec();
+          if (completed.matchedCount !== 1) {
+            throw new Error('Upload publication lease was lost before transaction commit');
+          }
+
+          await this.cacheEventModel.create([{
+            eventId: `${operationId}:activated`,
+            type: 'track.activated',
+            trackId,
+            state: 'pending',
+            attempts: 0,
+            nextAttemptAt: new Date(),
+          }], { session });
+          createdTrack = track;
+        });
+      } finally {
+        await session.endSession();
+      }
+      if (!createdTrack) throw new Error('Upload transaction committed without returning its track');
+      committed = true;
+      return toTrackDetail(createdTrack);
     } catch (error) {
-      await Promise.all(
-        stored.map(({ name, type }) =>
-          this.fileService.removeFile(name, type).catch(() => undefined),
-        ),
-      );
+      if (intentCreated && !committed) await this.markUploadForCleanup(operationId, leaseToken, error);
       throw error;
     }
   }
 
-  async getAll(count?: number, offset?: number): Promise<TrackDocument[]> {
-    const { limit, skip } = this.parsePagination(count, offset, 10);
-
-    return this.trackModel.find().skip(skip).limit(limit).populate('comments').exec();
-  }
-
-  async getOne(id: string): Promise<TrackDocument> {
-    this.assertValidId(id);
-
-    const track = await this.trackModel
-      .findById(id)
-      .populate('comments')
-      .exec();
-
-    if (!track) {
-      throw new NotFoundException(`Track with id "${id}" was not found`);
-    }
-
-    return track;
-  }
-
-  async deleteOne(id: string): Promise<TrackDocument> {
-    this.assertValidId(id);
-
-    const track = await this.trackModel.findByIdAndDelete(id).exec();
-
-    if (!track) {
-      throw new NotFoundException(`Track with id "${id}" was not found`);
-    }
-
-    await this.commentModel.deleteMany({ track_id: track._id }).exec();
-
-    // Медиа-файлы удаляем после успешного удаления документа
-    this.removeStoredFiles(track.audio, track.picture);
-
-    return track;
-  }
-
-  async addComment(dto: CreateCommentDto): Promise<CommentDocument> {
-    this.assertValidId(dto.trackId, 'trackId');
-
-    const track = await this.trackModel.findById(dto.trackId).exec();
-
-    if (!track) {
-      throw new NotFoundException(
-        `Track with id "${dto.trackId}" was not found`,
-      );
-    }
-
+  private async markUploadForCleanup(operationId: string, leaseToken: string | undefined, error: unknown): Promise<void> {
+    const errorObject = error as { code?: unknown; name?: unknown };
+    const rawCode = typeof errorObject?.code === 'string'
+      ? errorObject.code
+      : typeof errorObject?.name === 'string' ? errorObject.name : 'unknown';
+    const lastErrorCode = /^[A-Za-z0-9_-]{1,64}$/.test(rawCode) ? rawCode : 'upload_failed';
+    const filter: Record<string, unknown> = leaseToken
+      ? {
+          $or: [
+            { operationId, state: 'uploading' },
+            { operationId, state: 'publishing', leaseToken },
+          ],
+        }
+      : { operationId, state: { $in: ['uploading', 'publishing'] } };
     try {
-      const comment = await this.commentModel.create({
-        username: dto.username,
-        text: dto.text,
-        track_id: track._id,
-        rating: dto.rating,
-      });
-
-      await this.trackModel.findByIdAndUpdate(track._id, {
-        $push: { comments: comment._id },
-      });
-
-      return comment;
-    } catch (error) {
-      return this.rethrow(error);
+      await this.operationModel.updateOne(filter, {
+        $set: { state: 'cleanup', nextAttemptAt: new Date(), lastErrorCode },
+        $inc: { attempts: 1 },
+        $unset: { leaseOwner: '', leaseToken: '', leaseUntil: '' },
+      }).exec();
+    } catch (cleanupError) {
+      this.logger.error(`Could not mark upload operation ${operationId} for cleanup (${this.safeErrorCode(cleanupError)})`);
     }
   }
 
-  async deleteComment(id: string): Promise<CommentDocument> {
+  private safeErrorCode(error: unknown): string {
+    const value = error as { code?: unknown; name?: unknown };
+    const code = typeof value?.code === 'string' ? value.code : typeof value?.name === 'string' ? value.name : 'unknown';
+    return /^[A-Za-z0-9_-]{1,64}$/.test(code) ? code : 'unknown';
+  }
+
+  async getPage(query: ListTracksQuery): Promise<TrackListPage> {
+    const after = query.cursor ? decodeCursor(query.cursor).after : undefined;
+    const filter: Record<string, unknown> = { lifecycle: 'active' };
+    if (after) filter._id = { $gt: new Types.ObjectId(after) };
+    const records = (await this.trackModel
+      .find(filter)
+      .select('_id name artist audio picture duration listens')
+      .sort({ _id: 1 })
+      .limit(query.count + 1)
+      .lean()
+      .exec()) as TrackListRecord[];
+
+    const hasMore = records.length > query.count;
+    const pageRecords = records.slice(0, query.count);
+    return Object.assign(new TrackListPage(), {
+      items: pageRecords.map(toTrackListItem),
+      nextCursor:
+        hasMore && pageRecords.length > 0
+          ? encodeCursor({ after: String(pageRecords.at(-1)!._id) })
+          : null,
+    });
+  }
+
+  async getOne(id: string): Promise<TrackDetail> {
     this.assertValidId(id);
 
-    const comment = await this.commentModel.findByIdAndDelete(id).exec();
+    const track = (await this.trackModel
+      .findOne({ _id: new Types.ObjectId(id), lifecycle: 'active' })
+      .select('_id name artist audio picture duration listens text ownerId')
+      .lean()
+      .exec()) as TrackListRecord | null;
 
-    if (!comment) {
-      throw new NotFoundException(`Comment with id "${id}" was not found`);
+    if (!track) {
+      throw new NotFoundException(`Track with id "${id}" was not found`);
     }
 
-    await this.trackModel.findByIdAndUpdate(comment.track_id, {
-      $pull: { comments: comment._id },
-    });
-
-    return comment;
+    return toTrackDetail(track);
   }
 
-  async getAllComments(trackId?: string): Promise<CommentDocument[]> {
-    if (trackId) {
-      if (!Types.ObjectId.isValid(trackId)) {
-        throw new BadRequestException('Invalid track id');
-      }
-      return this.commentModel.find({ track_id: trackId }).exec();
+  async deleteOne(id: string, actor?: Actor): Promise<DeletionAccepted> {
+    const identity = new PermissionService().requireActor(actor);
+    this.assertValidId(id);
+    const trackId = new Types.ObjectId(id);
+    const newOperationId = randomUUID();
+    let operationId: string | undefined;
+    const session = await this.connection.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const current = await this.trackModel.findById(trackId).session(session).lean().exec();
+        if (!current) throw new NotFoundException(`Track with id "${id}" was not found`);
+
+        new PermissionService().assertOwner(identity, current.ownerId);
+        if (current.lifecycle !== 'active') {
+          const existing = await this.operationModel.findOne({ kind: 'delete', trackId }).session(session).lean().exec();
+          if (!existing) throw new Error('Track lifecycle has no matching delete operation');
+          operationId = existing.operationId;
+          return;
+        }
+
+        const transitioned = await this.trackModel.updateOne(
+          { _id: trackId, lifecycle: 'active', ...(identity.role === 'admin' ? {} : { ownerId: new Types.ObjectId(identity.id) }) },
+          { $set: { lifecycle: 'deleting' } },
+          { session },
+        ).exec();
+        if (transitioned.matchedCount !== 1) throw new Error('Track lifecycle changed while accepting deletion');
+
+        operationId = newOperationId;
+        await this.operationModel.create([{
+          operationId,
+          kind: 'delete',
+          trackId,
+          ...(current.audio ? { audioKey: current.audio } : {}),
+          ...(current.picture ? { pictureKey: current.picture } : {}),
+          ownerId: current.ownerId ?? null,
+          state: 'cleanup',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+        }], { session });
+        await this.cacheEventModel.create([{
+          eventId: `track.deleted:${id}`,
+          type: 'track.deleted',
+          trackId,
+          state: 'pending',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+        }], { session });
+      });
+    } finally {
+      await session.endSession();
     }
-    return this.commentModel.find().exec();
+    if (!operationId) throw new Error('Delete transaction committed without returning its operation');
+    return Object.assign(new DeletionAccepted(), { _id: id, operationId, status: 'accepted' as const });
   }
 
-  async listen(id: string): Promise<void> {
+  async listen(id: string): Promise<ListenResult> {
     this.assertValidId(id);
 
     // Атомарный инкремент: без race-условий read-modify-write.
     // Документ не найден → 404, как и раньше.
     const updated = await this.trackModel
-      .findByIdAndUpdate(id, { $inc: { listens: 1 } })
+      .findOneAndUpdate({ _id: new Types.ObjectId(id), lifecycle: 'active' }, { $inc: { listens: 1 } }, { returnDocument: 'after' })
+      .select('listens')
       .exec();
 
     if (!updated) {
       throw new NotFoundException(`Track with id "${id}" was not found`);
     }
+
+    return Object.assign(new ListenResult(), { listens: updated.listens });
   }
 
-  async search(
-    params: SearchParams,
-    count?: number,
-    offset?: number,
-  ): Promise<TrackDocument[]> {
-    const { query, name, artist, text } = params;
-    const { limit, skip } = this.parsePagination(count, offset);
+  async search(query: SearchTracksQuery): Promise<TrackSearchPage> {
+    const { query: term, name, artist, text } = query;
+    const scope = searchCursorScope({ query: term, name, artist, text });
+    const cursor = query.cursor ? decodeScopedCursor(query.cursor) : undefined;
+    if (cursor && cursor.scope !== scope) {
+      throw new BadRequestException('"cursor" does not match the search filters');
+    }
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { lifecycle: 'active' };
 
-    if (query?.trim()) {
-      const re = new RegExp(escapeRegex(query.trim()), 'i');
+    if (term) {
+      const re = new RegExp(escapeRegex(term), 'i');
       filter.$or = [{ name: re }, { artist: re }, { text: re }];
     }
 
-    if (name?.trim()) {
-      filter.name = new RegExp(escapeRegex(name.trim()), 'i');
+    if (name) {
+      filter.name = new RegExp(escapeRegex(name), 'i');
     }
-    if (artist?.trim()) {
-      filter.artist = new RegExp(escapeRegex(artist.trim()), 'i');
+    if (artist) {
+      filter.artist = new RegExp(escapeRegex(artist), 'i');
     }
-    if (text?.trim()) {
-      filter.text = new RegExp(escapeRegex(text.trim()), 'i');
+    if (text) {
+      filter.text = new RegExp(escapeRegex(text), 'i');
     }
 
     if (Object.keys(filter).length === 0) {
@@ -218,51 +355,22 @@ export class TrackService {
       );
     }
 
-    return this.trackModel.find(filter).skip(skip).limit(limit).exec();
-  }
-
-  /**
-   * Валидация и разбор пагинации (count/offset) — общая для getAll и search.
-   * Дефолт лимита применяется, когда параметр не передан
-   * (у getAll — 10, у search — 100, как раньше, только с потолком в 100).
-   */
-  private parsePagination(
-    count: number | undefined,
-    offset: number | undefined,
-    defaultLimit = 100,
-  ) {
-    const limit = count ?? defaultLimit;
-    const skip = offset ?? 0;
-
-    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
-      throw new BadRequestException('"count" must be between 1 and 100');
-    }
-    if (!Number.isFinite(skip) || skip < 0) {
-      throw new BadRequestException('"offset" must be non-negative');
-    }
-
-    return { limit, skip };
-  }
-
-  /**
-   * Удаляет медиа-файлы трека с диска. У старых треков audio/picture могут
-   * быть пустыми или храниться не в формате FileService — ошибки удаления
-   * не должны блокировать удаление трека, поэтому глотаются.
-   */
-  private removeStoredFiles(
-    audio?: string | null,
-    picture?: string | null,
-  ): void {
-    if (audio) {
-      void this.fileService
-        .removeFile(audio, FileType.AUDIO)
-        .catch(() => undefined);
-    }
-    if (picture) {
-      void this.fileService
-        .removeFile(picture, FileType.PICTURE)
-        .catch(() => undefined);
-    }
+    if (cursor) filter._id = { $gt: new Types.ObjectId(cursor.after) };
+    const records = (await this.trackModel
+      .find(filter)
+      .select('_id name artist audio picture duration listens')
+      .sort({ _id: 1 })
+      .limit(query.count + 1)
+      .lean()
+      .exec()) as TrackListRecord[];
+    const hasMore = records.length > query.count;
+    const pageRecords = records.slice(0, query.count);
+    return Object.assign(new TrackSearchPage(), {
+      items: pageRecords.map(toTrackListItem),
+      nextCursor: hasMore && pageRecords.length > 0
+        ? encodeScopedCursor({ after: String(pageRecords.at(-1)!._id), scope })
+        : null,
+    });
   }
 
   private assertValidId(id: string, field = 'id'): void {
