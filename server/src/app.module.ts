@@ -1,3 +1,5 @@
+import { FriendsModule } from './friends/friends.module.js';
+import { UsersModule } from './users/users.module.js';
 import { AccountModule } from './account/account.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { Module } from '@nestjs/common';
@@ -15,6 +17,8 @@ import { AuthModule } from './auth/auth.module.js';
 @Module({
   imports: [
     AccountModule,
+    FriendsModule,
+    UsersModule,
     QueueModule,
     AuthModule,
     TrackModule,

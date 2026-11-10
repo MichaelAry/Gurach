@@ -1,3 +1,5 @@
+import { FriendsService } from '../friends/friends.service.js';
+import { UsersService } from '../users/users.service.js';
 import { AccountService } from '../account/account.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { TrackReadService } from '../track/track-read.service.js';
@@ -16,6 +18,8 @@ import { CommentService } from '../comment/comment.service.js';
 @Module({
   controllers: [...API_CONTROLLERS],
   providers: [
+    { provide: FriendsService, useValue: {} },
+    { provide: UsersService, useValue: {} },
     { provide: AccountService, useValue: {} },
     { provide: TrackReadService, useValue: {} },
     { provide: QueueService, useValue: {} },

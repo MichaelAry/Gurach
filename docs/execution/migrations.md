@@ -24,3 +24,12 @@ npm run db:migrate:verify -- --migration 001-track-lifecycle --database gurach_t
 ```
 
 Keep migration summaries and target fingerprints with the private run record. Do not copy document-level journal data into tracked reports. Real-data operations remain outside this framework phase and require the backup, restore, writer-freeze, and review gates in `START-HERE.md` and P8 acceptance.
+
+## Social relations
+
+`007-social-relations` installs canonical-pair and active-request unique indexes,
+pagination indexes, independent block indexes, persistent request quota indexes,
+and the compound username pagination index. It does not backfill or alter users.
+It must be applied explicitly before enabling the friends feature; application
+startup does not install these indexes. See [friends.md](friends.md) for the
+storage contract, transaction requirements and existing runner target restrictions.

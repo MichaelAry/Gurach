@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useListenRevision } from '@/features/tracks/components/ListenCountsProvider'
 import { AccountStatistics } from './AccountStatistics'
 import { AccountTracks } from './AccountTracks'
+import { AccountFriends } from './AccountFriends'
 
 export function AccountOverview() {
   const { user, loading, error } = useViewer()
@@ -44,7 +45,8 @@ export function AccountOverview() {
             </Stack>
           </Paper>
 
-          <AccountStatistics revision={revision} />
+          <AccountStatistics revision={revision} friendsRevision={refresh} />
+          <AccountFriends revision={refresh} />
           <Button component={Link} href="/favorites" variant="outlined">Избранные треки</Button>
 
           <Paper component="section" aria-labelledby="account-uploads" variant="outlined" sx={{ p: 2 }}>

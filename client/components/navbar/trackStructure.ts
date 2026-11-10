@@ -23,4 +23,5 @@ export const trackStructure: TrackItem[] = buildTrackStructure([
   { label: 'Main', href: '/', trackCount: 14 },
   { label: 'All tracks', href: '/tracks', trackCount: 20 },
   { label: 'Избранное', href: '/favorites', trackCount: 8 },
+  { label: 'Друзья', href: '/friends', trackCount: 8 },
 ])

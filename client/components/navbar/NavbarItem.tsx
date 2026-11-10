@@ -1,5 +1,6 @@
 'use client'
 
+import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import LibraryMusicOutlinedIcon from '@mui/icons-material/LibraryMusicOutlined'
@@ -17,6 +18,8 @@ export const NavbarItem = ({ item, active }: Props) => {
 
   const Icon = item.href === '/'
     ? HomeOutlinedIcon
+    : item.href === '/friends'
+      ? PeopleOutlinedIcon
     : item.href === '/favorites'
       ? FavoriteBorderIcon
       : LibraryMusicOutlinedIcon
