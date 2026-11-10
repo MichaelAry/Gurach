@@ -81,15 +81,47 @@ export const theme = createTheme({
   },
 
   typography: {
-    fontFamily: 'var(--font-geist-sans), system-ui, -apple-system, sans-serif',
+    fontFamily: 'var(--font-onest), Arial, sans-serif',
+    fontWeightLight: 400,
+    fontWeightRegular: 400,
+    fontWeightMedium: 500,
+    fontWeightBold: 700,
+    // Keep the existing MUI size and line-height scale. Onest does not need
+    // Roboto's tracking adjustments, especially at small Cyrillic sizes.
+    allVariants: { letterSpacing: '0em' },
+    h1: { fontWeight: 700 },
+    h2: { fontWeight: 700 },
+    h3: { fontWeight: 600 },
+    h4: { fontWeight: 600 },
+    h5: { fontWeight: 600 },
+    h6: { fontWeight: 600 },
+    subtitle1: { fontWeight: 600 },
+    subtitle2: { fontWeight: 600 },
+    button: { fontWeight: 500 },
   },
 
   components: {
+    MuiCssBaseline: {
+      styleOverrides: (theme) => ({
+        html: { fontFamily: theme.typography.fontFamily },
+        'button, input, select, textarea': { fontFamily: 'inherit' },
+      }),
+    },
+    MuiButtonBase: {
+      styleOverrides: {
+        root: ({ theme }) => ({ fontWeight: theme.typography.fontWeightMedium }),
+      },
+    },
+    MuiFormLabel: {
+      styleOverrides: {
+        root: ({ theme }) => ({ fontWeight: theme.typography.fontWeightMedium }),
+      },
+    },
     // Плоские кнопки без «прыжка» регистра
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { textTransform: 'none', fontWeight: 500 },
+        root: { textTransform: 'none' },
       },
     },
     // Мягкая граница у paper — читается на светлом фоне
