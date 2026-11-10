@@ -2,12 +2,15 @@
 
 import { Button } from '@mui/material'
 import Link from 'next/link'
+import { useViewer } from '@/features/auth/ViewerProvider'
 
 export function UploadTracksButton() {
+  const { user, loading } = useViewer()
+  if (loading) return null
   return (
     <Button
       component={Link}
-      href="/upload"
+      href={user ? '/upload' : '/login?returnTo=/upload'}
       variant="contained"
       sx={{
         bgcolor: 'primary.main',
@@ -15,7 +18,7 @@ export function UploadTracksButton() {
         '&:hover': { bgcolor: 'primary.dark' },
       }}
     >
-      Загрузить
+      {user ? 'Загрузить' : 'Войти для загрузки'}
     </Button>
   )
 }
