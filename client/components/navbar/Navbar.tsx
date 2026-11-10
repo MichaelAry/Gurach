@@ -1,37 +1,45 @@
 'use client'
 
-import { Box } from '@mui/material'
+import { Paper } from '@mui/material'
+import { usePathname } from 'next/navigation'
+import { Suspense } from 'react'
 import { NavbarItem } from './NavbarItem'
-import { useHoveredIndex } from './hooks/useHoveredIndex'
 import { trackStructure } from './trackStructure'
 
-export const Navbar = () => {
-  const { hoveredIdx, onEnter, onLeave } = useHoveredIndex()
+function NavigationLinks() {
+  const pathname = usePathname()
 
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '3px',
-        alignItems: 'flex-end',
-        perspective: '800px',
-        transformStyle: 'preserve-3d',
-        userSelect: 'none',
-      }}
-    >
-      {trackStructure.map((item, idx) => (
-        <NavbarItem
-          key={item.id}
-          item={item}
-          idx={idx}
-          hoveredIdx={hoveredIdx}
-          onEnter={onEnter}
-          onLeave={onLeave}
-        />
-      ))}
-    </Box>
-  )
+  return trackStructure
+    .filter((item) => item.isAnchor)
+    .map((item) => (
+      <NavbarItem
+        key={item.id}
+        item={item}
+        active={
+          pathname === item.href ||
+          (item.href !== '/' && !!item.href && pathname.startsWith(`${item.href}/`))
+        }
+      />
+    ))
 }
+
+export const Navbar = () => (
+  <Paper
+    component="nav"
+    aria-label="Main navigation"
+    variant="outlined"
+    sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 0.5,
+      p: 0.5,
+      borderRadius: 3,
+    }}
+  >
+    <Suspense fallback={null}>
+      <NavigationLinks />
+    </Suspense>
+  </Paper>
+)
 
 export default Navbar

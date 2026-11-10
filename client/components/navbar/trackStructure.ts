@@ -22,6 +22,5 @@ export function buildTrackStructure(sections: Section[]): TrackItem[] {
 export const trackStructure: TrackItem[] = buildTrackStructure([
   { label: 'Main', href: '/', trackCount: 14 },
   { label: 'All tracks', href: '/tracks', trackCount: 20 },
-  // сюда добавляешь новые секции одной строкой:
-  // { label: 'Favorites', href: '#favorites', trackCount: 8 },
+  { label: 'Избранное', href: '/favorites', trackCount: 8 },
 ])

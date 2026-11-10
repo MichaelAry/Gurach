@@ -1,7 +1,6 @@
 // theme/AppThemeProvider.tsx
 'use client'
 
-import { ListenCountsProvider } from '@/features/tracks/components/ListenCountsProvider'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { theme } from './index'
 
@@ -17,17 +16,12 @@ import { theme } from './index'
  * Серверный layout рендерит <AppThemeProvider>{children}</AppThemeProvider>
  * (см. app/layout.tsx) — children остаются серверными компонентами.
  *
- * Сюда же добавлен ListenCountsProvider — клиентский стор счётчиков
- * прослушиваний. Он должен быть выше TrackRow / PlayButton, но ниже
- * ThemeProvider (компоненты MUI внутри стора не рендерятся, но пусть
- * будет по правилам). PlayerProvider может жить и ниже — главное, чтобы
- * ListenCountsProvider был выше тех, кто вызывает useBumpListen().
  */
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <ListenCountsProvider>{children}</ListenCountsProvider>
+      {children}
     </ThemeProvider>
   )
 }
