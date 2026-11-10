@@ -1,38 +1,19 @@
-// features/tracks/api/getTrack.ts
-import type { ITrack } from '@/types/track'
-import { cacheLife } from 'next/cache'
+import { fetchBackend, backendErrorFrom } from '@/lib/server/backend'
+import type { TrackDetail } from '../types'
+import { cacheLife, cacheTag } from 'next/cache'
 
-const API_URL = process.env.API_URL ?? 'http://localhost:5000'
-
-/**
- * Возвращает трек по id или null, если не найден.
- *
- * Кэшируется на уровне Next.js через директиву `'use cache'`.
- * `cacheLife('minutes')` — ближайший аналог старого `revalidate: 60`.
- * Доступные пресеты: 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks' | 'max'.
- * Кастомный профиль: cacheLife({ revalidate: 60, expire: 3600 }).
- *
- * Если бэкенд недоступен, возвращает null.
- */
-export async function getTrack(id: string): Promise<ITrack | null> {
+/** Only genuine missing resources become null; outages reach the error boundary. */
+export async function getTrack(id: string): Promise<TrackDetail | null> {
   'use cache'
   cacheLife('minutes')
+  cacheTag(`track:${id}`)
 
-  try {
-    const res = await fetch(`${API_URL}/tracks/${id}`)
-
-    if (res.status === 404) return null
-    if (!res.ok) {
-      console.error(`[getTrack] Upstream error: ${res.status}`)
-      return null
-    }
-
-    const track: ITrack = await res.json()
-    // Сервер отдаёт `_id` — раньше здесь была проверка `track?._id`,
-    // из-за которой даже найденный трек превращался в null (404).
-    return track ?? null
-  } catch (error) {
-    console.error('[getTrack] Fetch failed:', error)
-    return null
+  if (!/^[a-f\d]{24}$/i.test(id)) return null
+  const response = await fetchBackend(`/tracks/${encodeURIComponent(id)}`)
+  if (!response.ok) {
+    const error = await backendErrorFrom(response)
+    if (response.status === 404 && error.apiError?.code === 'NOT_FOUND') return null
+    throw error
   }
+  return response.json() as Promise<TrackDetail>
 }
