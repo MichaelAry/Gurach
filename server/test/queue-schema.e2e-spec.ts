@@ -1,0 +1,21 @@
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import { MongoClient, ObjectId } from 'mongodb';
+import { assertIsolatedTestDatabase } from '../src/common/test-database.js';
+import { queueIndexesMigration } from '../src/scripts/migrations/006-queue-indexes.js';
+const uri = process.env.MONGODB_URI!;
+const name = new URL(uri).pathname.slice(1);
+assertIsolatedTestDatabase(name);
+const client = new MongoClient(uri);
+const db = client.db(name);
+const userId = new ObjectId();
+beforeAll(async () => { await client.connect(); });
+afterAll(async () => { await db.collection('queues').deleteMany({ userId }); await client.close(); });
+it('installs the unique queue owner index idempotently without backfill', async () => {
+  const before = await db.collection('queues').countDocuments();
+  await queueIndexesMigration.finalize!(db);
+  await queueIndexesMigration.finalize!(db);
+  expect((await queueIndexesMigration.verify(db, 100)).issueCount).toBe(0);
+  expect(await db.collection('queues').countDocuments()).toBe(before);
+  await db.collection('queues').insertOne({ userId, revision: 0, entries: [] });
+  await expect(db.collection('queues').insertOne({ userId, revision: 0, entries: [] })).rejects.toMatchObject({ code: 11000 });
+});

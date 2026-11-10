@@ -1,0 +1,31 @@
+import { expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import mongoose, { Types } from 'mongoose';
+import { QueueWriteDto } from './dto/queue-write.dto.js';
+import { QueueSchema } from './schemas/queue.schema.js';
+import { assertQueueWrite } from './queue-policy.js';
+import { emptyQueue } from './dto/queue-response.dto.js';
+const model = mongoose.model('QueuePolicyTest', QueueSchema);
+const trackId = new Types.ObjectId().toHexString();
+it.each([0, 1, 99, 100, 101])('enforces capacity %s in DTO and schema, allowing distinct occurrences of the same track', async (count) => {
+  const entries = Array.from({ length: count }, () => ({ entryId: randomUUID(), trackId }));
+  const dto = plainToInstance(QueueWriteDto, { expectedRevision: 0, mutationId: randomUUID(), entries });
+  expect((await validate(dto)).length === 0).toBe(count <= 100);
+  const row = new model({ userId: new Types.ObjectId(), entries: entries.map((entry) => ({ ...entry, display: { name: 'Snapshot', artist: null } })) });
+  const schemaValid = await row.validate().then(() => true, () => false);
+  expect(schemaValid).toBe(count <= 100);
+  if (count <= 100) expect(() => assertQueueWrite(dto)).not.toThrow();
+  else expect(() => assertQueueWrite(dto)).toThrow();
+});
+it('rejects colliding entry IDs and unsafe revisions and returns a virtual empty queue', async () => {
+  const entry = { entryId: randomUUID(), trackId };
+  const dto = plainToInstance(QueueWriteDto, { expectedRevision: Number.MAX_SAFE_INTEGER + 1, mutationId: randomUUID(), entries: [entry, { ...entry, entryId: entry.entryId.toUpperCase() }] });
+  expect((await validate(dto)).length).toBeGreaterThan(0);
+  expect(() => assertQueueWrite(dto)).toThrow();
+  const duplicate = new model({ userId: new Types.ObjectId(), entries: [entry, entry].map((value) => ({ ...value, display: { name: 'Snapshot', artist: null } })) });
+  await expect(duplicate.validate()).rejects.toThrow();
+  expect(emptyQueue()).toEqual({ capacity: 100, revision: 0, entries: [], updatedAt: null });
+  expect(Object.hasOwn(dto, 'userId')).toBe(false);
+});
