@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Install, static checks, tests and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - name: Install independent packages
+        run: |
+          npm ci --prefix client
+          npm ci --prefix server
+      - name: Install ffprobe for media validation tests
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg
+      - name: Client checks
+        env:
+          API_URL: http://127.0.0.1:5000
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: |
+          npm test --prefix client
+          npm run typecheck --prefix client
+          npm run lint --prefix client
+          npm run build --prefix client
+      - name: Server checks
+        run: |
+          npm test --prefix server
+          npm run typecheck --prefix server
+          npm run tools:check-config --prefix server
+          npm run lint --prefix server
+          npm run build --prefix server
+          npm run contracts:check --prefix server
+
+  integration:
+    name: Authenticated Mongo replica-set integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg
+      - run: npm run test:isolated --prefix server
+
+  browser:
+    name: Playwright browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci --prefix client
+      - name: Install Playwright Chromium and OS dependencies
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke against fixture API
+        env:
+          CI: '1'
+        working-directory: client
+        run: npm run test:e2e
+      - name: Upload sanitized Playwright failure context
+        if: failure() && !cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-failure-context
+          path: client/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
