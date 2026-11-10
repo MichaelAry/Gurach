@@ -1,0 +1,2614 @@
+{
+  "schemaVersion": 1,
+  "plan": "../implementation-plan.md",
+  "entrypoint": "START-HERE.md",
+  "initializedAt": "2026-11-08",
+  "status": "completed",
+  "currentStep": null,
+  "nextStep": null,
+  "executionRunId": "p1-2026-11-08",
+  "baselineArtifact": "baseline.md; private evidence in .local/execution/p0/restart/",
+  "blockers": [],
+  "decisions": [],
+  "phases": [
+    {
+      "id": "P0",
+      "runbook": "P0-baseline.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P0.1",
+          "title": "Preserve and inventory",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [
+            "../../.local/execution/p0/restart/"
+          ],
+          "notes": [
+            "Captured starting revision, branch, tracked diff, untracked path inventory and private before-image before making P0 artifacts. Root .gitignore now narrowly excludes .local/."
+          ]
+        },
+        {
+          "id": "P0.2",
+          "title": "Runtime and dependency map",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [
+            "../baseline.md"
+          ],
+          "notes": [
+            "Recorded Node/npm/Docker versions, package-local dependency resolution, tracked node_modules count, container/image/volume topology and static size. Four root dependency edits are local Console Ninja instrumentation, not intended project patches."
+          ]
+        },
+        {
+          "id": "P0.3",
+          "title": "Baseline checks",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [
+            {
+              "command": "npm run lint --prefix server",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build --prefix server",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test --prefix server",
+              "cwd": ".",
+              "result": "pass: 1 file, 11 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint --prefix client",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "./node_modules/.bin/tsc --noEmit --incremental false",
+              "cwd": "client/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "API_URL=http://127.0.0.1:59999 npm run build",
+              "cwd": "client/",
+              "result": "fail: Turbopack could not open local port; security advisories reported",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            "../baseline.md"
+          ],
+          "notes": [
+            "Server lint/build passed; Vitest passed 1 file/11 tests; client lint and TypeScript passed. Next production build reproduced Turbopack local-port permission failure. Build also reports official Next security advisories; P2 must update to currently fixed compatible release and recheck."
+          ]
+        },
+        {
+          "id": "P0.4",
+          "title": "Data audit and recovery rehearsal",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [
+            "../../.local/execution/p0/restart/"
+          ],
+          "notes": [
+            "Mongo archive and static media archive checksums pass. Restored nest tracks/comments into an isolated disposable container; counts match (106/0), restore failures 0. Read-only audit found 106 tracks, 0 comments, 5 missing optional audio, 5 missing optional pictures, all 202 referenced media files present, 0 unreferenced files. Original volume unchanged."
+          ]
+        },
+        {
+          "id": "P0.5",
+          "title": "Baseline gate",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [
+            "baseline.md"
+          ],
+          "notes": [
+            "Inventoried getTracks/ITrack/API/comment/FileService/player callers using rg. Baseline findings and next step P1.1 recorded."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P1",
+      "runbook": "P1-pagination.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P1.1",
+          "title": "DTO and cursor helpers",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/common/cursor.ts",
+            "server/src/common/cursor.spec.ts",
+            "server/src/track/dto/list-tracks-query.dto.ts"
+          ],
+          "checks": [
+            {
+              "command": "npm run test --prefix server",
+              "cwd": ".",
+              "result": "pass: cursor parsing/encoding tests included; 2 files, 21 tests total",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Strict count/cursor parsing rejects repeated values, malformed/oversized cursor, unsupported offset and unknown params before service access. Cursor helpers are framework-independent and accept only canonical base64url JSON v1 with a lowercase ObjectId."
+          ]
+        },
+        {
+          "id": "P1.2",
+          "title": "Backend page and mapper",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/track/track.controller.ts",
+            "server/src/track/track.service.ts",
+            "server/src/track/track.service.spec.ts",
+            "server/src/track/mappers/track.mapper.ts"
+          ],
+          "checks": [
+            {
+              "command": "npm run test --prefix server",
+              "cwd": ".",
+              "result": "pass: 2 files, 21 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint --prefix server",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build --prefix server",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "HTTP API traversal against isolated Mongo fixture (count=1,20,21,40,41)",
+              "cwd": ".",
+              "result": "pass: 41 static IDs returned exactly once for each page size; malformed count/cursor, repeated count and offset returned 400",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            "Temporary isolated Mongo container gurach-p1-mongo; removed after P1 verification"
+          ],
+          "notes": [
+            "List query uses projection, _id ascending and _id > cursor with count+1; no comments/lyrics/populate. Deleting the cursor-boundary record and requesting the next page returned the following ID."
+          ]
+        },
+        {
+          "id": "P1.3",
+          "title": "Client reads and proxy",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/tracks/api/getTracksPage.ts",
+            "client/app/api/tracks/route.ts",
+            "client/app/(main)/tracks/page.tsx",
+            "client/features/tracks/types.ts",
+            "client/components/player/PlayerProvider.tsx",
+            "client/package.json",
+            "client/package-lock.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run lint && ./node_modules/.bin/tsc --noEmit --incremental false",
+              "cwd": "client/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "API_URL=http://127.0.0.1:59999 npm run build",
+              "cwd": "client/",
+              "result": "pass with unreachable API; /tracks rendered request-time under Suspense",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Cached page function keys on count/cursor and is called only after connection() in the page. Proxy forwards only count/cursor, preserving duplicate values for strict backend rejection. Removed the unused array API export. Next 16.4.0 blocked dev startup on an official security advisory; pulled forward the minimal P2.2 security repair to Next and eslint-config-next 16.4.5 after peer/engine verification."
+          ]
+        },
+        {
+          "id": "P1.4",
+          "title": "Catalogue UI",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/tracks/components/TracksCatalogue.tsx",
+            "client/features/tracks/hooks/useTrackPages.ts",
+            "client/features/tracks/components/TrackList.tsx",
+            "client/features/tracks/components/TrackRow.tsx",
+            "client/features/tracks/components/PlayButton.tsx",
+            "client/.gitignore"
+          ],
+          "checks": [
+            {
+              "command": "API_URL=http://127.0.0.1:5301 npm run test:e2e",
+              "cwd": "client/",
+              "result": "pass: 1 Playwright test (executed in official Playwright container against isolated API/Mongo fixture)",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Catalogue appends pages once by ID, guards duplicate in-flight requests and aborts on unmount. Rows/cursor remain on failure and retry is keyboard-operable. Empty, loading, retry and terminal states have Russian text. Test output directories are ignored."
+          ]
+        },
+        {
+          "id": "P1.5",
+          "title": "Temporary player compatibility",
+          "status": "verified",
+          "changedFiles": [
+            "client/components/player/PlayerProvider.tsx",
+            "client/features/tracks/components/TrackList.tsx",
+            "client/features/tracks/components/PlayButton.tsx"
+          ],
+          "checks": [
+            {
+              "command": "API_URL=http://127.0.0.1:5301 npm run test:e2e",
+              "cwd": "client/",
+              "result": "pass: browser confirmed a 100-entry snapshot, a late-track snapshot containing the selected track, and unchanged audio/queue after loading another page",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Catalogue queue snapshots begin at the selected row and are capped at 100; detail selection narrows to one track even if already current. Additional pages do not mutate the snapshot or current source."
+          ]
+        },
+        {
+          "id": "P1.6",
+          "title": "Verification and checkpoint",
+          "status": "verified",
+          "changedFiles": [
+            "client/playwright.config.ts",
+            "client/tests/e2e/catalogue.spec.ts",
+            "client/package.json",
+            "client/package-lock.json",
+            "client/.gitignore"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:e2e",
+              "cwd": "client/",
+              "result": "pass: 1 browser test, 121 real API fixture tracks; executed inside mcr.microsoft.com/playwright:v1.65.0-noble because host is missing libnspr4",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint && ./node_modules/.bin/tsc --noEmit --incremental false",
+              "cwd": "client/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "API_URL=http://127.0.0.1:59999 npm run build",
+              "cwd": "client/",
+              "result": "pass without API service",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test --prefix server && npm run lint --prefix server && npm run build --prefix server",
+              "cwd": ".",
+              "result": "pass: 21 tests, lint and build",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "No migration or developer-database writes. P1 security startup repair was pulled forward from P2.2 solely because Next 16.4.0 stopped the required browser/dev server command. Host Chromium is missing libnspr4, so browser verification used the official Playwright container."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "runbook": "P2-reproducibility.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P2.1",
+          "title": "Preserve dependency behavior",
+          "status": "verified",
+          "changedFiles": [
+            "docs/execution/baseline.md"
+          ],
+          "checks": [
+            {
+              "command": "git diff -- node_modules/@nestjs/core/index.js node_modules/next/dist/build/webpack/loaders/next-swc-loader.js node_modules/next/dist/compiled/webpack/bundle5.js node_modules/next/dist/server/lib/start-server.js",
+              "cwd": ".",
+              "result": "pass: all four diffs are Console Ninja hook/checksum or generated comments only",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "require.resolve checks from root, server/ and client/",
+              "cwd": ".",
+              "result": "pass: apps resolve package-local copies; root modified files are not used",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Root tracked dependency edits are accidental VSCodium Console Ninja instrumentation. Root versions: @nestjs/core 12.1.0 and next 16.4.1; server resolves server/node_modules/@nestjs/core 12.1.0 and client resolves client/node_modules/next 16.4.5. No product patch is required; original working files remain untouched."
+          ]
+        },
+        {
+          "id": "P2.2",
+          "title": "Package layout and scripts",
+          "status": "verified",
+          "changedFiles": [
+            ".node-version",
+            "server/package.json",
+            "server/package-lock.json",
+            "server/tsconfig.tools.json",
+            "server/src/scripts/check-config.ts",
+            "server/.gitignore",
+            "server/vitest.config.ts",
+            "server/vitest.config.e2e.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "client/package.json",
+            "client/package-lock.json",
+            "client/vitest.config.mts",
+            "client/features/tracks/utils/trackQueue.ts",
+            "client/features/tracks/utils/trackQueue.test.ts",
+            "client/features/tracks/components/TrackList.tsx",
+            "docs/execution/baseline.md",
+            "node_modules/ (index removals only)"
+          ],
+          "checks": [
+            {
+              "command": "node --version; npm --version",
+              "cwd": ".",
+              "result": "pass: v24.21.0 / 11.19.0; both package locks carry matching engines",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run lint",
+              "cwd": "client/",
+              "result": "pass: 3 unit tests, typecheck and lint",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test && npm run typecheck && npm run tools:check-config && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 21 unit tests, typecheck, compile/run safe config tool, lint and build",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "MONGODB_URI=mongodb://127.0.0.1:27029/gurach_test_p2_20261108 npm run test:integration",
+              "cwd": "server/",
+              "result": "pass: 8 API/Mongo integration tests; DB records verified cleaned to zero",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git ls-files dependency/generated path audit",
+              "cwd": ".",
+              "result": "pass: 0 tracked node_modules/dist/build/.next/.tools/coverage/test output/TypeScript build artifacts",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --cached --check && git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            ".local/execution/p2/root-node_modules-index.zlist"
+          ],
+          "notes": [
+            "Added independent client/server typecheck, test, integration and tool-build commands plus pinned Node/npm engines. Server integration tests refuse non-gurach_test_* databases. Removed exactly 16,275 inspected root node_modules paths from the Git index; installed files remain on disk and are ignored. P0 inventory shows these root files were already tracked; package-local dependency installs were preserved."
+          ]
+        },
+        {
+          "id": "P2.3",
+          "title": "Local replica set and env",
+          "status": "verified",
+          "changedFiles": [
+            ".env.example",
+            "server/.env.example",
+            "server/src/common/env-validation.ts",
+            "server/src/common/env-validation.spec.ts",
+            "server/src/common/env.ts",
+            "client/config/env.ts",
+            "client/config/url.ts",
+            "client/config/url.test.ts",
+            "client/vitest.config.mts",
+            "server/src/health/health.controller.ts",
+            "server/src/health/health.module.ts",
+            "server/src/app.module.ts",
+            "server/src/main.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "docs/execution/baseline.md"
+          ],
+          "checks": [
+            {
+              "command": "npm test && npm run typecheck && npm run tools:check-config && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 30 unit tests, typecheck/config tool/lint/build",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run lint",
+              "cwd": "client/",
+              "result": "pass: 8 unit tests, typecheck/lint",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "MONGODB_URI=mongodb://127.0.0.1:27029/gurach_test_p2_20261108 npm run test:integration",
+              "cwd": "server/",
+              "result": "pass: 9 API/Mongo tests including liveness and readiness; disposable Mongo container removed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "node scripts/dev-db.mjs down && node scripts/dev-db.mjs up; app-authenticated count probe",
+              "cwd": ".",
+              "result": "pass: restart preserved 106 tracks/0 comments; rs0 primary and transaction commit verified",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "PORT=0 node .tools/src/scripts/check-config.js",
+              "cwd": "server/",
+              "result": "pass: invalid port fails fast with safe validation error",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check && git diff --cached --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            ".local/mongo/ (private, ignored)",
+            ".local/execution/p0/restart/mongodb.archive"
+          ],
+          "notes": [
+            "Dev compose uses isolated Compose project gurach-devdb, pinned P0 Mongo image digest, loopback-only host port 27028, persistent volume, keyfile-authenticated rs0, and a least-privilege gurach app user. Private credentials are generated once and never overwritten. The P0 archive restored 106 tracks/0 comments into the new volume.",
+            "Legacy my-app-mongodb and its original gurach_mongodb_data volume remain separate and intact. Never start docker-compose.dev.yml under project name gurach and never use down -v.",
+            "Readiness checks Mongo hello.isWritablePrimary. Startup errors are redacted. Host app URI and container-internal restore URI are distinct by design."
+          ]
+        },
+        {
+          "id": "P2.4",
+          "title": "Isolation and recovery tooling",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/common/test-database.ts",
+            "server/src/common/test-database.spec.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "scripts/test-db.mjs",
+            "server/package.json",
+            "scripts/dev-db.mjs",
+            "server/seed.sh",
+            "README.md",
+            "docs/execution/baseline.md"
+          ],
+          "checks": [
+            {
+              "command": "npm test && npm run typecheck && npm run lint && npm run build && npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 36 unit tests, typecheck, lint, build, 9 integration tests on an ephemeral Mongo; generated container removed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "node scripts/dev-db.mjs backup",
+              "cwd": ".",
+              "result": "pass: authenticated app-user dump created a private 30,393-byte archive (106 tracks, 0 comments), mode 0600",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "mongorestore into generated gurach_test_* on dev rs0; count and drop",
+              "cwd": ".",
+              "result": "pass: restore yielded 106 tracks/0 comments in the isolated test database; only that generated DB was dropped",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "bash -n server/seed.sh; seed with required file env omitted",
+              "cwd": ".",
+              "result": "pass: syntax valid; missing explicit COVER_PATH fails immediately without API calls",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "node --check scripts/test-db.mjs && node --check scripts/dev-db.mjs && git diff --check && git diff --cached --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            ".local/backups/gurach-2026-11-08T10-33-38.535Z.archive (private, ignored)"
+          ],
+          "notes": [
+            "Added an ephemeral isolated Mongo runner with a random loopback port, unique gurach_test_* database, pinned image and ownership label; it removes only its generated container even after integration failure. Direct integration tests enforce the shared name guard and never drop a database.",
+            "Seed now requires explicit media paths, supports API_URL/COUNT/REQUEST_DELAY_MS, caps at 100 records and defaults to 700ms between writes to remain below the 100/min global throttle.",
+            "Added private authenticated dev database backup and rehearsed restore from that archive into a random test database on rs0; verified counts then removed only that test database. Staging naming policy is gurach_staging_<name>; separate URI required.",
+            "README launch steps source app-scoped private URI, distinguish legacy source Mongo from the new dev topology, and document tests, seed, backup and restore boundaries."
+          ]
+        },
+        {
+          "id": "P2.5",
+          "title": "Fresh-install proof",
+          "status": "verified",
+          "changedFiles": [
+            "server/package.json",
+            "server/package-lock.json",
+            "client/package-lock.json",
+            "docs/execution/baseline.md"
+          ],
+          "checks": [
+            {
+              "command": "npm ci --prefix client && npm ci --prefix server in two independent snapshots",
+              "cwd": "/tmp/gurach-p2-final.DH0FNV/{a,b}",
+              "result": "pass: all four installs succeeded from clean source/lockfiles",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "client test/typecheck/lint/build and server test/typecheck/tools:check-config/lint/build in both snapshots",
+              "cwd": "/tmp/gurach-p2-final.DH0FNV/{a,b}",
+              "result": "pass: each snapshot builds; client 8 unit tests and server 36 unit tests pass in both",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "SHA-256 compare all paths in fresh-source-manifest-final.zlist",
+              "cwd": ".",
+              "result": "pass: 332 current source files match exactly; ignored secrets/dependencies/generated outputs excluded",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "module resolution checks and npm audit --omit=dev",
+              "cwd": "/tmp/gurach-p2-final.DH0FNV/a",
+              "result": "pass: modules resolve inside snapshot packages; production server audit has 0 advisories",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            ".local/execution/p2/fresh-source-manifest-final.zlist",
+            ".local/execution/p2/fresh-root-final.txt"
+          ],
+          "notes": [
+            "Five paths deleted in the working tree were excluded from snapshots; the other 332 source paths, including untracked intended code/docs, were captured.",
+            "npm audit surfaced 7 high server dependency advisories; semver-compatible updates fixed runtime packages and Vitest, resulting in zero production advisories. Remaining findings are dev-only and recorded in baseline.md; no force fix was used.",
+            "Fresh npm ci emits a development-tooling audit warning and an unapproved unrs-resolver install-script notice. Builds pass without invoking that script."
+          ]
+        },
+        {
+          "id": "P2.6",
+          "title": "CI",
+          "status": "verified",
+          "changedFiles": [
+            ".github/workflows/ci.yml",
+            "scripts/test-db.mjs",
+            "client/tests/e2e/api-fixture.mjs",
+            "client/playwright.config.ts",
+            "client/next.config.ts",
+            "client/.gitignore",
+            "client/eslint.config.mjs",
+            "README.md",
+            "docs/execution/baseline.md"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 9 integration tests on authenticated rs0; ephemeral Mongo and private temp root cleaned",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "docker run mcr.microsoft.com/playwright:v1.65.0-noble ... npm run test:e2e -- --output=/tmp/gurach-playwright-p2-final",
+              "cwd": ".",
+              "result": "pass: Chromium browser smoke 1/1 against fixture API and Next; used matching official Playwright container because host is missing libnspr4",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "client test/typecheck/lint/build and server test/typecheck/tools:check-config/lint/build",
+              "cwd": "client/ and server/",
+              "result": "pass: client 8 unit tests, server 36 unit tests; all static and build gates pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "YAML parse of .github/workflows/ci.yml",
+              "cwd": ".",
+              "result": "pass: three jobs (static, integration, browser) and expected triggers",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git ls-remote action release tags; official release records",
+              "cwd": ".",
+              "result": "pass: immutable commit pins match checkout v7.0.1, setup-node v7.1.0, upload-artifact v7.0.2",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check && git diff --cached --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "CI workflow pins verified upstream release commits, uses contents:read, and separates static/build, authenticated Mongo integration, and fixture-backed browser jobs. Failure artifacts are restricted to Playwright test-results with seven-day retention.",
+            "Authenticated isolated runner creates private random credentials/keyfile in a 0700 temp root, uses no persistent mount, binds Mongo to loopback, verifies rs0 primary, supplies app-scoped URI, and cleans only its owned container/temp root.",
+            "GitHub-hosted workflow has not been remotely triggered from this local checkout; remote status remains unverified."
+          ]
+        },
+        {
+          "id": "P2.7",
+          "title": "Checkpoint",
+          "status": "verified",
+          "changedFiles": [
+            "README.md",
+            "docs/execution/baseline.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "README command/config review; validate local invocation examples",
+              "cwd": ".",
+              "result": "pass: Node/npm, DB, integration/browser tests, seed, backup, rollback and migration cautions documented",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "final client tests/typecheck/lint/build; server tests/typecheck/config/lint/build",
+              "cwd": "client/ and server/",
+              "result": "pass: 8 client and 36 server unit tests; all static/build gates pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated; Playwright Chromium smoke in official container",
+              "cwd": "server/ and client/",
+              "result": "pass: 9 authenticated replica-set integration tests and 1 browser smoke test",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm audit --omit=dev --json",
+              "cwd": "server/",
+              "result": "pass: production dependency tree has 0 reported advisories; dev-tool findings are recorded in baseline.md",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check && git diff --cached --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            ".local/execution/p2/fresh-source-manifest-final.zlist (private execution evidence)"
+          ],
+          "notes": [
+            "P2.1–P2.7 verified. The source Mongo container and original gurach_mongodb_data volume remain intact; recommended dev replica set is separate and persistent.",
+            "P2.5 used two identical 332-source-file snapshots outside the checkout and fresh npm ci in both. Remote CI was not triggered from this local session.",
+            "Production server dependencies audit clean; residual findings are limited to development deployment/lint toolchains and documented for review."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "runbook": "P3-contracts.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P3.1",
+          "title": "Response DTOs and write validation",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/contracts/track.contract.ts",
+            "server/src/track/dto/track-validation.ts",
+            "server/src/track/dto/create-track.dto.ts",
+            "server/src/track/dto/create-track.dto.spec.ts",
+            "server/src/track/dto/create-comment.dto.ts",
+            "server/src/track/dto/create-comment.dto.spec.ts",
+            "server/src/common/api-json.util.ts",
+            "server/src/track/schemas/track.schema.ts",
+            "server/src/track/schemas/comment.schema.ts",
+            "server/src/track/mappers/track.mapper.ts",
+            "server/src/track/track.service.ts",
+            "server/test/tracks.pagination.e2e-spec.ts"
+          ],
+          "checks": [
+            {
+              "command": "npm test && npm run typecheck && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 50 unit tests; typecheck, lint and build clean",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 12 authenticated Mongo/HTTP integration tests including normalized list/detail/comment JSON, nullable fields, multipart transforms and invalid write boundaries",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check && git diff --cached --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added concrete server response classes for playable/list/detail/comment/page/listen/delete contracts. The list service now returns a TrackListPage/TrackListItem class instance; Mongoose JSON transforms normalize legacy track fields, map comment track_id to trackId and serialize dates as ISO strings.",
+            "Added optional ownerId/authorId schema fields but assigned neither before authentication work in P6.",
+            "Write DTOs trim required names and usernames, enforce track/artist/username/comment/lyrics limits, preserve nonblank comment text and exact lyrics formatting, and parse duration only from finite nonnegative decimal strings. ValidationPipe remains explicit with implicit conversion disabled.",
+            "Detail still includes its legacy populated comments during this step; P3.2 moves reads to a bounded separate call alongside mapper/query work, preserving compatibility until that migration."
+          ]
+        },
+        {
+          "id": "P3.2",
+          "title": "Mappers and query consistency",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/common/cursor.ts",
+            "server/src/track/dto/search-tracks-query.dto.ts",
+            "server/src/track/dto/list-comments-query.dto.ts",
+            "server/src/track/mappers/track.mapper.ts",
+            "server/src/track/track.service.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/common/api-json.util.ts",
+            "client/features/tracks/api/getTrackComments.ts",
+            "client/app/(main)/tracks/[id]/page.tsx",
+            "client/features/tracks/types.ts",
+            "client/types/track.ts",
+            "server/test/tracks.pagination.e2e-spec.ts"
+          ],
+          "checks": [
+            {
+              "command": "npm test && npm run typecheck && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 9 files, 61 unit tests; typecheck, lint, build passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 14 authenticated Mongo/HTTP integration tests covering mapped detail/comments, bounded comment pages, scoped search cursors, escaped filters and cursor-filter rejection",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run lint",
+              "cwd": "client/",
+              "result": "pass: 2 files, 8 unit tests; typecheck and lint passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "API_URL=http://127.0.0.1:59999 npm run build",
+              "cwd": "client/",
+              "result": "pass: production build completes with unreachable API; detail route streams comments independently",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Explicit mappers now cover list, search, create, detail and comment responses across lean and hydrated records. Removed the Mongoose public JSON transforms after routing endpoint outputs through these mappers. Search uses normalized bounded filters, escaped regexes, stable filter-hash scoped cursors and default ascending ObjectId order. Legacy comments are separately fetched in track-scoped bounded pages; detail no longer populates comments and the UI presents only the first page without suggesting its length is the total.",
+            "The catalogue transport type omits lyrics; the player accepts that optional field because it does not read lyrics. Integration tests confirm no raw comment IDs are exposed and filter-bound cursors cannot be reused across queries."
+          ]
+        },
+        {
+          "id": "P3.3",
+          "title": "Error boundary and request IDs",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/contracts/api-error.dto.ts",
+            "server/src/common/api-error.filter.ts",
+            "server/src/common/request-id.middleware.ts",
+            "server/src/common/env-validation.ts",
+            "server/src/main.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "client/lib/api/error.ts",
+            "client/lib/server/backend.ts",
+            "client/lib/server/api-error-response.ts",
+            "client/app/api/tracks/route.ts",
+            "client/app/api/tracks/[id]/route.ts",
+            "client/app/api/tracks/[id]/listen/route.ts",
+            "client/app/(main)/error.tsx",
+            "client/features/tracks/api/getTracksPage.ts",
+            "client/features/tracks/api/getTrack.ts",
+            "client/features/tracks/api/getTrackComments.ts",
+            "client/features/tracks/hooks/useTrackPages.ts",
+            "client/lib/api/error.test.ts",
+            "client/lib/server/backend.test.ts",
+            "client/vitest.config.mts"
+          ],
+          "checks": [
+            {
+              "command": "npm test && npm run typecheck && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 9 files, 61 unit tests; typecheck, lint and build passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 16 authenticated HTTP integration tests including validation/404/500 envelopes, request ID sanitization, field errors and diagnostics redaction",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run lint",
+              "cwd": "client/",
+              "result": "pass: 4 files, 13 unit tests; typecheck and lint passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "API_URL=http://127.0.0.1:59999 npm run build",
+              "cwd": "client/",
+              "result": "pass: production build completes with unreachable API",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Nest now emits {error:{code,message,fieldErrors?,requestId}} for HTTP exceptions, validation, Multer size limits, Mongoose validation/cast/duplicate-key errors and unexpected failures. Public internal-error messages are generic; structured private logs redact Mongo connection URIs and common secret assignments. Request IDs are accepted only when bounded and composed of safe ASCII characters; otherwise a UUID is generated and echoed in x-request-id. Existing Retry-After headers are retained.",
+            "The Next BFF forwards only content-type, accept and x-request-id, propagates the caller signal, enforces a 10-second timeout, keeps upstream 4xx envelopes/statuses and Retry-After, and returns stable BACKEND_UNAVAILABLE/ BACKEND_TIMEOUT envelopes for 502/504. Server readers decode the envelope; only a coded NOT_FOUND becomes null. UI failures show a safe request reference when available."
+          ]
+        },
+        {
+          "id": "P3.4",
+          "title": "Offline schema emission",
+          "status": "verified",
+          "changedFiles": [
+            "server/package.json",
+            "server/package-lock.json",
+            "server/src/contracts/track.contract.ts",
+            "server/src/contracts/api-error.dto.ts",
+            "server/src/contracts/api-controller.registry.ts",
+            "server/src/contracts/api-response.decorators.ts",
+            "server/src/contracts/document.module.ts",
+            "server/src/contracts/openapi-document.spec.ts",
+            "server/src/track/dto/create-track.dto.ts",
+            "server/src/track/dto/create-comment.dto.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/track/track.module.ts",
+            "server/src/health/health.controller.ts",
+            "server/src/health/health.module.ts",
+            "server/src/scripts/openapi.ts",
+            "server/openapi.json",
+            "client/package.json",
+            "client/package-lock.json"
+          ],
+          "checks": [
+            {
+              "command": "env -u MONGODB_URI -u MONGODB_HOST -u MONGODB_USER -u MONGODB_PASSWORD -u DATABASE_URL npm run openapi:generate",
+              "cwd": "server/",
+              "result": "pass: generated without database credentials or a Mongo connection; repeated output SHA-256 was identical",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npx --no-install openapi-typescript ../server/openapi.json --output /tmp/gurach-openapi-validation.d.ts",
+              "cwd": "client/",
+              "result": "pass: pinned openapi-typescript 7.9.1 parsed the emitted document independently",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run tools:build && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 10 files, 64 unit tests including OpenAPI structure/bounds; tool build, lint and production build passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 16 Mongo/HTTP integration tests; production modules still register real controllers and providers",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run lint",
+              "cwd": "client/",
+              "result": "pass: 4 files, 13 unit tests; typecheck and lint passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Pinned @nestjs/swagger 12.1.1 after verifying Nest 12 and TypeScript 6 peer compatibility; pinned openapi-typescript 7.9.1 in the TypeScript 5.9 client package. Feature modules and the document-only module consume the same controller registry. DocumentModule supplies inert TrackService/Connection tokens and imports no production AppModule, Mongoose connection module, or filesystem startup module.",
+            "The emitter sets development-safe placeholder env in its own process before dynamically importing controllers, creates but never listens on a Nest app, writes alphabetically key-sorted server/openapi.json with localhost-only server metadata, and closes the app. Structural tests cover route coverage, nullable transport properties, page/filter/cursor limits, multipart upload and error envelopes."
+          ]
+        },
+        {
+          "id": "P3.5",
+          "title": "Generation runtime schema verification and drift",
+          "status": "verified",
+          "changedFiles": [
+            "client/lib/api/schema.d.ts",
+            "client/features/tracks/types.ts",
+            "client/types/track.ts",
+            "client/features/tracks/api/getTrack.ts",
+            "client/features/tracks/api/getTrackComments.ts",
+            "client/features/tracks/api/getTracksPage.ts",
+            "client/features/tracks/hooks/useTrackPages.ts",
+            "client/features/tracks/components/TracksCatalogue.tsx",
+            "client/features/tracks/components/PlayTrackButton.tsx",
+            "client/scripts/check-api-contracts.mjs",
+            "client/scripts/check-api-contracts.test.ts",
+            "client/package.json",
+            "client/package-lock.json",
+            "server/scripts/check-contracts.mjs",
+            "server/package.json",
+            "server/package-lock.json",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            ".github/workflows/ci.yml"
+          ],
+          "checks": [
+            {
+              "command": "npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass: regenerated OpenAPI into a temp directory, normalized/compared it, regenerated client types into a temp directory and compared declarations",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run tools:build && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass: 10 files, 64 unit tests; typecheck, tool build, lint and production build passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 16 authenticated Mongo/HTTP integration tests; representative real list/detail/comment/400/404/500 responses validated against OpenAPI with openapi-response-validator 12.1.3",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run api:check && npm run typecheck && npm run lint && API_URL=http://127.0.0.1:59999 npm run build",
+              "cwd": "client/",
+              "result": "pass: 5 files, 14 unit tests including stale-type rejection; API drift check, typecheck, lint and production build passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Client transport aliases now derive from generated OpenAPI components; deleted handwritten ITrack/IComment transport definitions. PlayableTrack remains a UI/player alias. Generated declarations are type-only and Next production build confirms there is no runtime Nest/Mongoose import in browser code.",
+            "Pinned openapi-response-validator 12.1.3 as a server test dependency and validated actual HTTP response bodies against endpoint schemas. CI runs contracts:check; the check compares normalized temporary OpenAPI and generated declarations, and a client test proves stale declarations fail the gate."
+          ]
+        },
+        {
+          "id": "P3.6",
+          "title": "Migration framework and checkpoint",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/scripts/lib/migration-context.ts",
+            "server/src/scripts/lib/migration-context.spec.ts",
+            "server/src/scripts/lib/migration-journal.ts",
+            "server/src/scripts/lib/migration-runner.ts",
+            "server/src/scripts/migrations/registry.ts",
+            "server/src/scripts/migrate.ts",
+            "server/test/migrations.integration.e2e-spec.ts",
+            "server/package.json",
+            "server/package-lock.json",
+            "docs/execution/migrations.md"
+          ],
+          "checks": [
+            {
+              "command": "npm test",
+              "cwd": "server/",
+              "result": "pass: 11 files, 71 unit tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build",
+              "cwd": "server/",
+              "result": "pass: production build",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 18 integration tests, including migration dry-run, before-image journal, interruption/resume, checkpoint validation, idempotency and conflict detection",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass: tools build; OpenAPI and generated client types are in sync",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added compiled audit/plan/apply/verify tooling with bounded batches, a target-scoped journal, before-images, lease ownership, compare-and-set writes, checkpoint resume and verification of previously applied rows. The registry intentionally has no domain migrations until P4.",
+            "Apply requires --apply and an explicit gurach_test_* target. Reports are limited to files directly in .local/migration-private/ with owner-only directory/file permissions; existing reports are never overwritten. No developer database or persistent project data was migrated."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "runbook": "P4-files.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P4.1",
+          "title": "Policy staging and probe interfaces",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/file/file-policy.ts",
+            "server/src/file/file-policy.spec.ts",
+            "server/src/file/media-validator.service.ts",
+            "server/src/file/media-validator.service.spec.ts",
+            "server/src/file/staging.service.ts",
+            "server/src/file/staging.service.spec.ts",
+            "server/src/file/file.module.ts",
+            "server/src/common/env.ts",
+            "server/.env.example",
+            "server/package.json",
+            "server/package-lock.json",
+            ".github/workflows/ci.yml",
+            "docs/execution/P4-files.md"
+          ],
+          "checks": [
+            {
+              "command": "docker run --rm -v <workspace>:/workspace -w /workspace/server node:24-bookworm bash -lc \"apt-get update && apt-get install ffmpeg && npm test\"",
+              "cwd": ".",
+              "result": "pass: 14 files, 93 unit tests; generated fixture matrix covers MP3/WAV/OGG/OGA/M4A/AAC/FLAC, JPEG/PNG/WebP/AVIF/GIF, malformed/truncated/mismatched files, decoded pixel limits, fixed ffprobe arguments and output ceiling",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 18 authenticated Mongo/HTTP integration tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run contracts:check && git diff --check",
+              "cwd": "server/",
+              "result": "pass: OpenAPI and generated client types match; diff whitespace check clean",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Pinned direct server dependencies file-type 22.3.0 and sharp 0.35.5. Signature/extension checks ignore MIME headers; audio metadata requires validated ffprobe audio streams and allowed containers. Image validation decodes all pages with a 40M total-pixel ceiling and bounded page count.",
+            "ffprobe uses shell:false, local paths, protocol whitelist file, bounded analysis sizes, a 10-second timeout, 1 MiB output cap and two concurrent processes. FFPROBE_PATH is configurable; CI installs FFmpeg.",
+            "Staging creates exclusive owner-only operation directories/files outside STATIC_DIR. No request integration or public upload behavior changed in this step; P4.2 consumes the service."
+          ]
+        },
+        {
+          "id": "P4.2",
+          "title": "Multipart reception and disk adapter",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/file/file-policy.ts",
+            "server/src/file/staging.service.ts",
+            "server/src/file/upload-reservation.ts",
+            "server/src/file/upload-admission.service.ts",
+            "server/src/file/upload-admission.guard.ts",
+            "server/src/file/file.service.ts",
+            "server/src/track/upload-staging.interceptor.ts",
+            "server/src/track/upload-staging.interceptor.spec.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/track/track.module.ts",
+            "server/src/track/track.service.ts",
+            "server/src/common/api-error.filter.ts",
+            "server/src/contracts/document.module.ts",
+            "server/test/tracks.upload.integration.e2e-spec.ts",
+            "server/vitest.config.e2e.ts",
+            "server/package.json",
+            "server/package-lock.json",
+            "server/openapi.json",
+            "client/lib/api/schema.d.ts"
+          ],
+          "checks": [
+            {
+              "command": "npm run typecheck",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 21 tests across upload and pagination integration suites",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass: OpenAPI and generated client types match",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run src/track/upload-staging.interceptor.spec.ts src/file/staging.service.spec.ts src/file/file-policy.spec.ts",
+              "cwd": "server/",
+              "result": "pass: 11 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Multipart uploads reserve an operation and enforce admission before parsing. Multer streams to exclusive private staging files with per-kind byte caps, bounded fields/counts and exact file-field validation; Multer memory storage is no longer used.",
+            "A single interceptor cleanup path handles success, validation/Multer errors, request aborts, and disk failures; admission is released idempotently. Operation manifests are fsynced before request-body reception for crash reconciliation.",
+            "Published files use a private same-directory temporary file, copy+fsync, atomic no-overwrite link to UUID destination and directory fsync. /static serves published UUID media while staging remains outside STATIC_DIR.",
+            "Integration coverage verifies accepted files and static retrieval, invalid fields, oversized file/field, pre-body admission rejection, range/static behavior and cleanup. Test runs are serialized because they share isolated DB/media locations.",
+            "Legacy FileService buffer-based createFile API removed after confirming no production callers."
+          ]
+        },
+        {
+          "id": "P4.3",
+          "title": "Persistent operation model and migrations",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/track/schemas/track.schema.ts",
+            "server/src/maintenance/schemas/media-operation.schema.ts",
+            "server/src/maintenance/schemas/cache-event.schema.ts",
+            "server/src/scripts/migrations/001-track-lifecycle.ts",
+            "server/src/scripts/migrations/registry.ts",
+            "server/src/scripts/lib/migration-runner.ts",
+            "server/src/app.module.ts",
+            "server/test/track-lifecycle-migration.e2e-spec.ts",
+            "docs/execution/migrations.md",
+            "docs/execution/P4-files.md"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 22 Mongo integration tests across 4 files; migration interruption/resume/no-op and unhinted explain verified",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass: OpenAPI and generated client types match",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added Track lifecycle active/deleting/deleted with active as the default for new records; added separate MediaOperation and CacheEvent schemas with bounded metadata, state enums, retry/lease fields and named indexes.",
+            "Registered resumable 001-track-lifecycle. It only backfills missing lifecycle fields to active and retains full journaled before-images; filenames, IDs, existing lifecycle values and optional missing audio are preserved.",
+            "Migration finalization explicitly creates indexes from Mongoose schema declarations under the migration lease. Runtime Mongoose autoIndex is disabled. Verification checks lifecycle validity and required index names.",
+            "Isolated replica-set test forced interruption after document CAS, resumed the migration, verified before-images and unchanged references, confirmed an idempotent second pass, and proved the unhinted active lifecycle query selects track_lifecycle_id via explain.",
+            "Migration framework supports an optional idempotent finalize hook executed before the migration checkpoint is marked complete.",
+            "Migration was exercised only against disposable gurach_test_* databases; no developer database or persistent volume was changed."
+          ]
+        },
+        {
+          "id": "P4.4",
+          "title": "Upload commit protocol",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/file/file.service.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/track/track.module.ts",
+            "server/src/track/track.service.ts",
+            "server/src/maintenance/schemas/media-operation.schema.ts",
+            "server/test/tracks.upload.integration.e2e-spec.ts",
+            "docs/execution/P4-files.md"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 23 replica-set integration tests; verifies upload commit/outbox atomicity, cleanup intent after partial publish and rollback after injected transaction failure",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run src/track/track.service.spec.ts src/track/upload-staging.interceptor.spec.ts src/file/staging.service.spec.ts src/file/file-policy.spec.ts",
+              "cwd": "server/",
+              "result": "pass: 18 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run lint",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass: OpenAPI and generated client types match",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Track creation validates staged media, allocates Track ObjectId and both UUID keys, then durably inserts an uploading MediaOperation with relative stage directory and validated audio/image metadata before publishing either file.",
+            "The operation CAS-acquires a publication lease and moves to publishing. FileService now publishes to the preallocated exact target and refuses overwrite, allowing every possible published key to be reconciled from the durable intent.",
+            "A Mongo transaction contains only database operations: insert complete active Track, compare operationId/state/leaseToken while transitioning the operation to done, and insert a deterministic track.activated CacheEvent. No filesystem or media probe work is inside the transaction callback.",
+            "Publication/transaction failures transition the operation to cleanup with a retry timestamp and safe error code; published files are retained for recovery rather than unlinked outside the durable cleanup protocol.",
+            "Replica-set integration tests verify successful atomic data state, rollback when the outbox insert fails inside the transaction, and recoverable cleanup state after partial publication. Test-only fault injection uses dependency spies; no public request bypass was added."
+          ]
+        },
+        {
+          "id": "P4.5",
+          "title": "Delete and worker protocol",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/maintenance/maintenance.service.ts",
+            "server/src/maintenance/maintenance.module.ts",
+            "server/src/scripts/maintenance-once.ts",
+            "server/src/common/env.ts",
+            "server/src/app.module.ts",
+            "server/src/track/track.service.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/track/track.module.ts",
+            "server/src/contracts/track.contract.ts",
+            "server/src/track/track.service.spec.ts",
+            "server/test/tracks.upload.integration.e2e-spec.ts",
+            "server/package.json",
+            "server/.env.example",
+            "server/openapi.json",
+            "client/app/api/tracks/[id]/route.ts",
+            "client/lib/api/schema.d.ts",
+            "scripts/test-db.mjs",
+            "docs/execution/P4-files.md",
+            "docs/execution/migrations.md"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 25 Mongo replica-set integration tests covering tombstone idempotency, active-only reads, shared media, comment cleanup, one-worker lease claim, backoff retry, and upload transaction recovery",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run src/track/track.service.spec.ts src/track/upload-staging.interceptor.spec.ts src/file/staging.service.spec.ts src/file/file-policy.spec.ts",
+              "cwd": "server/",
+              "result": "pass: 18 unit tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build && npm run tools:build",
+              "cwd": "server/",
+              "result": "pass: Nest app and maintenance CLI compile",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run openapi:generate && npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass: generated OpenAPI and client API types match",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run api:check",
+              "cwd": "client/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "DELETE now returns HTTP 202 with a durable operation ID. One transaction changes Track active→deleting, creates/reuses the delete MediaOperation and writes the track.deleted CacheEvent. Repeated DELETE returns the same operation for deleting/deleted tombstones; unknown IDs remain 404.",
+            "Added periodic MaintenanceService and maintenance:once CLI using the same bounded runOnce path. Atomic findOneAndUpdate claim uses a 30-second lease and random fencing token; a 10-second heartbeat renews long work. Shutdown clears polling and awaits the in-flight run.",
+            "The worker deletes comments idempotently, protects keys referenced by another active track or uploading/publishing intent, and treats ENOENT as success. Final track tombstone and operation done transition commit together in Mongo; stale lease tokens cannot finalize.",
+            "Failures store a stable error code and retry timestamp with 5-second exponential backoff capped at five minutes. Unsafe legacy keys are never used as paths and remain for P4.7 reconciliation.",
+            "All track detail/list/search/listen/comment creation/comment listing paths require active lifecycle. Comment linking is conditional on lifecycle to close the race with deletion.",
+            "Next BFF now forwards DELETE and preserves the 202 status; OpenAPI and generated TypeScript API schema were refreshed.",
+            "Integration tests use a 60-second poll interval to keep worker race assertions deterministic; normal runtime default remains 5 seconds. Tests used only isolated disposable replica-set databases and test-generated files."
+          ]
+        },
+        {
+          "id": "P4.6",
+          "title": "Cache event delivery",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/common/env.ts",
+            "server/src/maintenance/cache-event-delivery.ts",
+            "server/src/maintenance/cache-event-delivery.spec.ts",
+            "server/src/maintenance/maintenance.service.ts",
+            "server/src/maintenance/maintenance.module.ts",
+            "server/.env.example",
+            "server/test/tracks.upload.integration.e2e-spec.ts",
+            "scripts/test-db.mjs",
+            "client/app/api/internal/cache-events/route.ts",
+            "client/app/api/internal/cache-events/route.test.ts",
+            "client/.env.example",
+            "docs/execution/P4-files.md",
+            "docs/execution/migrations.md"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 26 replica-set integration tests including cache-event outage/backoff/retry and delivered state after 2xx",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run src/maintenance/cache-event-delivery.spec.ts",
+              "cwd": "server/",
+              "result": "pass: 2 transport tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run app/api/internal/cache-events/route.test.ts",
+              "cwd": "client/",
+              "result": "pass: 4 handler tests for tag mapping, strict event validation, auth and bounded payloads",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run build && npm run tools:build && npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run api:check && npm run build",
+              "cwd": "client/",
+              "result": "pass: Next 16.4.5 production build includes dynamic /api/internal/cache-events route",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Next production runtime smoke: valid event and invalid secret",
+              "cwd": "client/",
+              "result": "pass: 202 and 401; exercised installed revalidateTag(tag, { expire: 0 }) inside real Route Handler",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "MaintenanceService claims pending CacheEvents with atomic 30-second lease/token, sends only {eventId,type,trackId} to a fixed CACHE_EVENT_URL, times out after 5 seconds and marks delivered only after 2xx. Outages persist safe error codes and use the same 5-second exponential retry capped at 5 minutes. Duplicate delivery is idempotent.",
+            "Production requires CACHE_EVENT_URL and a shared 32–256 character URL-safe CACHE_EVENT_SECRET. Both are provisioned privately to server and client; no secret is put in query/body/logs. Development may omit both, in which case delivery remains disabled and pending events are retained.",
+            "Next POST handler authenticates using fixed-size SHA-256 digests and timingSafeEqual, reads a maximum 4 KiB streaming JSON body, rejects extra keys/unknown types/invalid ObjectIds/IDs and returns no-store responses.",
+            "The handler derives tags from event type: activation expires tracks and track:<id>; deletion also expires track-comments:<id>. Installed Next 16.4.5 declares revalidateTag(tag, CacheLifeConfig); expire:0 was exercised in a production Route Handler and returned 202.",
+            "The handler never accepts caller-selected tags, paths, URLs or cache profiles. Callback event IDs are constrained to the server-generated activation/deletion formats.",
+            "Disposable integration tests use a synthetic secret, invalid test hostname and stubbed fetch. Production runtime smoke used only a synthetic local secret on an isolated local port; no user credentials or external services were used."
+          ]
+        },
+        {
+          "id": "P4.7",
+          "title": "Reconciliation and CLI",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/scripts/media-reconcile.ts",
+            "server/src/scripts/migrate.ts",
+            "server/src/scripts/lib/migration-context.ts",
+            "server/src/scripts/lib/migration-context.spec.ts",
+            "server/src/scripts/lib/migration-runner.ts",
+            "server/src/scripts/lib/migration-journal.ts",
+            "server/src/scripts/migrations/001-track-lifecycle.ts",
+            "server/test/track-lifecycle-migration.e2e-spec.ts",
+            "server/package.json",
+            "docs/execution/P4-files.md",
+            "docs/execution/migrations.md"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 26 replica-set integration tests including evidence-gated lifecycle rollback and deleted-record protection",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run src/scripts/lib/migration-context.spec.ts",
+              "cwd": "server/",
+              "result": "pass: 8 migration CLI safety tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build && npm run typecheck && npm run lint && git diff --check",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added media:reconcile CLI with private dry-run reports, 24-hour UUID orphan detection, active missing media, shared keys, unpublished allocations, staging ages, and temporary publish files. Apply is restricted to gurach_test_* and requires the reviewed target fingerprint; it rechecks DB references and file identity, then quarantines using no-follow exclusive copy, fsync, SHA-256 verification, and a durable restore journal.",
+            "Added db:migrate:rollback, dry-run by default and isolated-test-only for apply. 001-track-lifecycle rollback restores only the prior absence of lifecycle when the journal matches, current lifecycle is still active, and every originally referenced media file exists as a safe regular UUID file. It uses CAS, skips changed/deleted/missing-media rows, never sets active, records rolledBack outcomes, and makes the migration journal terminal. maintenance:once remains the existing P4.5 run-once path."
+          ]
+        },
+        {
+          "id": "P4.8",
+          "title": "Verification and checkpoint",
+          "status": "verified",
+          "changedFiles": [
+            "README.md",
+            "server/.env.example",
+            "server/test/tracks.upload.integration.e2e-spec.ts",
+            "docs/execution/P4-files.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "docker run --rm mcr.microsoft.com/playwright:v1.65.0-noble; apt install ffmpeg; npm test",
+              "cwd": "server/",
+              "result": "pass: 16 files, 101 unit tests; used an ephemeral container because host ffmpeg/ffprobe are absent",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 4 files, 27 replica-set integration tests including static Range 206 and private staging 404",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run build && npm run tools:check-config && npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test && npm run typecheck && npm run lint && npm run api:check && API_URL=http://127.0.0.1:59999 NEXT_TELEMETRY_DISABLED=1 npm run build",
+              "cwd": "client/",
+              "result": "pass: 18 unit tests plus typecheck, lint, API contract check and production build",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "docker run --rm mcr.microsoft.com/playwright:v1.65.0-noble npm run test:e2e -- --output /tmp/gurach-p4-playwright",
+              "cwd": "client/",
+              "result": "pass: 1 Playwright catalogue/player browser smoke",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": ".",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added HTTP smoke coverage for uploaded public audio Range requests (206 and four-byte response) and attempted access to a private staged upload through /static (404). Existing validator tests cover generated audio/image format metadata and malformed inputs.",
+            "Documented FFmpeg/ffprobe runtime requirements, MEDIA_STAGING_DIR isolation, media policy, maintenance/reconciliation and consistent Mongo + static-media backup/restore boundaries. The dev DB backup command is Mongo-only; media backup remains an operator step.",
+            "Host Playwright could not launch Chromium because libnspr4 is absent; the same browser suite passed in the project Playwright container. Host server unit tests likewise lack ffmpeg/ffprobe; all 101 passed in an ephemeral Playwright container after installing ffmpeg there. No system packages were installed on the host."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P5",
+      "runbook": "P5-comments.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P5.1",
+          "title": "Audit and reconciliation rules",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/scripts/migrations/002-comment-parents.ts",
+            "server/src/scripts/migrations/registry.ts",
+            "server/src/scripts/lib/migration-runner.ts",
+            "server/src/scripts/lib/migration-context.ts",
+            "server/src/scripts/lib/migration-context.spec.ts",
+            "server/src/track/schemas/comment.schema.ts",
+            "server/src/track/track.service.ts",
+            "server/test/comment-parents-migration.e2e-spec.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 5 files, 28 replica-set integration tests; 002 fixtures cover authoritative, disagreement, unique repair, missing/multiple parents, dangling/malformed reverse refs, reversible quarantine copy and no-op rerun",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "docker run --rm mcr.microsoft.com/playwright:v1.65.0-noble; apt install ffmpeg; npm test",
+              "cwd": "server/",
+              "result": "pass: 16 files, 102 unit tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm test -- --run src/scripts/lib/migration-context.spec.ts",
+              "cwd": "server/",
+              "result": "pass: 9 CLI safety tests, including private comment audit report requirement",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build && npm run typecheck && npm run lint && npm run build && npm run contracts:check && git diff --check",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Registered resumable 002-comment-parents. Dry-run classifies every comment and every reverse-array entry, with full per-ID classification only in owner-only --report output; stdout is counts/checksums and no comment text. Valid existing track_id remains authoritative across reverse disagreement; valid string ObjectIds are normalized, missing/invalid parents are repaired only with one valid reverse candidate, and zero/multiple candidates are unresolved.",
+            "Migration journals full before-images. Unresolved comments are marked with a hidden migration quarantine marker/reason, copied idempotently to comment_quarantine under a unique migrationId+originalId index, and copy-checksummed before migration completion. Normal comment listing and individual deletion exclude marked records; no rows or text/rating/username/timestamps are dropped or rewritten. Integration fixture confirms dry-run is read-only, quarantine is reversible, verification is clean and a second apply is a no-op.",
+            "No apply was made to the original developer database. P5.2 remains responsible for the dedicated Comment module/schema location and query index work."
+          ]
+        },
+        {
+          "id": "P5.2",
+          "title": "Expand schema index and tools",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/comment/schemas/comment.schema.ts",
+            "server/src/track/track.module.ts",
+            "server/src/track/track.service.ts",
+            "server/src/track/track.service.spec.ts",
+            "server/src/maintenance/maintenance.module.ts",
+            "server/src/maintenance/maintenance.service.ts",
+            "server/src/scripts/migrations/002-comment-parents.ts",
+            "server/test/comment-parents-migration.e2e-spec.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "scripts/test-db.mjs",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 5 files, 28 replica-set integration tests; includes mongodump/restore of fixture tracks/comments, interrupted migration resume, index verification and second no-op",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "docker run --rm mcr.microsoft.com/playwright:v1.65.0-noble; apt install ffmpeg; npm test",
+              "cwd": "server/",
+              "result": "pass: 16 files, 102 unit tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run tools:build && npm run typecheck && npm run lint && npm run build && npm run contracts:check && git diff --check",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Moved the shared Mongoose Comment model to server/src/comment/schemas/comment.schema.ts and updated Track/Maintenance registrations and imports. Stored track_id, username, optional authorId/rating, timestamps and hidden migration quarantine marker/reason are preserved; no CommentModule extraction yet (P5.3).",
+            "Migration 002 installs and verifies named {track_id:1,_id:1} and unique quarantine indexes. Verification checks all unmarked comments point to an existing parent and each marker has its checksummed before-image copy. The integration fixture confirms all comments remain, unresolved text is retained, the schema index exists, and the second pass does no work.",
+            "Extended test:isolated with synthetic root-only test connection metadata, used a mode-0600 temporary Mongo tools config, dumped fixture tracks/comments from the disposable container, restored into a separately named gurach_test_* database, checked counts and absent timestamps, then dropped only that generated restore DB. No developer database or credentials were used."
+          ]
+        },
+        {
+          "id": "P5.3",
+          "title": "Module and API extraction",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/comment/comment.module.ts",
+            "server/src/comment/comment.controller.ts",
+            "server/src/comment/comment.service.ts",
+            "server/src/comment/dto/create-comment.dto.ts",
+            "server/src/comment/dto/list-comments-query.dto.ts",
+            "server/src/comment/mappers/comment.mapper.ts",
+            "server/src/common/validation/text.decorators.ts",
+            "server/src/contracts/api-controller.registry.ts",
+            "server/src/contracts/document.module.ts",
+            "server/src/app.module.ts",
+            "server/src/track/track-access.service.ts",
+            "server/src/track/track.module.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/track/track.service.ts",
+            "server/src/track/track.service.spec.ts",
+            "server/src/track/dto/create-comment.dto.ts",
+            "server/src/track/dto/create-track.dto.ts",
+            "server/src/track/dto/track-validation.ts",
+            "server/src/track/mappers/track.mapper.ts",
+            "server/src/track/mappers/track.mapper.spec.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "server/test/tracks.upload.integration.e2e-spec.ts",
+            "server/openapi.json",
+            "client/lib/api/schema.d.ts",
+            "client/features/tracks/api/getTrackComments.ts",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 5 files, 28 replica-set integration tests; new resource routes, malformed/missing parent, cursor scoping, legacy POST and OpenAPI response validation",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass (lint emitted one unused import warning before it was removed; clean rerun included in final gate)",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run openapi:generate && npm run contracts:check",
+              "cwd": "server/",
+              "result": "pass; OpenAPI and generated client types synchronized",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "git diff --check",
+              "cwd": "repository/",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Extracted CommentModule, CommentController, CommentService, comment DTO/query parsing and mapper. TrackModule exports only TrackAccessService; CommentModule imports TrackModule; TrackService has no comment model or CRUD dependency. Maintenance retains independent Comment model registration.",
+            "Added GET/POST /tracks/:trackId/comments and DELETE /comments/:commentId. Temporary legacy POST /tracks/comments and DELETE /tracks/comments/:id remain. The legacy GET /tracks/comments collides with GET /tracks/:id due Nest route registration and cannot be reliably retained without a reverse feature dependency; migrated the server-side getTrackComments caller early to the resource route and removed that alias.",
+            "Comment reads are track_id scoped, bounded and cursor scoped; parent IDs are validated and parent must be active. CommentService does not mutate Track.comments. Create still has the pre-P5.4 nontransactional parent-delete race, intentionally addressed by the next plan step.",
+            "No original/developer database was changed."
+          ]
+        },
+        {
+          "id": "P5.4",
+          "title": "Transactional creation and delete ordering",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/track/schemas/track.schema.ts",
+            "server/src/track/track-access.service.ts",
+            "server/src/comment/comment.service.ts",
+            "server/test/tracks.pagination.e2e-spec.ts",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "cwd": "server/",
+              "result": "pass: 5 files, 29 replica-set integration tests; includes 3 concurrent create/delete races with cleanup reconciliation",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run typecheck && npm run lint && npm run build",
+              "cwd": "server/",
+              "result": "pass",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run contracts:check && git diff --check",
+              "cwd": "server/",
+              "result": "pass; OpenAPI/client types remain synchronized",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added Track.commentWriteRevision. Comment creation conditionally increments it on an active Track and inserts the Comment in one snapshot/majority transaction. Track deletion already updates lifecycle transactionally on the same document, forcing the two operations to serialize.",
+            "Comment create/delete use a manual transaction loop with a maximum of three attempts for TransientTransactionError and up to three commit attempts for UnknownTransactionCommitResult. Application, filesystem and callback side effects are outside transaction callbacks.",
+            "Individual comment deletion now participates in the same parent revision/lifecycle protocol and returns 404 when the parent is no longer active. Quarantined comments remain undeletable through normal API.",
+            "Replica-set integration test races comment creation against track deletion three times, then runs maintenance and confirms no comment remains under the deleting/deleted parent. No original database was changed."
+          ]
+        },
+        {
+          "id": "P5.5",
+          "title": "Client and BFF",
+          "status": "verified",
+          "changedFiles": [
+            "client/app/api/tracks/[id]/comments/route.ts",
+            "client/app/api/tracks/[id]/comments/route.test.ts",
+            "client/app/api/comments/[id]/route.ts",
+            "client/app/api/comments/[id]/route.test.ts",
+            "client/features/comments/api/getCommentsPage.ts",
+            "client/features/comments/types.ts",
+            "client/features/comments/hooks/useCommentPages.ts",
+            "client/features/comments/components/CommentsSection.tsx",
+            "client/features/tracks/types.ts",
+            "client/features/tracks/api/getTrackComments.ts",
+            "client/app/(main)/tracks/[id]/page.tsx",
+            "client/tests/e2e/api-fixture.mjs",
+            "client/tests/e2e/comments.spec.ts",
+            "client/playwright.config.ts",
+            "client/eslint.config.mjs",
+            "client/tsconfig.json",
+            "client/.gitignore",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run typecheck && npm run lint && npm test && npm run api:check && git diff --check",
+              "cwd": "client/",
+              "result": "pass: 8 files / 22 unit tests; generated types match OpenAPI",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "NEXT_DIST_DIR=.next-e2e-p55-build API_URL=http://127.0.0.1:5300 npm run build",
+              "cwd": "client/",
+              "result": "pass: optimized production build; Next 16.4.5",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "docker run --rm --user 1001:1001 ... playwright test --output /tmp/...",
+              "cwd": "client/",
+              "result": "pass: 3 browser E2E tests (comments pagination/retry/no duplicates, empty and upstream error states, existing catalogue journey)",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added allowlisted BFF routes for comment page GET, comment POST DTO fields and comment DELETE. Upstream errors/request IDs are preserved using the existing backend proxy; query filters other than count/cursor are rejected.",
+            "Track detail rendering now fetches track metadata independently from the client-side CommentsSection. Comment pagination has separate initial/more loading, empty/error/retry states, AbortController cleanup, generation guards against stale responses, and ID deduplication on append.",
+            "Added browser fixtures/tests for 45 comments, unknown timestamp, empty list, upstream failure, retry of a failed continuation without duplicates, and existing catalogue behavior. Comment authoring stays explicitly disabled in the UI; no fake POST interaction was added.",
+            "E2E was run in the Playwright Docker image because host Chromium lacked libnspr4.so. The config accepts NEXT_DIST_DIR for isolated runs; ESLint/TypeScript ignore generated .next-e2e* directories. No external services or database were modified."
+          ]
+        },
+        {
+          "id": "P5.6",
+          "title": "Switch and contract migration",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/scripts/migrations/003-remove-track-comment-arrays.ts",
+            "server/src/scripts/lib/migration-runner.ts",
+            "server/test/comment-parents-migration.e2e-spec.ts",
+            "server/src/contracts/openapi-document.spec.ts",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 5 files / 30 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "typecheck, lint, build, contracts:check, OpenAPI unit tests, git diff --check",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Legacy endpoints and runtime Track.comments writes removed. Migration 003 journals before-images and checks reconciliation 002. Original developer database remains unapplied; operating freeze and rollback window documented.",
+            "Isolated rehearsal passed interruption after CAS, resume, unchanged comment rows, no-op rerun, rollback preview and exact restoration. Rollback refuses tracks changed since contract migration."
+          ]
+        },
+        {
+          "id": "P5.7",
+          "title": "Verification and rollback record",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/scripts/migrations/003-remove-track-comment-arrays.spec.ts",
+            "docs/execution/P5-comments.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "Docker server unit suite; rollback evidence test; client unit suite; Docker Playwright; typecheck/lint/contracts",
+              "result": "pass: 102 server tests + 1 new rollback test; 22 client tests; 3 browser tests",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Reused P5.6 disposable replica-set evidence: 30 passing integration tests including races and migration restoration.",
+            "Original database migrations 002/003 remain UNAPPLIED. Freeze, rollback ordering, post-write forward-repair boundary recorded in P5-comments.md."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P6",
+      "runbook": "P6-authentication.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P6.1",
+          "title": "Users and password service",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/auth/password.service.ts",
+            "server/src/auth/password.service.spec.ts",
+            "server/src/auth/schemas/user.schema.ts",
+            "server/src/scripts/auth-provision.ts",
+            "server/package.json",
+            "docs/execution/P6-authentication.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "typecheck, lint, real-policy password test, tools:build",
+              "result": "pass on Node 24.21.0",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "No accounts provisioned; stdin-only exact UTF-8 password input. Provisioning update operations and broader CLI integration verification remain P6.6."
+          ]
+        },
+        {
+          "id": "P6.2",
+          "title": "Session model and service",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/auth/auth.module.ts",
+            "server/src/auth/session.service.ts",
+            "server/src/auth/schemas/session.schema.ts",
+            "server/src/app.module.ts",
+            "server/src/scripts/migrations/004-auth-indexes.ts",
+            "server/src/scripts/migrations/registry.ts",
+            "server/test/auth-sessions.e2e-spec.ts",
+            "docs/execution/P6-authentication.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 6 files, 31 tests, disposable replica set",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "typecheck, lint, build, contracts:check, git diff --check",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Fixed seven-day session expiry; only token hashes stored. Expiry/revocation and live account state checked on every authenticate.",
+            "Migration 004 original database apply remains UNAPPLIED; no default accounts or legacy ownership changes. Auth HTTP routes and no-store headers are P6.3."
+          ]
+        },
+        {
+          "id": "P6.3",
+          "title": "Nest routes guard and permissions",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 7 files, 34 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "typecheck, lint, build, contracts:check, git diff --check",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Global default-deny Bearer guard, explicit public reads/listens, auth endpoints and no-store responses implemented. Session identity supplies owner/author and comment display snapshot. Transactional owner/lifecycle predicates enforce own/admin deletion; legacy null-owned records admin-only.",
+            "Account and observed-source login limits are bounded local-process limits. No trust in forwarded actor/network headers. Shared limits for multi-instance deployment remain an operational requirement.",
+            "34 isolated integration tests passed including direct Nest identity/ownership checks and authenticated upload/delete races. Full browser/CSRF matrix remains P6.4/P6.7."
+          ]
+        },
+        {
+          "id": "P6.4",
+          "title": "Next session boundary",
+          "status": "verified",
+          "changedFiles": [
+            "client/lib/server/session.ts",
+            "client/lib/server/csrf.ts",
+            "client/lib/server/backend.ts",
+            "client/lib/server/backend.test.ts",
+            "client/lib/server/session-boundary.test.ts",
+            "client/app/api/auth/login/route.ts",
+            "client/app/api/auth/logout/route.ts",
+            "client/app/api/auth/me/route.ts",
+            "client/app/api/tracks/[id]/route.ts",
+            "client/app/api/tracks/[id]/comments/route.ts",
+            "client/app/api/comments/[id]/route.ts",
+            "client/app/api/tracks/[id]/listen/route.ts",
+            "client/features/tracks/components/ListenCountsProvider.tsx",
+            "client/.env.example",
+            "client/playwright.config.ts",
+            "docs/execution/P6-authentication.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck/lint/test/api:check; production build; Docker Playwright",
+              "result": "pass: 26 unit tests, 3 browser regression scenarios",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Cookie-only authenticated backend forwarding, exact Origin/header mutation validation, token-free login projection, uncached viewer session, expired-session logout cookie clearing.",
+            "Production cookie attributes unit-verified. Full login UI/HTTPS browser journey remains P6.5/P6.7. No original database changes."
+          ]
+        },
+        {
+          "id": "P6.5",
+          "title": "Login UI and ownership controls",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/auth/LoginForm.tsx",
+            "client/features/auth/ViewerProvider.tsx",
+            "client/features/auth/SessionControls.tsx",
+            "client/features/auth/return-path.ts",
+            "client/features/auth/return-path.test.ts",
+            "client/app/(auth)/login/page.tsx",
+            "client/app/(main)/layout.tsx",
+            "client/app/(main)/upload/page.tsx",
+            "client/features/tracks/components/UploadTracksButton.tsx",
+            "client/tests/e2e/login.spec.ts",
+            "client/tests/e2e/api-fixture.mjs",
+            "docs/execution/P6-authentication.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck/lint/test; production build; Docker browser regression and login journey",
+              "result": "pass: 27 unit tests; 3 existing browser scenarios and 1 login/logout journey",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Real login form, Russian errors/pending state, safe local return path, request-scoped viewer fetch, stable logout controls. Existing unfinished upload UI explicitly disabled and gated behind identity.",
+            "Login uses separate auth layout and unmounts audio; logout performs full navigation to clear identity state and stops audio. No secondary audio element introduced. P7 defines persisted restoration."
+          ]
+        },
+        {
+          "id": "P6.6",
+          "title": "Provisioning and legacy owner tools",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/auth/provision.service.ts",
+            "server/src/scripts/auth-provision.ts",
+            "server/test/auth-sessions.e2e-spec.ts",
+            "server/seed.sh",
+            "docs/execution/P6-authentication.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 7 files, 35 tests, real-policy provisioning race/update/session revocation",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "typecheck, lint, tools:build, bash -n seed.sh, git diff --check",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Creation conflicts safely; explicit --update changes credentials/display/role and revokes sessions transactionally while preserving disabled state. Password stdin only.",
+            "Seed requires owner-only Authorization header file and verifies active admin identity. No real accounts created or seed uploads performed.",
+            "Optional 005 ownership migration not registered because no reviewed mapping supplied; null-owned legacy rows remain readable/admin-manageable without assignment."
+          ]
+        },
+        {
+          "id": "P6.7",
+          "title": "Verification and checkpoint",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/auth/session.service.ts",
+            "server/src/auth/schemas/user.schema.ts",
+            "server/test/auth-sessions.e2e-spec.ts",
+            "server/src/contracts/openapi-document.spec.ts",
+            "client/tests/e2e/login.spec.ts",
+            "docs/execution/P6-authentication.md",
+            "docs/execution/progress.json",
+            "client/playwright.https.config.ts",
+            "client/tests/e2e/https-production.mjs",
+            "client/tests/e2e/production-cookie.spec.ts",
+            "client/playwright.config.ts",
+            "client/package.json",
+            "client/tests/e2e/api-fixture.mjs",
+            "server/test/auth-permissions.e2e-spec.ts",
+            "server/test/tracks.pagination.e2e-spec.ts"
+          ],
+          "checks": [
+            {
+              "command": "Docker full server unit suite",
+              "result": "pass: 104 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 40 integration tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "client static/unit/contracts and Docker browser tests",
+              "result": "pass: 27 client tests, 6 browser scenarios, 1 production HTTPS scenario",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "HTTPS production-cookie browser test passed against production Next through local TLS proxy. Six standard browser tests include identity switch, CSRF, invalid-session cleanup and redirect handling.",
+            "Expanded direct Nest anonymous/A/B/admin checks passed. Cache callback network dependency removed from race fixture.",
+            "Original database auth indexes remain unapplied; no legacy owners assigned. Local-process limiters and unavailable upload authoring UI explicitly recorded."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P7",
+      "runbook": "P7-queue.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P7.1",
+          "title": "Policy DTOs and model",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/queue/queue-policy.ts",
+            "server/src/queue/queue-policy.spec.ts",
+            "server/src/queue/dto/queue-write.dto.ts",
+            "server/src/queue/dto/queue-response.dto.ts",
+            "server/src/queue/schemas/queue.schema.ts",
+            "server/src/scripts/migrations/006-queue-indexes.ts",
+            "server/src/scripts/migrations/registry.ts",
+            "server/src/scripts/openapi.ts",
+            "server/src/main.ts",
+            "server/test/queue-schema.e2e-spec.ts",
+            "server/openapi.json",
+            "client/lib/api/schema.d.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "queue-policy unit tests; test:isolated; typecheck/lint/build/contracts",
+              "result": "pass: 6 queue boundary tests, 41 integration tests, generated schema synchronized",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Capacity 100, occurrence UUID uniqueness, safe revisions, server snapshot schema, virtual empty response and 64KiB queue body parser implemented.",
+            "Migration 006 adds only unique queue owner index without backfill; original database remains unapplied. Runtime service/CAS/resolution follow P7.2."
+          ]
+        },
+        {
+          "id": "P7.2",
+          "title": "Revision-safe service and API",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/queue/queue.service.ts",
+            "server/src/queue/queue.controller.ts",
+            "server/src/queue/queue.module.ts",
+            "server/src/queue/queue-error.ts",
+            "server/src/track/track-read.service.ts",
+            "server/src/track/track.module.ts",
+            "server/src/app.module.ts",
+            "server/src/contracts/api-controller.registry.ts",
+            "server/src/contracts/document.module.ts",
+            "server/src/contracts/api-error.dto.ts",
+            "server/src/common/api-error.filter.ts",
+            "server/test/auth-permissions.e2e-spec.ts",
+            "server/openapi.json",
+            "client/lib/api/schema.d.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 42 tests including queue insert/CAS races, retry, actor isolation and unavailable hydration",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "typecheck, lint, build, OpenAPI generation/contracts:check, git diff --check",
+              "result": "pass",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Authenticated private GET/PUT queue uses actor-only ownership and revision CAS. Last mutation/hash retries return canonical data without increment.",
+            "Hydration uses one bounded projected TrackReadService query and does not update revision or listens. New unavailable tracks rejected; existing unavailable occurrences retained.",
+            "Original database migration 006 remains unapplied; Next boundary/resolver follow P7.3."
+          ]
+        },
+        {
+          "id": "P7.3",
+          "title": "Track resolver and Next boundary",
+          "status": "verified",
+          "changedFiles": [
+            "server/src/track/dto/resolve-tracks.dto.ts",
+            "server/src/track/track.controller.ts",
+            "server/src/contracts/document.module.ts",
+            "server/src/main.ts",
+            "server/test/auth-permissions.e2e-spec.ts",
+            "client/app/api/queue/route.ts",
+            "client/app/api/queue/route.test.ts",
+            "client/app/api/tracks/resolve/route.ts",
+            "client/lib/server/bounded-json.ts",
+            "client/features/queue/api/resolveTracks.ts",
+            "client/features/queue/api/resolveTracks.test.ts",
+            "server/openapi.json",
+            "client/lib/api/schema.d.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm run test:isolated",
+              "result": "pass: 43 integration tests including guest resolver privacy/boundaries/no listen increment",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "client typecheck/lint/test; server typecheck/lint; both builds; contracts:check; git diff --check",
+              "result": "pass: 31 client tests and synchronized generated contracts",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added bounded guest POST resolver and same-origin BFF. Empty queue helper skips HTTP; distinct IDs resolved in one batch without session forwarding.",
+            "Queue BFF forwards cookie identity only, rejects oversized payloads/CSRF before body forwarding, strips forged owner/snapshot fields and preserves conflict/error responses."
+          ]
+        },
+        {
+          "id": "P7.4",
+          "title": "Pure commands and store",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/queue/types.ts",
+            "client/features/queue/commands.ts",
+            "client/features/queue/queueReducer.ts",
+            "client/features/queue/queueReducer.test.ts",
+            "client/features/queue/queueStore.ts",
+            "client/features/queue/queueStore.test.ts",
+            "client/features/queue/adapters.ts",
+            "client/features/queue/QueueProvider.tsx",
+            "client/features/queue/hooks.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck/lint/test/api:check and production build",
+              "result": "pass: 38 client tests; final store guard rerun 3/3",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Pure occurrence commands are bounded/immutable and reject bulk overflow. One confirmed store with separate pending preview; writes blocked while save is pending.",
+            "Network retry reuses IDs; 409 fetches canonical state and requires explicit retry; disposed/stale responses ignored.",
+            "Provider/audio shell integration follows P7.5; persistent guest adapters and focus/tab behavior follow P7.6/P7.8."
+          ]
+        },
+        {
+          "id": "P7.5",
+          "title": "Audio integration",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/player/PlayerProvider.tsx",
+            "client/components/player/PlayerProvider.tsx",
+            "client/components/player/PlayerBar.tsx",
+            "client/app/(main)/layout.tsx",
+            "client/features/tracks/components/PlayButton.tsx",
+            "client/features/tracks/components/PlayTrackButton.tsx",
+            "client/features/tracks/components/TrackRow.tsx",
+            "client/features/tracks/components/TrackList.tsx",
+            "client/features/queue/memoryAdapter.ts",
+            "client/tests/e2e/api-fixture.mjs",
+            "client/tests/e2e/audio-queue.spec.ts",
+            "client/tests/e2e/catalogue.spec.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client TypeScript, ESLint, Vitest, API contract check and production build",
+              "result": "pass: 38 client unit tests; production build and generated API contract synchronized",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Docker Playwright browser suite",
+              "result": "pass: 7 scenarios, including real audio duplicate/reorder/remove/clear behavior and listen-session counting",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "One audio element is hosted under the main shell and uses QueueStore as the sole queue membership source; transport and progress contexts are separated.",
+            "Occurrence identity controls audio sessions. Duplicate occurrence selection restarts and counts a listen only on actual play; reorder preserves the active source/time/session. Previous restart, confirmed removal selection, and clear source release verified in browser.",
+            "The footer includes move-up/remove-current/clear controls pending the complete queue UI in P7.7. Guest queue remains per-tab in-memory until P7.6. No original database migrations were applied."
+          ]
+        },
+        {
+          "id": "P7.6",
+          "title": "Guest persistence and account transition",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/queue/guestAdapter.ts",
+            "client/features/queue/guestAdapter.test.ts",
+            "client/features/queue/memoryAdapter.ts",
+            "client/features/queue/components/GuestQueueImport.tsx",
+            "client/features/player/PlayerProvider.tsx",
+            "client/features/player/guestAudioLease.ts",
+            "client/components/player/PlayerBar.tsx",
+            "client/tests/e2e/api-fixture.mjs",
+            "client/tests/e2e/guest-queue.spec.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck, ESLint, Vitest, API contract check and production build",
+              "result": "pass: 40 client unit tests; generated API contract synchronized",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Docker Playwright full browser suite, workers=1",
+              "result": "pass: 12 scenarios including reload, guest import, account A/B, invalid storage, quota fallback and two-tab audio lease",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Versioned guest snapshot persistence is used only with Web Locks and BroadcastChannel. Exclusive writes use revision checks and retry identity; cross-tab changes trigger reload. Unsupported/denied storage keeps an explicit per-tab unsaved in-memory queue.",
+            "Guest queues re-resolve IDs before playback. Corrupt and unknown-version data is quarantined with an explicit reset action; offline resolution retains saved bytes and does not mark cached tracks playable.",
+            "Playback resume is namespaced by guest/account identity and restores paused after validation and duration clamping. Web Lock audio ownership prevents concurrent guest-tab playback.",
+            "Account import is explicitly selected per account, supports replace/merge subsets, preserves repeated occurrences, never truncates over-capacity input, and leaves the guest queue isolated. Logout/identity changes stop audio and replace the active identity store."
+          ]
+        },
+        {
+          "id": "P7.7",
+          "title": "Complete UI",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/queue/components/QueuePanel.tsx",
+            "client/features/queue/components/QueueRow.tsx",
+            "client/features/queue/components/QueueTrackActions.tsx",
+            "client/features/queue/queueStore.ts",
+            "client/features/queue/hooks.ts",
+            "client/components/player/PlayerBar.tsx",
+            "client/features/tracks/components/TrackList.tsx",
+            "client/features/tracks/components/TrackRow.tsx",
+            "client/features/tracks/components/PlayButton.tsx",
+            "client/app/(main)/tracks/[id]/page.tsx",
+            "client/tests/e2e/queue-panel.spec.ts",
+            "client/tests/e2e/audio-queue.spec.ts",
+            "client/tests/e2e/catalogue.spec.ts",
+            "client/tsconfig.json",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck, ESLint, Vitest, API contract check and production build",
+              "result": "pass: 40 client unit tests; generated API contract synchronized",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Docker Playwright full browser suite, workers=1",
+              "result": "pass: 15 scenarios including queue drawer, bulk selection, replacement, mobile keyboard reorder and audio actions",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Added responsive queue drawer with occurrence status, unavailable reasons, pending preview, retry/conflict recovery, clear confirmation, play/remove/reorder controls and accessible row labels.",
+            "Catalogue and detail actions explicitly append/play-next; loaded catalog pages do not change queue. Multi-select append/replace checks capacity and confirms replacing a nonempty curated queue.",
+            "Keyboard reorder and touch controls use the same reorder command. A stable QueueStore server snapshot prevents SSR hydration mismatch in queue action controls."
+          ]
+        },
+        {
+          "id": "P7.8",
+          "title": "Synchronization and lifecycle edge cases",
+          "status": "verified",
+          "changedFiles": [
+            "client/features/queue/adapters.ts",
+            "client/features/queue/queueStore.ts",
+            "client/features/queue/queueStore.test.ts",
+            "client/tests/e2e/queue-panel.spec.ts",
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck, ESLint, Vitest, API contract check and production build",
+              "result": "pass: 41 client unit tests; generated API contract synchronized",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Docker Playwright full browser suite, workers=1",
+              "result": "pass: 16 scenarios including same-origin account queue tab synchronization",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [],
+          "notes": [
+            "Account queue refetches on focus, visible-tab return and online recovery; account mutations publish same-origin BroadcastChannel notifications across tabs.",
+            "QueueStore ignores stale generations/revisions, preserves stable pending mutation identity for retries, requires deliberate conflict refresh, clears private state on 401, and clears selection when a refreshed occurrence is unavailable.",
+            "Server revision CAS remains authoritative across devices; remote updates do not initiate playback on another tab. Guest coordination remains Web Locks/BroadcastChannel-based from P7.6."
+          ]
+        },
+        {
+          "id": "P7.9",
+          "title": "Verification and checkpoint",
+          "status": "verified",
+          "changedFiles": [
+            "docs/execution/P7-queue.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "client typecheck, ESLint, Vitest, API contract check and git diff --check",
+              "result": "pass: 41 tests across 15 files; generated API types match OpenAPI",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Production build and full Docker Playwright suite (P7.8 checkpoint)",
+              "result": "pass: build succeeded; 16 browser scenarios passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "Queue capacity and API integration gates",
+              "result": "pass: schema/reducer/API coverage includes 100/101 boundaries, CAS, auth and resolution",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            "docs/execution/P7-queue.md"
+          ],
+          "notes": [
+            "P7 implementation and available phase gates verified. No database migration was applied to the original database.",
+            "Browser coverage does not yet include the complete 100-entry journey and all deletion/keyboard/mobile acceptance cases; these remain explicit P8.4 work.",
+            "No queue rerender profiling measurement was collected; P8 should record it if the performance acceptance gate remains applicable."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P8",
+      "runbook": "P8-acceptance.md",
+      "status": "verified",
+      "steps": [
+        {
+          "id": "P8.1",
+          "title": "Fresh-source installation and static gates",
+          "status": "verified",
+          "changedFiles": [
+            "docs/execution/P8-acceptance.md",
+            "docs/execution/progress.json"
+          ],
+          "checks": [
+            {
+              "command": "npm ci --prefix server and client in fresh source snapshot",
+              "result": "pass: 390 server and 464 client packages installed from lockfiles",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "server static gates and unit tests",
+              "result": "pass: lint, typecheck, build; 110 tests with temporary FFmpeg/FFprobe 6.1.1-3ubuntu5",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "client static gates and unit tests",
+              "result": "pass: lint, typecheck; 41 tests",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "contract drift before/after generation",
+              "result": "pass: contracts:check and api:check before generation; both generators and post-generation checks passed",
+              "at": "2026-11-08"
+            },
+            {
+              "command": "source manifest verification",
+              "result": "pass: 379 files / 3,711,845 bytes; all file hashes match",
+              "at": "2026-11-08"
+            }
+          ],
+          "artifacts": [
+            "/home/michael/projects/Gurach-acceptance/p81/source-manifest.json",
+            "/home/michael/projects/Gurach-acceptance/p81/source-manifest.sha256",
+            "/home/michael/projects/Gurach-acceptance/p81/tool-versions.txt",
+            "/home/michael/projects/Gurach-acceptance/p81/p81-result.json"
+          ],
+          "notes": [
+            "Fresh snapshot is a sibling of the source repository and excludes local static/audio media, dependency trees, build output, private state and environment files other than templates.",
+            "Host system lacks FFmpeg/FFprobe. Server suite first showed 8 media-validator failures; reran all 110 tests successfully with FFmpeg/FFprobe 6.1.1-3ubuntu5 and libraries extracted under /tmp. No host packages or project database changed.",
+            "npm ci reported server 6 audit advisories (2 low, 1 moderate, 3 high) and client 8 moderate advisories; install-script allowlist notices were also recorded. Review during final security handover.",
+            "No database migrations or original-data operations occurred."
+          ]
+        },
+        {
+          "id": "P8.2",
+          "title": "Database and migration evidence",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [],
+          "notes": [
+            "Completion confirmed by the project owner on 2026-11-10. No additional check results are asserted by this status update."
+          ]
+        },
+        {
+          "id": "P8.3",
+          "title": "Offline build and running topology",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [],
+          "notes": [
+            "Completion confirmed by the project owner on 2026-11-10. No additional check results are asserted by this status update."
+          ]
+        },
+        {
+          "id": "P8.4",
+          "title": "User and queue journeys",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [],
+          "notes": [
+            "Completion confirmed by the project owner on 2026-11-10. No additional check results are asserted by this status update."
+          ]
+        },
+        {
+          "id": "P8.5",
+          "title": "Failure recovery and operation races",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [],
+          "notes": [
+            "Completion confirmed by the project owner on 2026-11-10. No additional check results are asserted by this status update."
+          ]
+        },
+        {
+          "id": "P8.6",
+          "title": "Completion report and final review",
+          "status": "verified",
+          "changedFiles": [],
+          "checks": [],
+          "artifacts": [],
+          "notes": [
+            "Completion confirmed by the project owner on 2026-11-10. No additional check results are asserted by this status update."
+          ]
+        }
+      ]
+    }
+  ]
+}
