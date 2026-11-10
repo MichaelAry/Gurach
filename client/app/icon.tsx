@@ -16,8 +16,8 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#2a2c36', // mono[800] — primary.main темы
-          color: '#fafbfc', // mono[25] — primary.contrastText
+          background: '#343530', // mono[800] — primary.main темы
+          color: '#F0EFE9', // mono[25] — primary.contrastText
           fontSize: 40,
           fontWeight: 700,
           borderRadius: 14,

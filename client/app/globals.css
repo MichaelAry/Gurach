@@ -42,21 +42,6 @@ a:focus-visible {
   border-radius: 2px;
 }
 
-/* CSS-переменные — та же шкала, что mono в theme/index.ts */
-:root {
-  --mono-25: #fafbfc;
-  --mono-50: #f4f5f8;
-  --mono-100: #e8eaef;
-  --mono-200: #d5d8e0;
-  --mono-300: #b4b9c6;
-  --mono-400: #8c91a1;
-  --mono-500: #6a6f7e;
-  --mono-600: #505463;
-  --mono-700: #3c3f4b;
-  --mono-800: #2a2c36;
-  --mono-900: #1b1d24;
-}
-
 /* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   html {

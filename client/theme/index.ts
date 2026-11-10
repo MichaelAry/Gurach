@@ -1,35 +1,21 @@
 // theme/index.ts
 import { createTheme } from '@mui/material/styles'
 
-/**
- * Монохромная СВЕТЛАЯ тема.
- *
- * Вся палитра построена на одной шкале «холодного графита» — от почти-белого
- * (25) до почти-чёрного (900). Никаких чистых #000 / #fff и никаких других
- * оттенков — поэтому это именно монохром, а не «чб».
- *
- * Если захочется чуть другого настроения:
- *   - сделай шкалу теплее  (например, тона stone/taupe: #f7f5f2, #e8e3dc, ...)
- *   - или холоднее/синее  (slate: #f5f7fa, #dde3ec, ...)
- * Логика остальных токенов не поменяется.
- */
+// Shared warm graphite scale; CSS variables are emitted by CssBaseline.
 const mono = {
-  25: '#fafbfc',
-  50: '#f4f5f8',
-  100: '#e8eaef',
-  200: '#d5d8e0',
-  300: '#b4b9c6',
-  400: '#8c91a1',
-  500: '#6a6f7e',
-  600: '#505463',
-  700: '#3c3f4b',
-  800: '#2a2c36',
-  900: '#1b1d24',
+  25: '#F0EFE9', 50: '#E8E7E1', 100: '#DFDED7',
+  200: '#D8D7D0', 300: '#CECDC6', 400: '#777873',
+  500: '#62635F', 600: '#555650', 700: '#454640',
+  800: '#343530', 900: '#292A28',
 } as const
+
+const surfaces = { secondary: mono[100], hover: '#D7D6CE', selected: '#CECDC4', border: mono[300] }
 
 export const theme = createTheme({
   palette: {
     mode: 'light',
+    common: { white: mono[25], black: mono[900] },
+    grey: { 50: mono[25], 100: mono[50], 200: mono[100], 300: mono[200], 400: mono[300], 500: mono[400], 600: mono[500], 700: mono[600], 800: mono[800], 900: mono[900], A100: mono[100], A200: mono[200], A400: mono[500], A700: mono[700] },
 
     primary: {
       main: mono[800], // графит — основной «акцент»
@@ -59,25 +45,22 @@ export const theme = createTheme({
 
     action: {
       active: mono[600],
-      hover: 'rgba(27, 29, 36, 0.06)',
-      selected: 'rgba(27, 29, 36, 0.10)',
+      hover: surfaces.hover,
+      selected: surfaces.selected,
       disabled: mono[300],
       disabledBackground: mono[100],
-      focus: 'rgba(27, 29, 36, 0.12)',
+      focus: surfaces.selected,
     },
 
-    // служебные состояния — тоже в монохроме, чтобы случайный MUI-цвет
-    // (оранжевый warning, красный error) не выбивался из монохромной картинки.
-    // Если нужны настоящие цвета для error/success — просто верни дефолт,
-    // убрав этот блок.
-    success: { main: mono[700], contrastText: mono[25] },
-    warning: { main: mono[600], contrastText: mono[25] },
-    error: { main: mono[800], contrastText: mono[25] },
-    info: { main: mono[500], contrastText: mono[25] },
+    // Muted semantic colors preserve recognizable feedback states.
+    success: { main: '#52634F', contrastText: mono[25] },
+    warning: { main: '#75613D', contrastText: mono[25] },
+    error: { main: '#8A514E', contrastText: mono[25] },
+    info: { main: '#52636B', contrastText: mono[25] },
   },
 
   shape: {
-    borderRadius: 8,
+    borderRadius: 10,
   },
 
   typography: {
@@ -97,13 +80,24 @@ export const theme = createTheme({
     h6: { fontWeight: 600 },
     subtitle1: { fontWeight: 600 },
     subtitle2: { fontWeight: 600 },
-    button: { fontWeight: 500 },
+    body1: { lineHeight: 1.6 },
+    body2: { lineHeight: 1.55 },
+    button: { fontWeight: 600, lineHeight: 1.5 },
   },
 
   components: {
+    MuiBackdrop: { styleOverrides: { root: { backgroundColor: 'rgba(41, 42, 40, 0.32)' } } },
+    MuiOutlinedInput: { styleOverrides: { root: { backgroundColor: mono[25], '& .MuiOutlinedInput-notchedOutline': { borderColor: surfaces.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: mono[400] } } } },
+    MuiTableCell: { styleOverrides: { head: { backgroundColor: surfaces.secondary, fontWeight: 600 } } },
+    MuiSnackbarContent: { styleOverrides: { root: { backgroundColor: mono[800], color: mono[25], boxShadow: 'none' } } },
+    MuiSlider: { styleOverrides: { thumb: { '&:hover, &.Mui-focusVisible, &.Mui-active': { boxShadow: 'none', outline: `2px solid ${mono[500]}`, outlineOffset: 3 } } } },
     MuiCssBaseline: {
       styleOverrides: (theme) => ({
-        html: { fontFamily: theme.typography.fontFamily },
+        html: { fontFamily: theme.typography.fontFamily, scrollbarColor: `${mono[400]} ${mono[50]}` },
+        ':root': Object.fromEntries(Object.entries(mono).map(([key, value]) => [`--mono-${key}`, value])),
+        ':focus-visible': { outline: `2px solid ${mono[500]}`, outlineOffset: 3 },
+        '.Mui-selected': { color: mono[900] },
+        '::selection': { background: surfaces.selected, color: mono[900] },
         'button, input, select, textarea': { fontFamily: 'inherit' },
       }),
     },
@@ -121,13 +115,14 @@ export const theme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { textTransform: 'none' },
+        root: { textTransform: 'none', padding: '8px 16px', transition: 'background-color 160ms ease, border-color 160ms ease', '&:active': { filter: 'brightness(0.96)' } },
+        outlined: { borderColor: surfaces.border, color: mono[900], backgroundColor: surfaces.secondary, '&:hover': { backgroundColor: surfaces.hover, borderColor: mono[400] } },
       },
     },
     // Мягкая граница у paper — читается на светлом фоне
     MuiPaper: {
       styleOverrides: {
-        root: { backgroundImage: 'none' },
+        root: { backgroundImage: 'none', boxShadow: 'none', border: `1px solid ${mono[200]}` },
         outlined: ({ theme }) => ({ borderColor: theme.palette.divider }),
       },
     },
