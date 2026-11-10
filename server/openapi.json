@@ -1,0 +1,2783 @@
+{
+  "components": {
+    "schemas": {
+      "AccountHistoryItem": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "listenedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "track": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TrackListItem"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "trackId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trackId",
+          "listenedAt",
+          "track"
+        ],
+        "type": "object"
+      },
+      "AccountHistoryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AccountHistoryItem"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "AccountStatistics": {
+        "properties": {
+          "comments": {
+            "type": "number"
+          },
+          "receivedListens": {
+            "type": "number"
+          },
+          "totalListens": {
+            "type": "number"
+          },
+          "uniqueTracks": {
+            "type": "number"
+          },
+          "uploadedTracks": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "uploadedTracks",
+          "totalListens",
+          "uniqueTracks",
+          "receivedListens",
+          "comments"
+        ],
+        "type": "object"
+      },
+      "ApiErrorBodyDto": {
+        "properties": {
+          "code": {
+            "enum": [
+              "QUEUE_FULL",
+              "QUEUE_CONFLICT",
+              "QUEUE_ENTRY_INVALID",
+              "TRACK_UNAVAILABLE",
+              "VALIDATION_ERROR",
+              "NOT_FOUND",
+              "CONFLICT",
+              "PAYLOAD_TOO_LARGE",
+              "UNSUPPORTED_MEDIA_TYPE",
+              "UNAUTHORIZED",
+              "FORBIDDEN",
+              "RATE_LIMITED",
+              "INTERNAL_ERROR",
+              "BACKEND_UNAVAILABLE",
+              "BACKEND_TIMEOUT"
+            ],
+            "type": "string"
+          },
+          "fieldErrors": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object"
+          },
+          "message": {
+            "example": "Request validation failed",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "8ab23250-cc7d-49bb-9abe-386844de0871",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "ApiErrorDto": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ApiErrorBodyDto"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "AuthSessionDto": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
+          }
+        },
+        "required": [
+          "user",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "AuthUserDto": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName",
+          "role"
+        ],
+        "type": "object"
+      },
+      "CommentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommentResponse"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "example": "eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "items"
+        ],
+        "type": "object"
+      },
+      "CommentResponse": {
+        "properties": {
+          "_id": {
+            "example": "507f1f77bcf86cd799439011",
+            "type": "string"
+          },
+          "authorId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "rating": {
+            "maximum": 10,
+            "minimum": 1,
+            "nullable": true,
+            "type": "number"
+          },
+          "text": {
+            "example": "Great track",
+            "type": "string"
+          },
+          "trackId": {
+            "example": "507f1f77bcf86cd799439012",
+            "type": "string"
+          },
+          "username": {
+            "example": "Listener",
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "trackId",
+          "authorId",
+          "username",
+          "text",
+          "rating",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "CreateCommentDto": {
+        "properties": {
+          "rating": {
+            "example": 8,
+            "maximum": 10,
+            "minimum": 1,
+            "type": "number"
+          },
+          "text": {
+            "example": "Great track",
+            "maxLength": 5000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "DeletionAccepted": {
+        "properties": {
+          "_id": {
+            "example": "507f1f77bcf86cd799439011",
+            "type": "string"
+          },
+          "operationId": {
+            "example": "1db26bd1-4d9c-4672-b3a9-a4cb3cb11958",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "accepted"
+            ],
+            "example": "accepted",
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "operationId",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ListenResult": {
+        "properties": {
+          "listens": {
+            "example": 11,
+            "type": "number"
+          }
+        },
+        "required": [
+          "listens"
+        ],
+        "type": "object"
+      },
+      "LoginDto": {
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "type": "object"
+      },
+      "LoginResultDto": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "token": {
+            "description": "Secret session token for the calling server only",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
+          }
+        },
+        "required": [
+          "user",
+          "expiresAt",
+          "token"
+        ],
+        "type": "object"
+      },
+      "PlayableTrack": {
+        "properties": {
+          "_id": {
+            "example": "507f1f77bcf86cd799439011",
+            "type": "string"
+          },
+          "artist": {
+            "example": "Artist name",
+            "nullable": true,
+            "type": "string"
+          },
+          "audio": {
+            "format": "uri",
+            "nullable": true,
+            "type": "string"
+          },
+          "duration": {
+            "example": 180,
+            "nullable": true,
+            "type": "number"
+          },
+          "listens": {
+            "example": 10,
+            "type": "number"
+          },
+          "name": {
+            "example": "Track title",
+            "type": "string"
+          },
+          "picture": {
+            "format": "uri",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "name",
+          "artist",
+          "audio",
+          "picture",
+          "listens",
+          "duration"
+        ],
+        "type": "object"
+      },
+      "QueueDisplayDto": {
+        "properties": {
+          "artist": {
+            "maxLength": 200,
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "artist"
+        ],
+        "type": "object"
+      },
+      "QueueEntryResponseDto": {
+        "properties": {
+          "availability": {
+            "enum": [
+              "playable",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "display": {
+            "$ref": "#/components/schemas/QueueDisplayDto"
+          },
+          "entryId": {
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "deleted",
+              "missing-audio"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "track": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlayableTrack"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "trackId": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "entryId",
+          "trackId",
+          "display",
+          "track",
+          "availability",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "QueueEntryWriteDto": {
+        "properties": {
+          "entryId": {
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "source": {
+            "description": "New entries default to manual; existing entries retain their source when omitted.",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "trackId": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entryId",
+          "trackId"
+        ],
+        "type": "object"
+      },
+      "QueueResponseDto": {
+        "properties": {
+          "capacity": {
+            "enum": [
+              100
+            ],
+            "type": "integer"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEntryResponseDto"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "revision": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "capacity",
+          "entries",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "QueueWriteDto": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEntryWriteDto"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "expectedRevision": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "mutationId": {
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "mutationId",
+          "entries"
+        ],
+        "type": "object"
+      },
+      "RecordAccountListenDto": {
+        "properties": {
+          "playbackId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "trackId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "trackId",
+          "playbackId"
+        ],
+        "type": "object"
+      },
+      "RegisterDto": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "displayName",
+          "password"
+        ],
+        "type": "object"
+      },
+      "ResolvedTrackDto": {
+        "properties": {
+          "availability": {
+            "enum": [
+              "playable",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "deleted",
+              "missing-audio"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "track": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlayableTrack"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "trackId": {
+            "pattern": "^[a-fA-F0-9]{24}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trackId",
+          "track",
+          "availability",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "ResolveTracksDto": {
+        "properties": {
+          "ids": {
+            "items": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "ResolveTracksResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedTrackDto"
+            },
+            "maxItems": 100,
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "TrackDetail": {
+        "properties": {
+          "_id": {
+            "example": "507f1f77bcf86cd799439011",
+            "type": "string"
+          },
+          "artist": {
+            "example": "Artist name",
+            "nullable": true,
+            "type": "string"
+          },
+          "audio": {
+            "format": "uri",
+            "nullable": true,
+            "type": "string"
+          },
+          "duration": {
+            "example": 180,
+            "nullable": true,
+            "type": "number"
+          },
+          "listens": {
+            "example": 10,
+            "type": "number"
+          },
+          "lyrics": {
+            "example": "Track lyrics",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "example": "Track title",
+            "type": "string"
+          },
+          "ownerId": {
+            "example": "507f1f77bcf86cd799439012",
+            "nullable": true,
+            "type": "string"
+          },
+          "picture": {
+            "format": "uri",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "name",
+          "artist",
+          "audio",
+          "picture",
+          "listens",
+          "duration",
+          "lyrics",
+          "ownerId"
+        ],
+        "type": "object"
+      },
+      "TrackListItem": {
+        "properties": {
+          "_id": {
+            "example": "507f1f77bcf86cd799439011",
+            "type": "string"
+          },
+          "artist": {
+            "example": "Artist name",
+            "nullable": true,
+            "type": "string"
+          },
+          "audio": {
+            "format": "uri",
+            "nullable": true,
+            "type": "string"
+          },
+          "duration": {
+            "example": 180,
+            "nullable": true,
+            "type": "number"
+          },
+          "listens": {
+            "example": 10,
+            "type": "number"
+          },
+          "name": {
+            "example": "Track title",
+            "type": "string"
+          },
+          "picture": {
+            "format": "uri",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "name",
+          "artist",
+          "audio",
+          "picture",
+          "listens",
+          "duration"
+        ],
+        "type": "object"
+      },
+      "TrackListPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackListItem"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "example": "eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "items"
+        ],
+        "type": "object"
+      },
+      "TrackSearchPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackListItem"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "example": "eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "items"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "contact": {},
+    "description": "HTTP API contract for Gurach.",
+    "title": "Gurach API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/account/favorite-ids": {
+      "get": {
+        "operationId": "AccountController_favoriteIds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/favorites": {
+      "get": {
+        "operationId": "AccountController_favorites",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackListPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/favorites/{id}": {
+      "delete": {
+        "operationId": "AccountController_removeFavorite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      },
+      "put": {
+        "operationId": "AccountController_addFavorite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/history": {
+      "get": {
+        "operationId": "AccountController_history",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountHistoryPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/listens": {
+      "post": {
+        "operationId": "AccountController_listen",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAccountListenDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListenResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/statistics": {
+      "get": {
+        "operationId": "AccountController_statistics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountStatistics"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/uploads": {
+      "get": {
+        "operationId": "AccountController_uploads",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackListPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResultDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request conflicts with existing data"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/comments/{commentId}": {
+      "delete": {
+        "operationId": "CommentController_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "commentId",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "ok"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "ok"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/queue": {
+      "get": {
+        "operationId": "QueueController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "queue"
+        ]
+      },
+      "put": {
+        "operationId": "QueueController_put",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueWriteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request conflicts with existing data"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "queue"
+        ]
+      }
+    },
+    "/tracks": {
+      "get": {
+        "operationId": "TrackController_getAll",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "example": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackListPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      },
+      "post": {
+        "operationId": "TrackController_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "artist": {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "audio": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "duration": {
+                    "example": "180",
+                    "pattern": "^\\d+(?:\\.\\d+)?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "example": "Track title",
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "picture": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Track lyrics",
+                    "maxLength": 100000,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "picture",
+                  "audio"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackDetail"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request conflicts with existing data"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/{id}": {
+      "delete": {
+        "operationId": "TrackController_deleteOne",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionAccepted"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      },
+      "get": {
+        "operationId": "TrackController_getOne",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackDetail"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/{id}/listen": {
+      "post": {
+        "operationId": "TrackController_listen",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListenResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/{trackId}/comments": {
+      "get": {
+        "operationId": "CommentController_list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trackId",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "example": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "comments"
+        ]
+      },
+      "post": {
+        "operationId": "CommentController_add",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trackId",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-fA-F0-9]{24}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request conflicts with existing data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/tracks/random": {
+      "get": {
+        "operationId": "TrackController_random",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlayableTrack"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/resolve": {
+      "post": {
+        "operationId": "TrackController_resolve",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveTracksDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveTracksResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/search": {
+      "get": {
+        "operationId": "TrackController_search",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "example": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "text",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "artist",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackSearchPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "Local development placeholder",
+      "url": "http://localhost:5000"
+    }
+  ],
+  "tags": []
+}
