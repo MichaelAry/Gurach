@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 test('restarts duplicate occurrences and commits current removal/clear through the account queue', async ({ page }) => {
-  await page.goto('/login')
+  await page.goto('/login?returnTo=/tracks')
   await page.getByLabel('Имя пользователя').fill('fixture_user')
   await page.getByLabel('Пароль').fill('fixture password long')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -9,7 +9,7 @@ test('restarts duplicate occurrences and commits current removal/clear through t
   let listenRequests = 0
   page.on('request', (request) => { if (new URL(request.url()).pathname === '/api/account/listens') listenRequests++ })
   await expect(audio).toHaveCount(1)
-  await page.getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Играть Track 1', exact: true }).click()
   await expect(footer.getByText('1 / 3', { exact: true })).toBeVisible()
   await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => !node.paused)).toBe(true)
   expect(listenRequests).toBe(0)

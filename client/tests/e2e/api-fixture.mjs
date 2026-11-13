@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 
 const port = Number(process.env.FIXTURE_API_PORT ?? 5300);
 const total = 121;
@@ -27,6 +28,7 @@ const commentsByTrack = new Map([
   [tracks[2]._id, []],
 ]);
 let failFirstNextCommentPage = true;
+const sessions = new Map();
 const accountFavorites = new Map();
 const accountQueues = new Map();
 const accountHistory = new Map();
@@ -38,19 +40,41 @@ const server = createServer((request, response) => {
   response.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges');
   const fixtureUser = { id: '000000000000000000000001', username: 'fixture_user', displayName: 'Пользователь теста', role: 'user' };
   const secondUser = { ...fixtureUser, id: '000000000000000000000002', username: 'fixture_other', displayName: 'Другой пользователь' };
-  const sessionUser = request.headers.authorization === `Bearer ${'a'.repeat(43)}` ? fixtureUser : request.headers.authorization === `Bearer ${'b'.repeat(43)}` ? secondUser : null;
+  const token = request.headers.authorization?.replace(/^Bearer /, '');
+  // Fixed sessions support direct-cookie upload tests; browser logins get isolated state.
+  const sessionUser = token === 'a'.repeat(43) ? fixtureUser : token === 'b'.repeat(43) ? secondUser : sessions.get(token) ?? null;
+  const accountKey = sessionUser ? `${sessionUser.id}:${token}` : null;
+  if (request.method === 'GET' && ['/home/releases', '/home/popular', '/home/activity', '/friends', '/friends/summary', '/friends/requests', '/friends/blocks'].includes(url.pathname)) {
+    const personal = !['/home/releases', '/home/popular'].includes(url.pathname);
+    if (personal && !sessionUser) { response.writeHead(401); response.end(); return; }
+    response.setHeader('content-type', 'application/json');
+    response.setHeader('Cache-Control', personal ? 'private, no-store' : 'no-store');
+    if (url.pathname === '/home/releases') {
+      const offset = Number(url.searchParams.get('cursor') ?? 0);
+      const count = Number(url.searchParams.get('count') ?? 20);
+      response.end(JSON.stringify({ items: tracks.slice(offset, offset + count), nextCursor: offset + count < tracks.length ? String(offset + count) : null })); return;
+    }
+    if (url.pathname === '/home/popular') {
+      response.end(JSON.stringify({ items: tracks.slice(0, 5) })); return;
+    }
+    if (url.pathname === '/friends/summary') {
+      response.end(JSON.stringify({ friendsCount: 0, incomingRequestsCount: 0, outgoingRequestsCount: 0, blockedUsersCount: 0 })); return;
+    }
+    // Both accounts start without friendships, requests, blocks or friend activity.
+    response.end(JSON.stringify({ items: [], nextCursor: null })); return;
+  }
   if (url.pathname.startsWith('/account/')) {
     if (!sessionUser) { response.writeHead(401); response.end(); return; }
     response.setHeader('content-type', 'application/json');
     response.setHeader('Cache-Control', 'private, no-store');
     const uploads = sessionUser.id === fixtureUser.id ? tracks.slice(0, 21) : [];
-    if (!accountHistory.has(sessionUser.id)) accountHistory.set(sessionUser.id, sessionUser.id === fixtureUser.id ? [
+    if (!accountHistory.has(accountKey)) accountHistory.set(accountKey, sessionUser.id === fixtureUser.id ? [
       { id: 'history-1', trackId: tracks[0]._id, listenedAt: '2026-01-02T12:00:00.000Z', track: tracks[0] },
       { id: 'history-2', trackId: 'f'.repeat(24), listenedAt: '2026-01-01T12:00:00.000Z', track: null },
     ] : []);
-    const history = accountHistory.get(sessionUser.id);
-    if (!accountFavorites.has(sessionUser.id)) accountFavorites.set(sessionUser.id, []);
-    const favorites = accountFavorites.get(sessionUser.id);
+    const history = accountHistory.get(accountKey);
+    if (!accountFavorites.has(accountKey)) accountFavorites.set(accountKey, []);
+    const favorites = accountFavorites.get(accountKey);
     if (url.pathname === '/account/favorite-ids' && request.method === 'GET') {
       response.end(JSON.stringify(favorites)); return;
     }
@@ -73,7 +97,7 @@ const server = createServer((request, response) => {
       let body = '';
       request.on('data', (chunk) => { body += chunk; });
       request.on('end', () => {
-        const event = JSON.parse(body), key = `${sessionUser.id}:${event.playbackId}`;
+        const event = JSON.parse(body), key = `${accountKey}:${event.playbackId}`;
         if (!accountPlaybacks.has(key)) {
           const track = tracks.find((item) => item._id === event.trackId);
           if (!track) { response.writeHead(404); response.end(); return; }
@@ -110,22 +134,22 @@ const server = createServer((request, response) => {
       display: { name: track.name, artist: track.artist }, track, availability: 'playable', reason: null,
     }));
     response.writeHead(200, { 'content-type': 'application/json' });
-    if (!accountQueues.has(sessionUser.id)) accountQueues.set(sessionUser.id, { revision: 1, capacity: 100, entries, updatedAt: null });
-    response.end(JSON.stringify(accountQueues.get(sessionUser.id))); return;
+    if (!accountQueues.has(accountKey)) accountQueues.set(accountKey, { revision: 1, capacity: 100, entries, updatedAt: null });
+    response.end(JSON.stringify(accountQueues.get(accountKey))); return;
   }
   if (url.pathname === '/queue' && request.method === 'PUT') {
     if (!sessionUser) { response.writeHead(401); response.end(); return; }
     let body = '';
     request.on('data', (chunk) => { body += chunk; });
     request.on('end', () => {
-      const input = JSON.parse(body), old = accountQueues.get(sessionUser.id);
+      const input = JSON.parse(body), old = accountQueues.get(accountKey);
       if (!old || input.expectedRevision !== old.revision) { response.writeHead(409); response.end(); return; }
       const entries = input.entries.map((entry) => {
         const track = tracks.find((item) => item._id === entry.trackId);
         return { ...entry, display: { name: track.name, artist: track.artist }, track, availability: 'playable', reason: null };
       });
       const saved = { revision: old.revision + 1, capacity: 100, entries, updatedAt: new Date().toISOString() };
-      accountQueues.set(sessionUser.id, saved);
+      accountQueues.set(accountKey, saved);
       response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify(saved));
     }); return;
   }
@@ -139,10 +163,11 @@ const server = createServer((request, response) => {
         response.end(JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Invalid credentials', requestId: 'fixture' } }));
         return;
       }
-      accountQueues.delete(value.username === 'fixture_user' ? fixtureUser.id : secondUser.id);
-      accountHistory.delete(value.username === 'fixture_user' ? fixtureUser.id : secondUser.id);
+      const token = randomBytes(32).toString('base64url');
+      const user = value.username === 'fixture_user' ? fixtureUser : secondUser;
+      sessions.set(token, user);
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ token: (value.username === 'fixture_user' ? 'a' : 'b').repeat(43), user: value.username === 'fixture_user' ? fixtureUser : secondUser, expiresAt: new Date(Date.now() + 600000).toISOString() }));
+      response.end(JSON.stringify({ token, user, expiresAt: new Date(Date.now() + 600000).toISOString() }));
     });
     return;
   }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-test('logs in, opens home, displays identity and clears session on logout', async ({ page, context }) => {
+test('logs in with returnTo, opens catalogue, displays identity and clears session on logout', async ({ page, context }) => {
   await page.goto('/login?returnTo=/tracks')
   await page.getByLabel('Имя пользователя').fill('fixture_user')
   await page.getByLabel('Пароль').fill('wrong password')
@@ -8,8 +8,8 @@ test('logs in, opens home, displays identity and clears session on logout', asyn
   await expect(page.getByLabel('Имя пользователя')).toHaveValue('fixture_user')
   await page.getByLabel('Пароль').fill('fixture password long')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByText('Пользователь теста', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/tracks$/)
+  await expect(page.getByRole('link', { name: 'Мой аккаунт' })).toHaveText('Пользователь теста')
   const cookie = (await context.cookies()).find((value) => value.name === 'gurach_session')
   expect(cookie?.httpOnly).toBe(true)
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
@@ -29,7 +29,7 @@ test('rejects CSRF, discards unsafe return destinations and clears an invalid se
   await expect(page).toHaveURL(/\/$/)
   await context.addCookies([{ name: 'gurach_session', value: 'z'.repeat(43), domain: '127.0.0.1', path: '/', httpOnly: true }])
   await page.reload()
-  await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('link', { name: 'Войти', exact: true })).toBeVisible()
   expect((await context.request.post('/api/auth/logout', { headers: { origin: 'http://127.0.0.1:3200', 'X-Gurach-Request': '1' } })).status()).toBe(204)
   expect((await context.cookies()).some((cookie) => cookie.name === 'gurach_session')).toBe(false)
 })
@@ -44,7 +44,19 @@ test('does not reuse the previous identity across logout and login', async ({ pa
     await page.getByLabel('Пароль').fill('fixture password long')
     await page.getByRole('button', { name: 'Войти', exact: true }).click()
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByText(displayName, { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Мой аккаунт' })).toHaveText(displayName)
+    const main = page.getByRole('main')
+    await expect(main.getByRole('heading', { name: 'Музыка на сегодня', exact: true })).toBeVisible()
+    const releases = main.locator('section').filter({ has: page.getByRole('heading', { name: 'Новые треки', exact: true }) })
+    await expect(releases.getByRole('link', { name: 'Track 1', exact: true })).toBeVisible()
+    await expect(main.getByRole('alert')).toHaveCount(0)
+    const personal = main.locator('section').filter({ has: page.getByRole('heading', { name: 'Для вас', exact: true }) })
+    if (username === 'fixture_user') {
+      await expect(personal.getByRole('link', { name: 'Track 1', exact: true })).toBeVisible()
+    } else {
+      await expect(main.getByText('Слушайте музыку — здесь появятся ваши открытия.', { exact: true })).toBeVisible()
+      await expect(personal).toHaveCount(0)
+    }
     await expect(page.getByText(previous, { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Выйти', exact: true }).click()
     await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible()

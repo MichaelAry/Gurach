@@ -1,16 +1,18 @@
 import { expect, test } from '@playwright/test'
 
 async function signIn(page: import('@playwright/test').Page) {
-  await page.goto('/login')
+  await page.goto('/login?returnTo=/tracks')
   await page.getByLabel('Имя пользователя').fill('fixture_user')
   await page.getByLabel('Пароль').fill('fixture password long')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(page).toHaveURL(/\/tracks$/)
+  await expect(page.getByRole('contentinfo').getByRole('button', { name: 'Открыть очередь, 3 из 100', exact: true })).toBeVisible()
 }
 
 test('queue drawer supports reorder, occurrence playback, remove and confirmed clear', async ({ page }) => {
   await signIn(page)
   const footer = page.getByRole('contentinfo'), audio = page.locator('audio')
+  await expect(footer.getByRole('button', { name: /Открыть очередь/ })).toHaveCount(1)
   await footer.getByRole('button', { name: /Открыть очередь/ }).click()
   const panel = page.getByRole('region', { name: 'Очередь воспроизведения' })
   await expect(panel.getByText('3 / 100 треков')).toBeVisible()
@@ -19,7 +21,7 @@ test('queue drawer supports reorder, occurrence playback, remove and confirmed c
   await panel.getByRole('button', { name: 'Закрыть' }).click()
 
   const add = page.waitForResponse((response) => response.url().endsWith('/api/queue') && response.request().method() === 'PUT')
-  await page.getByRole('button', { name: 'Добавить в очередь: Track 4' }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Добавить в очередь: Track 4' }).click()
   expect((await add).status()).toBe(200)
   await footer.getByRole('button', { name: /Открыть очередь/ }).click()
   await expect(panel.getByText('4 / 100 треков')).toBeVisible()
@@ -43,18 +45,18 @@ test('queue drawer supports reorder, occurrence playback, remove and confirmed c
 
 test('bulk selection adds entries and confirms replacement of a nonempty queue', async ({ page }) => {
   await signIn(page)
-  await page.getByRole('checkbox', { name: 'Выбрать Track 5' }).check()
-  await page.getByRole('checkbox', { name: 'Выбрать Track 6' }).check()
+  await page.getByRole('main').getByRole('checkbox', { name: 'Выбрать Track 5' }).check()
+  await page.getByRole('main').getByRole('checkbox', { name: 'Выбрать Track 6' }).check()
   const append = page.waitForResponse((response) => response.url().endsWith('/api/queue') && response.request().method() === 'PUT')
-  await page.getByRole('button', { name: 'Добавить выбранные' }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Добавить выбранные' }).click()
   const appended = await append
   expect(appended.status()).toBe(200)
   expect((await appended.request().postDataJSON()).entries).toHaveLength(5)
 
-  await page.getByRole('checkbox', { name: 'Выбрать Track 7' }).check()
+  await page.getByRole('main').getByRole('checkbox', { name: 'Выбрать Track 7' }).check()
   page.once('dialog', (dialog) => void dialog.accept())
   const replace = page.waitForResponse((response) => response.url().endsWith('/api/queue') && response.request().method() === 'PUT')
-  await page.getByRole('button', { name: 'Заменить выбранными' }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Заменить выбранными' }).click()
   const replaced = await replace
   expect(replaced.status()).toBe(200)
   expect((await replaced.request().postDataJSON()).entries).toHaveLength(1)
@@ -80,7 +82,8 @@ test('account queue changes notify another tab without replacing its active iden
   await signIn(page)
   const second = await context.newPage()
   await second.goto('/tracks')
-  await expect(second.getByRole('button', { name: 'Играть Track 1', exact: true })).toBeVisible()
+  await expect(second.getByRole('main').getByRole('button', { name: 'Играть Track 1', exact: true })).toBeVisible()
+  await expect(second.getByRole('contentinfo').getByRole('button', { name: 'Открыть очередь, 3 из 100', exact: true })).toBeVisible()
   const secondFooter = second.getByRole('contentinfo')
   await secondFooter.getByRole('button', { name: /Открыть очередь/ }).click()
   const secondPanel = second.getByRole('region', { name: 'Очередь воспроизведения' })
@@ -88,7 +91,7 @@ test('account queue changes notify another tab without replacing its active iden
   await secondPanel.getByRole('button', { name: 'Закрыть' }).click()
 
   const update = page.waitForResponse((response) => response.url().endsWith('/api/queue') && response.request().method() === 'PUT')
-  await page.getByRole('button', { name: 'Добавить в очередь: Track 4' }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Добавить в очередь: Track 4' }).click()
   expect((await update).status()).toBe(200)
   await secondFooter.getByRole('button', { name: /Открыть очередь/ }).click()
   await expect(secondPanel.getByText('4 / 100 треков')).toBeVisible()
