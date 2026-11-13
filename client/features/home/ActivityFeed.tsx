@@ -1,14 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  Button,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from '@mui/material'
-import type { TrackListPage, TrackListItem } from '@/features/tracks/types'
+import { Button, Stack, Typography } from '@mui/material'
+import type { TrackListItem } from '@/features/tracks/types'
 import { Section, MusicRows } from './MusicSection'
 import { BlockState } from './BlockState'
 type Event = {
@@ -18,41 +12,23 @@ type Event = {
   at: string
   track: TrackListItem
 }
-export function ActivityFeed({
-  authenticated,
-  releases,
-}: {
-  authenticated: boolean
-  releases: TrackListItem[]
-}) {
-  const [filter, setFilter] = useState('all'),
-    [cursor, setCursor] = useState<string | null>(null)
+export function ActivityFeed() {
+  const [cursor, setCursor] = useState<string | null>(null)
   const [items, setItems] = useState<Event[]>([]),
     [next, setNext] = useState<string | null>(null)
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(false),
     [attempt, setAttempt] = useState(0)
-  const social = authenticated && filter !== 'new'
   useEffect(() => {
     const controller = new AbortController()
-    const path = social ? '/api/home/activity' : '/api/home/releases'
-    fetch(path + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''), {
+    fetch('/api/home/activity' + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''), {
       signal: controller.signal,
       cache: 'no-store',
     })
       .then(async (r) => {
         if (!r.ok) throw new Error()
-        const page = (await r.json()) as
-          { items: Event[]; nextCursor: string | null } | TrackListPage
-        const rows: Event[] = social
-          ? (page.items as Event[])
-          : (page.items as TrackListItem[]).map((track) => ({
-              id: track._id,
-              track,
-              action: 'release',
-              at: '',
-              user: { username: '', displayName: '' },
-            }))
+        const page = (await r.json()) as { items: Event[]; nextCursor: string | null }
+        const rows = page.items
         if (!controller.signal.aborted) {
           setItems((old) =>
             cursor
@@ -75,42 +51,9 @@ export function ActivityFeed({
         }
       })
     return () => controller.abort()
-  }, [social, cursor, attempt])
+  }, [cursor, attempt])
   return (
-    <Section title="Лента">
-      <ToggleButtonGroup
-        exclusive
-        value={filter}
-        size="small"
-        aria-label="Фильтр ленты"
-        onChange={(_, value: string | null) => {
-          if (!value) return
-          setFilter(value)
-          setCursor(null)
-          setItems([])
-          setLoading(true)
-          setError(false)
-          setAttempt((a) => a + 1)
-        }}
-        sx={{ mb: 2 }}
-      >
-        <ToggleButton value="all">Все</ToggleButton>
-        <ToggleButton value="friends" disabled={!authenticated}>
-          Друзья
-        </ToggleButton>
-        <ToggleButton value="new">Новые треки</ToggleButton>
-      </ToggleButtonGroup>
-      {filter === 'all' && social && (
-        <>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Новые релизы
-          </Typography>
-          <MusicRows tracks={releases.slice(0, 3)} />
-          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-            Активность друзей
-          </Typography>
-        </>
-      )}
+    <Section title="Активность друзей">
       <Stack spacing={1}>
         {items
           .filter(
@@ -171,10 +114,11 @@ export function ActivityFeed({
           <Link href="/tracks">открыть каталог</Link>.
         </Typography>
       )}
-      {next && (
+      {next && !error && (
         <Button
           disabled={loading}
           onClick={() => {
+            setError(false)
             setLoading(true)
             setCursor(next)
           }}
