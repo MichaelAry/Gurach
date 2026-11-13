@@ -36,6 +36,9 @@ function Popular() {
   const block = useHomeBlock<{ items: TrackListItem[] }>('/api/home/popular')
   return (
     <Section title="Популярное за 7 дней">
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Рейтинг по прослушиваниям вошедших пользователей за последние 7 дней.
+      </Typography>
       <BlockState {...block} />
       {block.data &&
         (block.data.items.length ? (
