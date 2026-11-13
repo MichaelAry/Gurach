@@ -1,7 +1,7 @@
 # Gurach
 
 Музыкальный плеер: **NestJS 12 + MongoDB** на бэкенде, **Next.js 16** на фронтенде.
-Поддерживаемая среда: Node `24.21.0` и npm `11.19.x` (см. `.node-version` и package engines).
+Поддерживаемая среда: Node `24.21.0` (см. [.node-version](.node-version)), npm `>=11.19.0 <12`; оба пакета требуют Node `>=24.21.0 <25`. Зависимости клиента и сервера устанавливаются отдельно, корневого npm-пакета нет.
 
 ## Стек
 
@@ -13,29 +13,51 @@
 
 ## Как запустить
 
+Нужны Docker с Compose v2 и работающим daemon, а также системный пакет
+FFmpeg: сервер использует `ffprobe` для проверки медиа, тесты создают аудио
+через `ffmpeg`. Оба исполняемых файла должны быть доступны в `PATH`
+(для серверного `ffprobe` можно задать `FFPROBE_PATH`).
+
+Команды ниже выполняются из корня клона в Bash.
+
 ```bash
+npm ci --prefix client
+npm ci --prefix server
+ffmpeg -version
+ffprobe -version
+
 # 1. Рекомендуемая локальная БД (приватные креды создаются один раз)
 node scripts/dev-db.mjs up
 
 # 2. Бэкенд (Nest) — отдельный терминал
 cd server
 set -a && source ../.local/mongo/app.env && set +a
-npm run start:dev                  # http://localhost:5000
+PUBLIC_URL=http://localhost:5000 CORS_ORIGINS=http://localhost:3000 \
+  npm run start:dev                # http://localhost:5000
 
 # 3. Фронтенд (Next) — отдельный терминал
-cd client && npm run dev           # http://localhost:3000
+cd client
+API_URL=http://localhost:5000 APP_ORIGIN=http://localhost:3000 \
+  npm run dev                     # http://localhost:3000
 ```
+
+Новая dev-база пуста: `up` не восстанавливает baseline и не применяет миграции.
+Этот путь запускает процессы; перед использованием входа, очереди, друзей
+и загрузки проверьте необходимые индексы в разделе «Миграции» ниже.
 
 Проверка, что цепочка «БД → Nest» живая:
 
 ```bash
+curl http://localhost:5000/health/ready
 curl http://localhost:5000/tracks
 ```
 
 ## Настройки
 
 Все адреса и секреты — через переменные окружения. Для локальной разработки
-env-файлы создавать не обязательно: без них подставляются localhost-значения.
+env-файлы создавать не обязательно: shell-переменных из примера запуска достаточно.
+Однако default Mongo URI ведёт в `localhost:27017/nest`, а dev-скрипт запускает
+другую базу: для неё обязательно загрузите `MONGODB_URI` из `app.env`.
 
 ```bash
 cp server/.env.example server/.env      # опционально: переопределить настройки Nest
@@ -78,6 +100,9 @@ http://localhost:5000/health/live` и `curl http://localhost:5000/health/ready`.
 | `MEDIA_STAGING_DIR`     | закрытый каталог приема файлов, вне `STATIC_DIR`        | `.local/media-staging`    |
 | `FFPROBE_PATH`          | путь к `ffprobe` из пакета FFmpeg                         | `ffprobe`                 |
 | `UPLOAD_MAX_MB`         | максимальный размер одного загружаемого файла, МБ      | `50`                      |
+| `MAINTENANCE_POLL_INTERVAL_MS` | интервал worker очистки медиа и доставки cache events, мс | `5000` |
+| `CACHE_EVENT_URL` | фиксированный callback Next для инвалидации кеша | не задан; локально `http://localhost:3000/api/internal/cache-events` |
+| `CACHE_EVENT_SECRET` | общий с Next секрет, 32–256 случайных URL-safe символов | не задан |
 | `THROTTLE_TTL_MS`       | окно rate limit, мс                                    | `60000`                   |
 | `THROTTLE_LIMIT`        | общий лимит запросов на IP за окно                     | `100`                     |
 | `THROTTLE_LISTEN_LIMIT` | лимит на `POST /tracks/:id/listen` за окно             | `10`                      |
@@ -87,6 +112,13 @@ http://localhost:5000/health/live` и `curl http://localhost:5000/health/ready`.
 | Переменная | Назначение                                | По умолчанию            |
 | ---------- | ----------------------------------------- | ----------------------- |
 | `API_URL`  | адрес Nest (server components и прокси `/api/*`) | `http://localhost:5000` |
+| `APP_ORIGIN` | точный origin браузера без завершающего `/`, для проверки мутаций | `http://localhost:3000` в dev; в production обязателен |
+| `CACHE_EVENT_SECRET` | тот же приватный секрет, что у Nest | не задан |
+
+Для доставки cache events задайте в Nest одновременно `CACHE_EVENT_URL` и
+`CACHE_EVENT_SECRET`, а в Next — тот же секрет. В development эта связка
+опциональна; без неё доставка событий инвалидации кеша не настроена.
+Эти переменные используются на сервере Next, префикс `NEXT_PUBLIC_` не нужен.
 
 Изменения `client/.env.local` применяются только после перезапуска `next dev`.
 
@@ -144,6 +176,9 @@ backup`; архив сохраняется с правами пользоват�
 - На клиенте в production `API_URL` обязателен и для `next build`, и для
   `next start`: без него сборка/запуск падают с понятной ошибкой, чтобы
   пререндеренные страницы не «запекли» localhost-ссылки.
+- В Nest обязательны также `CACHE_EVENT_URL` и `CACHE_EVENT_SECRET`; в Next
+  задайте тот же секрет для приёма cache events. Для приватных browser-мутаций
+  Next требует явный `APP_ORIGIN`, совпадающий с origin браузера.
 - `CORS_ORIGINS` должен содержать домен фронтенда, а `HOST` — `0.0.0.0`,
   если сервер работает в контейнере/за reverse-proxy.
 
@@ -178,9 +213,62 @@ backup`; архив сохраняется с правами пользоват�
 или администратор. Старые треки без владельца может удалять только администратор.
 Поля владельца и роли в запросе не дают дополнительных прав.
 
-Рекомендуемая локальная база `gurach` восстанавливается из P0 baseline и уже
-содержит 106 треков. Чтобы добавить seed-данные, используйте явные файлы и
-параметры из примера выше; `seed.sh` не читает файлы из домашнего каталога.
+Приватный P0 baseline содержит 106 треков, но архив не входит в Git.
+При наличии `.local/execution/p0/restart/mongodb.archive` команда
+`node scripts/dev-db.mjs restore-baseline` отдельно восстанавливает его в пустую
+базу `gurach`; обычный `up` этого не делает. Чтобы добавить seed-данные,
+используйте явные файлы и параметры из примера выше; `seed.sh` не читает файлы из домашнего каталога.
+
+## Текущие возможности
+
+- Регистрация, вход и выход работают через Next BFF и серверные сессии.
+  После входа `returnTo` возвращает на разрешённую внутреннюю страницу,
+  сохраняя query и fragment; небезопасный адрес заменяется на `/`.
+- Форма `/upload` отправляет аудио, обложку и метаданные в Nest и показывает
+  ошибки. Дубликат активного трека по нормализованным названию и исполнителю
+  отклоняется с `409 TRACK_DUPLICATE`; при наличии ID форма даёт ссылку на
+  существующий трек. Для загрузки необходим индекс миграции `008`.
+- Очередь интегрирована с плеером и вмещает до 100 вхождений: добавление,
+  перестановка, удаление выбранных/первых/недоступных и очистка. Гостевая очередь
+  хранится в браузере, очередь аккаунта — на сервере; после входа предлагается
+  явный выбор переноса гостевой очереди. В строке трека одна кнопка добавления.
+- Главная показывает релизы, рекомендации и активность друзей. «Популярное за
+  7 дней» учитывает прослушивания вошедших пользователей; гостевые не входят.
+  Личная недельная сводка ограничена последними 30 прослушиваниями.
+
+Подробности и ограничения главной: [docs/implementation/home.md](docs/implementation/home.md).
+Публичные плейлисты и отдельная история позиции воспроизведения не реализованы.
+Наличие реализации не означает завершение production-приёмки.
+
+## Миграции
+
+Приложение не применяет миграции автоматически; глобальный Mongoose `autoIndex`
+отключён. Перед эксплуатацией проверьте схему и индексы целевой базы:
+
+- `004-auth-indexes` — уникальные индексы аккаунтов/токенов и TTL сессий
+  (SessionService также явно создаёт их при старте).
+- `006-queue-indexes` — уникальная очередь на пользователя.
+- `007-social-relations` — индексы отношений, заявок, блокировок и квот дружбы.
+- `008-track-identity` — ключи активных треков и уникальный индекс
+  `track_active_name_artist_unique` по названию и исполнителю. Нормализация:
+  NFC, trim, схлопывание пробелов, нижний регистр; пустой и отсутствующий
+  исполнитель совпадают. План останавливается при старых дублях, которые
+  оператор должен разрешить вручную. До plan/apply/verify остановите writers;
+  успешная проверка должна показать ноль проблем. Без совместимого индекса
+  сервер останавливает загрузку с `503`.
+
+Исключения из установки индексов только миграциями: SessionService создаёт
+индексы пользователей/сессий, а HomeService — индексы запросов главной при
+старте. Это не устанавливает индексы очереди, дружбы или дедупликации.
+
+Для старых данных также зарегистрированы `001-track-lifecycle`,
+`002-comment-parents`, `003-remove-track-comment-arrays`; порядок и условия
+rehearsal описаны в [docs/execution/migrations.md](docs/execution/migrations.md).
+Существующий runner разрешает **apply только в изолированные `gurach_test_*`**.
+Он пока не является способом установки в dev-базу `gurach`, staging или
+production. Для рабочей базы нужна отдельно согласованная процедура с backup
+и проверкой восстановления; обходить ограничение переименованием базы нельзя.
+Не считайте новую dev-базу готовой ко всем функциям сразу после `up`.
 
 ## Друзья
 
@@ -195,7 +283,7 @@ backup`; архив сохраняется с правами пользоват�
 
 Подробный разбор, выполненные исправления и приоритеты: [docs/architecture-review.md](docs/architecture-review.md).
 
-Подробный план семи следующих этапов (включая полную интеграцию очереди до 100 треков) с зависимостями, миграциями и критериями готовности: [docs/implementation-plan.md](docs/implementation-plan.md).
+Исторический план этапов с зависимостями, миграциями и критериями готовности (статус сверяйте с кодом и текущими ограничениями выше): [docs/implementation-plan.md](docs/implementation-plan.md).
 
 Пошаговое выполнение P0–P8: [START-HERE](docs/execution/START-HERE.md). Готовый промпт для запуска: [RUN-PROMPT](docs/execution/RUN-PROMPT.md). Прогресс реализации: [progress.json](docs/execution/progress.json).
 
@@ -209,12 +297,17 @@ backup`; архив сохраняется с правами пользоват�
 npm ci --prefix client && npm ci --prefix server
 npm test --prefix client && npm run typecheck --prefix client && npm run lint --prefix client
 npm test --prefix server && npm run typecheck --prefix server && npm run tools:check-config --prefix server && npm run lint --prefix server && npm run build --prefix server
+npm run contracts:check --prefix server
+API_URL=http://127.0.0.1:5000 npm run build --prefix client
 npm run test:isolated --prefix server
-npm run test:e2e --prefix client
+(cd client && npx playwright install --with-deps chromium)
+CI=1 npm run test:e2e --prefix client
 ```
 
-Client production build требует `API_URL`, например:
-`API_URL=http://127.0.0.1:5000 npm run build --prefix client`.
+Дополнительно типы клиента сверяются командой `npm run api:check --prefix client`.
+`test:isolated` требует Docker, media-тесты — FFmpeg/ffprobe. Playwright smoke
+сам запускает fixture API на `5300` и Next на `3200`; это не проверка живой Mongo
+или реального Nest. Не задавайте внешний `API_URL` при запуске этого smoke.
 GitHub Actions workflow `.github/workflows/ci.yml` выполняет install/static/build,
 authenticated Mongo replica-set integration и Playwright browser smoke. CI remote
 результаты видны в GitHub Actions после push/PR; локальная проверка workflow не
@@ -223,8 +316,6 @@ authenticated Mongo replica-set integration и Playwright browser smoke. CI remo
 Изменения схемы и данных должны сопровождаться явной миграцией и rehearsal на
 копии backup; не используйте production volume для экспериментов. P0 baseline
 архив и текущие локальные backups находятся в игнорируемом `.local/` и не входят
-в Git. До production отдельно завершить P3–P8, включая контракты, безопасное
-хранение media, аутентификацию и интеграцию очереди.
-
-Загрузка и вход на клиенте пока остаются заготовками; полная очередь из списка
-работ ещё не реализована.
+в Git. Production-приёмка, применение миграций к рабочим данным, проверка
+восстановления и реальные браузерные сценарии требуют отдельного подтверждения.
+Этот README не утверждает, что удалённый CI прошёл или все пункты roadmap готовы.
