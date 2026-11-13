@@ -2,16 +2,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button, Stack, Typography } from '@mui/material'
-import type { TrackListItem } from '@/features/tracks/types'
+import type { components } from '@/lib/api/schema'
 import { Section, MusicRows } from './MusicSection'
 import { BlockState } from './BlockState'
-type Event = {
-  id: string
-  user: { username: string; displayName: string }
-  action: string
-  at: string
-  track: TrackListItem
-}
+type ActivityPage = components['schemas']['HomeActivityPage']
+type Event = ActivityPage['items'][number]
 export function ActivityFeed() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [items, setItems] = useState<Event[]>([]),
@@ -27,7 +22,7 @@ export function ActivityFeed() {
     })
       .then(async (r) => {
         if (!r.ok) throw new Error()
-        const page = (await r.json()) as { items: Event[]; nextCursor: string | null }
+        const page: ActivityPage = await r.json()
         const rows = page.items
         if (!controller.signal.aborted) {
           setItems((old) =>

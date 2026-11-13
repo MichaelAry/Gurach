@@ -10,9 +10,9 @@ export function useHomeBlock<T>(path: string) {
   useEffect(() => {
     const controller = new AbortController()
     fetch(path, { signal: controller.signal, cache: 'no-store' })
-      .then(async (r) => {
+      .then(async (r): Promise<T> => {
         if (!r.ok) throw new Error()
-        return r.json() as Promise<T>
+        return r.json()
       })
       .then((data) => {
         if (!controller.signal.aborted)

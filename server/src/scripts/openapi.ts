@@ -35,6 +35,7 @@ async function main(): Promise<void> {
       .setTitle('Gurach API')
       .setDescription('HTTP API contract for Gurach.')
       .setVersion('1.0.0')
+      .addBearerAuth()
       .addServer('http://localhost:5000', 'Local development placeholder')
       .build();
     const document = SwaggerModule.createDocument(app, config, {

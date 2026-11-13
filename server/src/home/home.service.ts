@@ -1,3 +1,4 @@
+import type { HomeReleasesPage, HomePopularResponse, HomeActivityPage, HomeActivityItem } from './home.contract.js';
 import {
   BadRequestException,
   Injectable,
@@ -41,10 +42,10 @@ export class HomeService implements OnModuleInit {
       ),
     ]);
   }
-  async releases(cursor?: string) {
+  async releases(cursor?: string): Promise<HomeReleasesPage> {
     let after: Types.ObjectId | null = null;
     try {
-      if (cursor) after = new Types.ObjectId(decodeCursor(cursor).after);
+      if (cursor !== undefined) after = new Types.ObjectId(decodeCursor(cursor).after);
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
@@ -67,7 +68,7 @@ export class HomeService implements OnModuleInit {
           : null,
     };
   }
-  async popular() {
+  async popular(): Promise<HomePopularResponse> {
     const rows = await this.listens
       .aggregate<{ _id: Types.ObjectId; count: number }>([
         {
@@ -102,10 +103,10 @@ export class HomeService implements OnModuleInit {
       }),
     };
   }
-  async activity(userId: string, cursor?: string) {
+  async activity(userId: string, cursor?: string): Promise<HomeActivityPage> {
     let after: Types.ObjectId | null = null;
     try {
-      if (cursor) after = new Types.ObjectId(decodeCursor(cursor).after);
+      if (cursor !== undefined) after = new Types.ObjectId(decodeCursor(cursor).after);
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
@@ -166,14 +167,14 @@ export class HomeService implements OnModuleInit {
       ...uploads.map((row) => ({
         id: String(row._id),
         user: authors.get(String(row.ownerId))!,
-        action: 'upload',
+        action: 'upload' as const,
         track: toTrackListItem(row),
         at: row._id.getTimestamp().toISOString(),
       })),
       ...comments.map((row) => ({
         id: String(row._id),
         user: authors.get(String(row.authorId))!,
-        action: row.rating ? 'rating' : 'comment',
+        action: row.rating ? 'rating' as const : 'comment' as const,
         track: resolved.get(String(row.track_id)) ?? null,
         at:
           row.createdAt?.toISOString() ?? row._id.getTimestamp().toISOString(),
@@ -181,7 +182,7 @@ export class HomeService implements OnModuleInit {
     ].sort((a, b) => b.id.localeCompare(a.id));
     const page = candidates.slice(0, 20);
     return {
-      items: page.filter((row) => row.track?.audio),
+      items: page.filter((row): row is HomeActivityItem => !!row.track?.audio),
       nextCursor:
         candidates.length > 20
           ? encodeCursor({ after: page.at(-1)!.id })

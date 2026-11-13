@@ -12,7 +12,7 @@ import {
 } from '../friends/schemas/social-relation.schema.js';
 import { User, UserSchema } from '../auth/schemas/user.schema.js';
 import { TrackModule } from '../track/track.module.js';
-import { HomeController } from './home.controller.js';
+import { HOME_API_CONTROLLERS } from '../contracts/api-controller.registry.js';
 import { HomeService } from './home.service.js';
 @Module({
   imports: [
@@ -25,7 +25,7 @@ import { HomeService } from './home.service.js';
       { name: User.name, schema: UserSchema },
     ]),
   ],
-  controllers: [HomeController],
+  controllers: [...HOME_API_CONTROLLERS],
   providers: [HomeService],
 })
 export class HomeModule {}

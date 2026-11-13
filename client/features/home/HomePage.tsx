@@ -1,10 +1,11 @@
 'use client'
-import type { AccountStatistics, HistoryItem } from '@/features/account/api'
+import type { components } from '@/lib/api/schema'
+import type { AccountStatistics } from '@/features/account/api'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import type { FriendListPage } from '@/features/friends/api'
 import { usePlayer } from '@/features/player/PlayerProvider'
 import { QueuePanel } from '@/features/queue/components/QueuePanel'
-import type { TrackListItem, TrackListPage } from '@/features/tracks/types'
+import type { TrackListPage } from '@/features/tracks/types'
 import { Box, Button, LinearProgress, Stack, Typography } from '@mui/material'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
@@ -32,10 +33,11 @@ function ContinueListening() {
     </Section>
   )
 }
-type ReleasesBlock = ReturnType<typeof useHomeBlock<TrackListPage>>
+type HomeReleasesPage = components['schemas']['HomeReleasesPage']
+type ReleasesBlock = ReturnType<typeof useHomeBlock<HomeReleasesPage>>
 function Releases({ block }: { block: ReleasesBlock }) {
   const [cursor, setCursor] = useState<string | null>(null)
-  const [page, setPage] = useState<TrackListPage>({ items: [], nextCursor: null })
+  const [page, setPage] = useState<HomeReleasesPage>({ items: [], nextCursor: null })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -46,9 +48,9 @@ function Releases({ block }: { block: ReleasesBlock }) {
       signal: controller.signal,
       cache: 'no-store',
     })
-      .then(async (response) => {
+      .then(async (response): Promise<HomeReleasesPage> => {
         if (!response.ok) throw new Error()
-        return response.json() as Promise<TrackListPage>
+        return response.json()
       })
       .then((data) => {
         if (controller.signal.aborted) return
@@ -104,7 +106,7 @@ function Releases({ block }: { block: ReleasesBlock }) {
   )
 }
 function Popular() {
-  const block = useHomeBlock<{ items: TrackListItem[] }>('/api/home/popular')
+  const block = useHomeBlock<components['schemas']['HomePopularResponse']>('/api/home/popular')
   return (
     <Section title="Популярное за 7 дней">
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -124,7 +126,7 @@ function Popular() {
 }
 function Personal({ releases }: { releases: ReleasesBlock }) {
   const tracks = releases.data?.items
-  const history = useHomeBlock<{ items: HistoryItem[] }>('/api/account/history?count=30')
+  const history = useHomeBlock<components['schemas']['AccountHistoryPage']>('/api/account/history?count=30')
   const favorites = useHomeBlock<TrackListPage>('/api/account/favorites?count=30')
   const stats = useHomeBlock<AccountStatistics>('/api/account/statistics')
   const friends = useHomeBlock<FriendListPage>('/api/friends?count=5')
@@ -259,7 +261,7 @@ export default function HomePage() {
 }
 function HomeContent() {
   const viewer = useViewer(),
-    releases = useHomeBlock<TrackListPage>('/api/home/releases')
+    releases = useHomeBlock<HomeReleasesPage>('/api/home/releases')
   const [queueOpen, setQueueOpen] = useState(false)
   return (
     <Box

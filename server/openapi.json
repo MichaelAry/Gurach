@@ -415,6 +415,111 @@
         ],
         "type": "object"
       },
+      "HomeActivityItem": {
+        "properties": {
+          "action": {
+            "enum": [
+              "upload",
+              "comment",
+              "rating"
+            ],
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "track": {
+            "$ref": "#/components/schemas/TrackListItem"
+          },
+          "user": {
+            "$ref": "#/components/schemas/HomeActivityUser"
+          }
+        },
+        "required": [
+          "id",
+          "user",
+          "action",
+          "track",
+          "at"
+        ],
+        "type": "object"
+      },
+      "HomeActivityPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HomeActivityItem"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "nextCursor": {
+            "example": "eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "items"
+        ],
+        "type": "object"
+      },
+      "HomeActivityUser": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "HomePopularResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackListItem"
+            },
+            "maxItems": 6,
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "HomeReleasesPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackListItem"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "nextCursor": {
+            "example": "eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nextCursor",
+          "items"
+        ],
+        "type": "object"
+      },
       "ListenResult": {
         "properties": {
           "listens": {
@@ -966,6 +1071,13 @@
           "nextCursor"
         ],
         "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -3024,6 +3136,186 @@
         },
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/home/activity": {
+      "get": {
+        "operationId": "HomeController_activity",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeActivityPage"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "enum": [
+                    "private, no-store"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "home"
+        ]
+      }
+    },
+    "/home/popular": {
+      "get": {
+        "operationId": "HomeController_popular",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomePopularResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "home"
+        ]
+      }
+    },
+    "/home/releases": {
+      "get": {
+        "operationId": "HomeController_releases",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeReleasesPage"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "home"
         ]
       }
     },
