@@ -6,8 +6,11 @@ import Navbar from '@/components/navbar'
 import { BackButton } from '@/features/navigation/components/BackButton'
 import { Box } from '@mui/material'
 import { Suspense } from 'react'
+import type { Viewport } from 'next'
 import { ViewerProvider } from '@/features/auth/ViewerProvider'
 import { SessionControls } from '@/features/auth/SessionControls'
+
+export const viewport: Viewport = { viewportFit: 'cover' }
 
 export default function MainLayout({
   children,
@@ -18,17 +21,20 @@ export default function MainLayout({
     // Плеер живёт на всех страницах (main): контекст + <audio> + нижний бар
     <ViewerProvider><FavoritesProvider><ListenCountsProvider>
       <PlayerProvider>
-        <Box sx={{ position: 'absolute', top: 0, left: 0, zIndex: 10 }}>
+        <Box sx={{ position: { xs: 'static', md: 'absolute' }, top: 0, left: 0, zIndex: 10, overflowWrap: 'anywhere' }}>
           <SessionControls />
         </Box>
         <Box
           sx={{
-            position: 'fixed',
+            position: { xs: 'static', md: 'fixed' },
+            zIndex: 1200,
             right: 0,
             top: '50%',
-            transform: 'translateY(-50%)',
+            transform: { md: 'translateY(-50%)' },
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: { xs: 'row', md: 'column' },
+            flexWrap: 'wrap',
+            '& nav': { flexDirection: { xs: 'row', md: 'column' }, flexWrap: 'wrap' },
             alignItems: 'flex-end',
             gap: 1,
             p: 1,
@@ -44,25 +50,27 @@ export default function MainLayout({
           <Navbar />
         </Box>
 
-        {/* paddingBottom — чтобы контент не уходил под fixed-бар плеера.
-          Центрирование по ОБЕИМ осям: flex-контейнер на всю высоту экрана
-          + margin:auto на колонке. Ведёт себя как абсолютное центрирование:
-          при свободной высоте блок встаёт ровно в середину экрана, а когда
-          контента больше, чем высоты вьюпорта, auto-маргины сворачиваются
-          в ноль — верх не теряется, скролл работает как обычно.
-          Navbar справа — fixed, вне потока и на расчёт центра не влияет. */}
-        <main
-          style={{
-            paddingTop: 64,
-            paddingBottom: 144,
-            minHeight: 'calc(100vh - 144px)',
+        {/* PlayerBar measures its full height, including errors and the safe area. */}
+        <Box
+          component="main"
+          sx={{
+            pt: { xs: 2, md: 8 },
+            pr: { md: '72px' },
+            pb: 'calc(var(--player-bar-height, 180px) + 24px)',
+            minHeight: '100dvh',
+            minWidth: 0,
             display: 'flex',
+            '& [tabindex]:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+            '& :is([id], input, textarea, button, a, [tabindex])': {
+              scrollMarginTop: '16px',
+              scrollMarginBottom: 'calc(var(--player-bar-height, 180px) + 24px)',
+            },
           }}
         >
           <Box sx={{ width: '100%', maxWidth: 1000, margin: 'auto', '&:has([data-home-page])': { maxWidth: 1200 } }}>
             {children}
           </Box>
-        </main>
+        </Box>
 
         <PlayerBar />
       </PlayerProvider>
