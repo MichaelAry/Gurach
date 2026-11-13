@@ -540,7 +540,9 @@ export interface components {
         };
         ApiErrorBodyDto: {
             /** @enum {string} */
-            code: "QUEUE_FULL" | "QUEUE_CONFLICT" | "QUEUE_ENTRY_INVALID" | "TRACK_UNAVAILABLE" | "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNAUTHORIZED" | "FORBIDDEN" | "RATE_LIMITED" | "INTERNAL_ERROR" | "BACKEND_UNAVAILABLE" | "BACKEND_TIMEOUT";
+            code: "TRACK_DUPLICATE" | "QUEUE_FULL" | "QUEUE_CONFLICT" | "QUEUE_ENTRY_INVALID" | "TRACK_UNAVAILABLE" | "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNAUTHORIZED" | "FORBIDDEN" | "RATE_LIMITED" | "INTERNAL_ERROR" | "BACKEND_UNAVAILABLE" | "BACKEND_TIMEOUT";
+            /** @description Existing active track for TRACK_DUPLICATE */
+            existingTrackId?: string;
             fieldErrors?: {
                 [key: string]: string[];
             };
@@ -2696,6 +2698,15 @@ export interface operations {
             };
             /** @description Unexpected server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Upload protection index or media validation unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -26,6 +26,7 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiServiceUnavailableResponse,
   ApiParam,
   ApiQuery,
   ApiTags,
@@ -38,6 +39,7 @@ import {
   TrackListPage,
   TrackSearchPage,
 } from '../contracts/track.contract.js';
+import { ApiErrorDto } from '../contracts/api-error.dto.js';
 import { ApiStandardErrors } from '../contracts/api-response.decorators.js';
 import { env } from '../common/env.js';
 import { parseCursorPageQuery } from './dto/list-tracks-query.dto.js';
@@ -90,6 +92,7 @@ export class TrackController {
     },
   } })
   @ApiCreatedResponse({ type: TrackDetail })
+  @ApiServiceUnavailableResponse({ description: 'Upload protection index or media validation unavailable', type: ApiErrorDto })
   @ApiStandardErrors({ authenticated: true, payloadTooLarge: true, unsupportedMediaType: true, conflict: true, rateLimited: true })
   @UseGuards(UploadAdmissionGuard)
   @UseInterceptors(UploadStagingInterceptor)

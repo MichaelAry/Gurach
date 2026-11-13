@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import mongoose, { Types } from 'mongoose';
@@ -29,6 +30,9 @@ import {
 import type { ListTracksQuery } from './dto/list-tracks-query.dto.js';
 import { searchCursorScope, type SearchTracksQuery } from './dto/search-tracks-query.dto.js';
 import { toTrackDetail, toTrackListItem, type TrackListRecord } from './mappers/track.mapper.js';
+import { normalizeTrackIdentity } from './track-identity.js';
+import { DuplicateTrackError } from './duplicate-track.error.js';
+import { isTrackIdentityIndex, TRACK_IDENTITY_INDEX } from './schemas/track.schema.js';
 import { Track, TrackDocument } from './schemas/track.schema.js';
 import { CacheEvent, CacheEventDocument } from '../maintenance/schemas/cache-event.schema.js';
 import { MediaOperation, MediaOperationDocument } from '../maintenance/schemas/media-operation.schema.js';
@@ -72,7 +76,18 @@ export class TrackService {
     let committed = false;
     let leaseToken: string | undefined;
 
+    const nameKey = normalizeTrackIdentity(dto.name);
+    const artistKey = normalizeTrackIdentity(dto.artist);
     try {
+      const indexes = await this.trackModel.collection.listIndexes().toArray().catch((error: unknown) => {
+        if (error instanceof mongoose.mongo.MongoServerError && error.code === 26) return [];
+        throw error;
+      });
+      if (!indexes.some(isTrackIdentityIndex)) {
+        throw new ServiceUnavailableException('Track identity index is missing; run migration 008-track-identity');
+      }
+      const existing = await this.findDuplicate(nameKey, artistKey);
+      if (existing) throw new DuplicateTrackError(existing);
       const [audioValidation, coverValidation] = await Promise.allSettled([
         this.mediaValidator.validateAudio(audio.path, audio.originalname),
         this.mediaValidator.validateCover(picture.path, picture.originalname),
@@ -139,6 +154,8 @@ export class TrackService {
             // Map explicitly so DTO fields cannot bypass the file layer.
             name: dto.name,
             artist: dto.artist,
+            nameKey,
+            artistKey,
             text: dto.text,
             duration: audioMetadata.durationSeconds,
             listens: 0,
@@ -178,8 +195,32 @@ export class TrackService {
       return toTrackDetail(createdTrack);
     } catch (error) {
       if (intentCreated && !committed) await this.markUploadForCleanup(operationId, leaseToken, error);
+      // Cleanup must happen before looking up the winner of a publication race.
+      if (error instanceof mongoose.mongo.MongoServerError && error.code === 11000
+        && error.message.includes(`index: ${TRACK_IDENTITY_INDEX} dup key`)) {
+        const existing = await this.findDuplicate(nameKey, artistKey).catch(() => undefined);
+        throw new DuplicateTrackError(existing);
+      }
       throw error;
     }
+  }
+
+  private async findDuplicate(nameKey: string, artistKey: string): Promise<string | undefined> {
+    const keyed = await this.trackModel.findOne({ lifecycle: 'active', nameKey, artistKey }).select('_id').lean().exec();
+    if (keyed) return String(keyed._id);
+    // A partial index alone cannot protect a legacy catalogue. Check all unkeyed
+    // active rows with the same JS normalizer until the complete backfill passes.
+    const legacy = this.trackModel.find({
+      lifecycle: 'active',
+      $or: [{ nameKey: { $not: { $type: 'string' } } }, { artistKey: { $not: { $type: 'string' } } }],
+    }).select('_id name artist').lean().cursor();
+    for await (const track of legacy) {
+      if (normalizeTrackIdentity(track.name) === nameKey && normalizeTrackIdentity(track.artist) === artistKey) {
+        await legacy.close();
+        return String(track._id);
+      }
+    }
+    return undefined;
   }
 
   private async markUploadForCleanup(operationId: string, leaseToken: string | undefined, error: unknown): Promise<void> {

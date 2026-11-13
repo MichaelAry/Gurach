@@ -1,3 +1,4 @@
+import { DuplicateTrackError } from '../track/duplicate-track.error.js';
 import { QueueError } from '../queue/queue-error.js';
 import {
   ArgumentsHost,
@@ -47,6 +48,7 @@ function validationFields(response: unknown): Record<string, string[]> | undefin
 }
 
 function mapError(exception: unknown): { status: number; mapping: ErrorMapping; fields?: Record<string, string[]> } {
+  if (exception instanceof DuplicateTrackError) return { status: 409, mapping: { code: 'TRACK_DUPLICATE', message: exception.message } };
   if (exception instanceof QueueError) return { status: exception.getStatus(), mapping: { code: exception.queueCode, message: exception.message } };
   if (exception && typeof exception === 'object' && 'type' in exception && exception.type === 'entity.too.large') return { status: 413, mapping: PUBLIC_MESSAGES[413] };
   const multer = exception as MulterLikeError;
@@ -56,9 +58,6 @@ function mapError(exception: unknown): { status: number; mapping: ErrorMapping; 
   }
   if (exception instanceof mongoose.Error.ValidationError || exception instanceof mongoose.Error.CastError) {
     return { status: 400, mapping: PUBLIC_MESSAGES[400] };
-  }
-  if (exception instanceof mongoose.mongo.MongoServerError && exception.code === 11000) {
-    return { status: 409, mapping: PUBLIC_MESSAGES[409] };
   }
   if (exception instanceof HttpException) {
     const status = exception.getStatus();
@@ -101,6 +100,8 @@ export class ApiErrorFilter implements ExceptionFilter {
         code: queueValidation?.code ?? mapping.code,
         message: queueValidation?.message ?? mapping.message,
         ...(fields ? { fieldErrors: fields } : {}),
+        ...(exception instanceof DuplicateTrackError && exception.existingTrackId
+          ? { existingTrackId: exception.existingTrackId } : {}),
         requestId,
       },
     };
