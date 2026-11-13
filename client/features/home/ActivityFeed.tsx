@@ -90,6 +90,9 @@ export function ActivityFeed() {
                   </time>
                 </Typography>
               )}
+              {item.action !== 'upload' && (
+                <Link href={`/tracks/${item.track._id}#comment-${item.id}`}>Открыть комментарий</Link>
+              )}
               <MusicRows tracks={[item.track]} />
             </Stack>
           ))}

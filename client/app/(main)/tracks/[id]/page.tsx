@@ -2,7 +2,6 @@
 import { FavoriteButton } from '@/features/favorites/FavoriteButton'
 import {
   Box,
-  Button,
   Card,
   Stack,
   Typography,
@@ -137,10 +136,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
                 bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', borderRadius: 1,
               },
             }}>
-              <CommentsSection trackId={track._id} />
-              <Button variant="outlined" fullWidth disabled title="Добавление комментариев пока недоступно">
-                Добавление комментариев скоро появится
-              </Button>
+              <CommentsSection key={track._id} trackId={track._id} />
             </Box>
           </Box>
         </Card>

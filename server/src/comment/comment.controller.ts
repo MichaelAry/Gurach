@@ -31,6 +31,16 @@ export class CommentController {
     return this.comments.list(parseTrackCommentsQuery(trackId, query));
   }
 
+  @Public()
+  @Get('/tracks/:trackId/comments/:commentId')
+  @ApiParam({ name: 'trackId', schema: { type: 'string', pattern: '^[a-fA-F0-9]{24}$' } })
+  @ApiParam({ name: 'commentId', schema: { type: 'string', pattern: '^[a-fA-F0-9]{24}$' } })
+  @ApiOkResponse({ type: CommentResponse })
+  @ApiStandardErrors({ notFound: true })
+  get(@Param('trackId') trackId: string, @Param('commentId') commentId: string) {
+    return this.comments.get(trackId, commentId);
+  }
+
   @Delete('/comments/:commentId')
   @ApiParam({ name: 'commentId', schema: { type: 'string', pattern: '^[a-fA-F0-9]{24}$' } })
   @ApiOkResponse({ type: CommentResponse })

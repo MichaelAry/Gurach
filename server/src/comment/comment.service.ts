@@ -4,7 +4,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import type { ClientSession, Connection, Model } from 'mongoose';
-import { CommentPage } from '../contracts/track.contract.js';
+import { CommentPage, CommentResponse } from '../contracts/track.contract.js';
 import type { CommentRecord } from './mappers/comment.mapper.js';
 import { toCommentResponse } from './mappers/comment.mapper.js';
 import { Comment, CommentDocument } from './schemas/comment.schema.js';
@@ -94,6 +94,16 @@ export class CommentService {
     } finally {
       await session.endSession();
     }
+  }
+
+  async get(trackId: string, commentId: string): Promise<CommentResponse> {
+    const parentId = await this.tracks.assertActive(trackId);
+    if (!Types.ObjectId.isValid(commentId)) throw new BadRequestException('Invalid commentId');
+    const record = await this.comments.findOne({
+      _id: new Types.ObjectId(commentId), track_id: parentId, migrationQuarantineId: { $exists: false },
+    }).select('_id track_id authorId username text rating createdAt').lean().exec();
+    if (!record) throw new NotFoundException('Comment was not found');
+    return toCommentResponse(record as CommentRecord);
   }
 
   async list(query: ListCommentsQuery): Promise<CommentPage> {
