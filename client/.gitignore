@@ -13,6 +13,7 @@
 # testing
 /coverage
 /test-results/
+/test-results-https/
 /playwright-report/
 /blob-report/
 
