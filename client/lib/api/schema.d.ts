@@ -3314,6 +3314,8 @@ export interface operations {
                 text?: string;
                 artist?: string;
                 name?: string;
+                /** @description Match title or artist, excluding lyrics. Combined with other filters using AND. */
+                nameOrArtist?: string;
                 query?: string;
             };
             header?: never;

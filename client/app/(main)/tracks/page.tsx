@@ -15,7 +15,7 @@ async function CatalogueData() {
 export async function generateMetadata() {
   return {
     title: 'Треки',
-    description: 'Список всех треков',
+    description: 'Каталог и поиск треков по названию или исполнителю',
   }
 }
 

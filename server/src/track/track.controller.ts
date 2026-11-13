@@ -127,6 +127,7 @@ export class TrackController {
   @Public()
   @Get('search')
   @ApiQuery({ name: 'query', required: false, type: String, maxLength: 200 })
+  @ApiQuery({ name: 'nameOrArtist', required: false, type: String, maxLength: 200, description: 'Match title or artist, excluding lyrics. Combined with other filters using AND.' })
   @ApiQuery({ name: 'name', required: false, type: String, maxLength: 200 })
   @ApiQuery({ name: 'artist', required: false, type: String, maxLength: 200 })
   @ApiQuery({ name: 'text', required: false, type: String, maxLength: 200 })

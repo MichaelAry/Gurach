@@ -366,8 +366,8 @@ export class TrackService {
   }
 
   async search(query: SearchTracksQuery): Promise<TrackSearchPage> {
-    const { query: term, name, artist, text } = query;
-    const scope = searchCursorScope({ query: term, name, artist, text });
+    const { query: term, name, artist, text, nameOrArtist } = query;
+    const scope = searchCursorScope({ query: term, name, artist, text, nameOrArtist });
     const cursor = query.cursor ? decodeScopedCursor(query.cursor) : undefined;
     if (cursor && cursor.scope !== scope) {
       throw new BadRequestException('"cursor" does not match the search filters');
@@ -378,6 +378,12 @@ export class TrackService {
     if (term) {
       const re = new RegExp(escapeRegex(term), 'i');
       filter.$or = [{ name: re }, { artist: re }, { text: re }];
+    }
+
+    if (nameOrArtist) {
+      const re = new RegExp(escapeRegex(nameOrArtist), 'i');
+      // A separate clause preserves AND semantics with the legacy query filter.
+      filter.$and = [{ $or: [{ name: re }, { artist: re }] }];
     }
 
     if (name) {

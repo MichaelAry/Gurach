@@ -4242,6 +4242,16 @@
             }
           },
           {
+            "description": "Match title or artist, excluding lyrics. Combined with other filters using AND.",
+            "in": "query",
+            "name": "nameOrArtist",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "query",
             "required": false,
