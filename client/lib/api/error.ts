@@ -2,6 +2,7 @@ export interface ApiErrorEnvelope {
   error: {
     code: string
     message: string
+    existingTrackId?: string
     fieldErrors?: Record<string, string[]>
     requestId: string
   }

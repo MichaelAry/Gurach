@@ -17,7 +17,7 @@ export function FavoriteButton({ trackId, name }: { trackId: string; name: strin
     <span><IconButton size="small" color={favorite ? 'primary' : 'default'}
       disabled={loading || error || pending.has(trackId)} aria-label={`${label}: ${name}`} aria-pressed={favorite}
       onClick={() => {
-        if (!user) router.push(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+        if (!user) router.push(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`)
         else void toggle(trackId)
       }}>
       {favorite ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}

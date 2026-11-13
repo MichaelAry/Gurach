@@ -82,6 +82,7 @@
         "properties": {
           "code": {
             "enum": [
+              "TRACK_DUPLICATE",
               "QUEUE_FULL",
               "QUEUE_CONFLICT",
               "QUEUE_ENTRY_INVALID",
@@ -98,6 +99,11 @@
               "BACKEND_UNAVAILABLE",
               "BACKEND_TIMEOUT"
             ],
+            "type": "string"
+          },
+          "existingTrackId": {
+            "description": "Existing active track for TRACK_DUPLICATE",
+            "pattern": "^[a-f0-9]{24}$",
             "type": "string"
           },
           "fieldErrors": {
@@ -3379,6 +3385,16 @@
               }
             },
             "description": "Unexpected server error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Upload protection index or media validation unavailable"
           }
         },
         "tags": [

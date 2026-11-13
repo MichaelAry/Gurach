@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Alert, Button, LinearProgress, Stack, TextField } from '@mui/material'
-import { uploadTrack } from '../api/uploadTrack'
+import Link from 'next/link'
+import { DuplicateTrackError, uploadTrack } from '../api/uploadTrack'
 import { useRouter } from 'next/navigation'
 
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac']
@@ -28,6 +29,7 @@ export function UploadTrackForm() {
   const [coverError, setCoverError] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [existingTrackId, setExistingTrackId] = useState<string | null>(null)
   const [uploaded, setUploaded] = useState(false)
   const requestRef = useRef<AbortController | null>(null)
 
@@ -43,6 +45,7 @@ export function UploadTrackForm() {
     requestRef.current = controller
     setPending(true)
     setError(null)
+    setExistingTrackId(null)
     try {
       const trackId = await uploadTrack(body, controller.signal)
       if (!controller.signal.aborted) {
@@ -51,7 +54,10 @@ export function UploadTrackForm() {
         router.refresh()
       }
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Не удалось загрузить трек.')
+      if (!controller.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : 'Не удалось загрузить трек.')
+        setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
+      }
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null
@@ -114,7 +120,7 @@ export function UploadTrackForm() {
         />
       </Stack>
       {pending && <LinearProgress aria-label="Загрузка трека" />}
-      {error && <Alert severity="error">{error}</Alert>}
+      {error && <Alert severity="error">{error}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>Открыть существующий трек</Link></>}</Alert>}
       {uploaded && <Alert severity="success">Трек успешно загружен. Открываем страницу трека…</Alert>}
       <Button type="submit" variant="contained" disabled={pending || uploaded}>{uploaded ? 'Трек загружен' : pending ? 'Загружаем…' : 'Загрузить трек'}</Button>
     </Stack>

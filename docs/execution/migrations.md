@@ -33,3 +33,27 @@ and the compound username pagination index. It does not backfill or alter users.
 It must be applied explicitly before enabling the friends feature; application
 startup does not install these indexes. See [friends.md](friends.md) for the
 storage contract, transaction requirements and existing runner target restrictions.
+
+### Active track title/artist identity (008)
+
+`008-track-identity` uses NFC, trim, collapsed whitespace and lowercase comparison
+keys; a missing artist and an empty artist share the empty string key. Display
+metadata and audio are unchanged. Only active tracks participate.
+
+Stop all application, seed and maintenance writers for plan/apply/verify. On an
+isolated restore, run the existing plan, apply and verify commands above with
+`--migration 008-track-identity` and the restore database name. Planning lists
+all duplicate pairs and their track IDs in its error and stops before backfill.
+Duplicates require operator resolution; this migration never deletes or hides
+tracks and never assigns artificial distinct keys. No automated resolution is
+provided. Resume only after reviewing the entire catalogue again.
+
+A successful apply backfills every active track and explicitly creates
+`track_active_name_artist_unique`; verify must report zero issues before the
+catalogue is considered fully protected. A partial backfill, or an index over
+only some keyed records, is not full catalogue protection. `autoIndex` remains
+disabled. Each upload checks the actual index name, keys, uniqueness and partial
+filter before publishing; missing or incompatible indexes stop uploads. The
+prepublication lookup also normalizes unkeyed legacy rows. Publication races
+return `409 TRACK_DUPLICATE`, optionally with `existingTrackId`; both staged and
+published-file cleanup retain the existing upload lifecycle.
