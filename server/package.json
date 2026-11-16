@@ -32,6 +32,7 @@
     "db:migrate:verify": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:verify",
     "db:migrate:rollback": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:rollback",
     "media:reconcile": "npm run tools:build && node .tools/src/scripts/media-reconcile.js",
+    "audio:backfill": "npm run tools:build && node .tools/src/scripts/audio-backfill.js",
     "maintenance:once": "npm run tools:build && node .tools/src/scripts/maintenance-once.js",
     "test:integration": "vitest run --config ./vitest.config.e2e.ts",
     "auth:provision": "npm run tools:build && node .tools/src/scripts/auth-provision.js"

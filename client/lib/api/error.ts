@@ -3,6 +3,7 @@ export interface ApiErrorEnvelope {
     code: string
     message: string
     existingTrackId?: string
+    duplicateReason?: 'identity' | 'file_sha256' | 'decoded_audio_sha256' | 'chromaprint'
     fieldErrors?: Record<string, string[]>
     requestId: string
   }

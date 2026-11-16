@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { isDeepStrictEqual } from 'node:util';
 import { normalizeTrackIdentity } from '../track-identity.js';
 import { HydratedDocument, Types } from 'mongoose';
+import type { AudioFingerprint } from '../../file/audio-fingerprint.service.js';
 
 export type TrackDocument = HydratedDocument<Track>;
 
@@ -29,6 +30,15 @@ export class Track {
 
   @Prop({ type: String })
   artistKey?: string;
+
+  @Prop({ type: String })
+  fileSha256?: string;
+
+  @Prop({ type: String })
+  pcmSha256?: string;
+
+  @Prop({ type: Object })
+  audioFingerprint?: AudioFingerprint;
 
   @Prop({ type: String, required: true })
   audio: string;
@@ -82,3 +92,22 @@ TrackSchema.pre('validate', function () {
   this.nameKey = normalizeTrackIdentity(this.name);
   this.artistKey = normalizeTrackIdentity(this.artist);
 });
+
+export const AUDIO_EXACT_INDEXES = [
+  { field: 'fileSha256', name: 'track_active_file_sha256_unique' },
+  { field: 'pcmSha256', name: 'track_active_pcm_sha256_unique' },
+] as const;
+export function audioIndexPartial(field: string) {
+  return { lifecycle: 'active', [field]: { $type: 'string' } };
+}
+export function isAudioExactIndex(index: {
+  name?: string; unique?: boolean; key?: unknown; partialFilterExpression?: unknown; collation?: unknown;
+}, definition: (typeof AUDIO_EXACT_INDEXES)[number]): boolean {
+  return index.name === definition.name && index.unique === true && !index.collation
+    && isDeepStrictEqual(index.key, { [definition.field]: 1 })
+    && isDeepStrictEqual(index.partialFilterExpression, audioIndexPartial(definition.field));
+}
+for (const { field, name } of AUDIO_EXACT_INDEXES) {
+  TrackSchema.index({ [field]: 1 }, { name, unique: true, partialFilterExpression: audioIndexPartial(field) });
+}
+TrackSchema.index({ lifecycle: 1, 'audioFingerprint.duration': 1 }, { name: 'track_audio_duration_candidates' });

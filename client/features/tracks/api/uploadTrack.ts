@@ -1,8 +1,14 @@
 import { readApiError } from '@/lib/api/error'
 
 export class DuplicateTrackError extends Error {
-  constructor(readonly existingTrackId?: string) {
-    super('Активный трек с таким названием и исполнителем уже существует.')
+  constructor(readonly existingTrackId?: string, readonly duplicateReason: string = 'identity') {
+    const explanations: Record<string, string> = {
+      identity: 'Активный трек с таким названием и исполнителем уже существует.',
+      file_sha256: 'Этот аудиофайл побайтово совпадает с файлом существующего трека.',
+      decoded_audio_sha256: 'Аудиосэмплы и каналы совпадают с существующим треком, даже если теги или формат файла отличаются.',
+      chromaprint: 'Длительность и аудиоотпечатки почти всей записи совпадают с существующим треком. Возможно, это перекодированная копия.',
+    }
+    super(explanations[duplicateReason] ?? 'Сервер обнаружил дубликат существующего трека.')
   }
 }
 
@@ -35,7 +41,7 @@ export async function uploadTrack(body: FormData, signal: AbortSignal): Promise<
       const payload = await readApiError(response)
       if (payload?.error.code === 'TRACK_DUPLICATE') {
         const id = payload.error.existingTrackId
-        throw new DuplicateTrackError(typeof id === 'string' && /^[a-f\d]{24}$/i.test(id) ? id.toLowerCase() : undefined)
+        throw new DuplicateTrackError(typeof id === 'string' && /^[a-f\d]{24}$/i.test(id) ? id.toLowerCase() : undefined, payload.error.duplicateReason)
       }
     }
     throw new Error(UPLOAD_ERRORS[response.status] ?? 'Не удалось загрузить трек. Попробуйте позже.')

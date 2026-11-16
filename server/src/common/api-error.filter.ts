@@ -102,6 +102,7 @@ export class ApiErrorFilter implements ExceptionFilter {
         ...(fields ? { fieldErrors: fields } : {}),
         ...(exception instanceof DuplicateTrackError && exception.existingTrackId
           ? { existingTrackId: exception.existingTrackId } : {}),
+        ...(exception instanceof DuplicateTrackError ? { duplicateReason: exception.duplicateReason } : {}),
         requestId,
       },
     };

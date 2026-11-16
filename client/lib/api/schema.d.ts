@@ -605,6 +605,11 @@ export interface components {
         ApiErrorBodyDto: {
             /** @enum {string} */
             code: "TRACK_DUPLICATE" | "QUEUE_FULL" | "QUEUE_CONFLICT" | "QUEUE_ENTRY_INVALID" | "TRACK_UNAVAILABLE" | "VALIDATION_ERROR" | "NOT_FOUND" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNAUTHORIZED" | "FORBIDDEN" | "RATE_LIMITED" | "INTERNAL_ERROR" | "BACKEND_UNAVAILABLE" | "BACKEND_TIMEOUT";
+            /**
+             * @description What matched for TRACK_DUPLICATE. Chromaprint is approximate and not atomic.
+             * @enum {string}
+             */
+            duplicateReason?: "identity" | "file_sha256" | "decoded_audio_sha256" | "chromaprint";
             /** @description Existing active track for TRACK_DUPLICATE */
             existingTrackId?: string;
             fieldErrors?: {

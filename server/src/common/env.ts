@@ -149,6 +149,9 @@ export const env = {
 
   /** Путь к системному ffprobe; media validation fails closed if it is unavailable. */
   ffprobePath: str('FFPROBE_PATH', 'ffprobe'),
+  ffmpegPath: str('FFMPEG_PATH', 'ffmpeg'),
+  fpcalcPath: str('FPCALC_PATH', 'fpcalc'),
+  mediaPrlimitPath: str('MEDIA_PRLIMIT_PATH', 'prlimit'),
 
   /** Максимальный размер одного загружаемого файла. */
   uploadMaxBytes: int('UPLOAD_MAX_MB', 50) * 1024 * 1024,

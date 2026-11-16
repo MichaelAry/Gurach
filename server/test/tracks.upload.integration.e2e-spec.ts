@@ -1,10 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
-import { Types } from 'mongoose';
+import { Types, type Model } from 'mongoose';
 import type { Db } from 'mongodb';
 import { mkdir, mkdtemp, readdir, rm, stat, truncate, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -80,7 +82,7 @@ describe('POST /tracks disk staging (Mongo integration)', () => {
     temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'gurach-upload-e2e-'));
     audioFixture = path.join(temporaryRoot, 'audio.mp3');
     pictureFixture = path.join(temporaryRoot, 'picture.png');
-    await writeFile(audioFixture, Buffer.from([0xff, 0xfb, 0x90, 0x64, ...Array.from({ length: 128 }, () => 0)]));
+    await promisify(execFile)(env.ffmpegPath, ['-v', 'error', '-nostdin', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1.25', '-c:a', 'libmp3lame', audioFixture], { timeout: 10_000 });
     await sharp({ create: { width: 8, height: 8, channels: 3, background: '#269ac7' } }).png().toFile(pictureFixture);
 
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -101,6 +103,7 @@ describe('POST /tracks disk staging (Mongo integration)', () => {
     mediaValidator = app.get(MediaValidatorService);
     stagingService = app.get(StagingService);
     database = app.get(getConnectionToken()).db as Db;
+    await app.get<Model<Track>>(getModelToken(Track.name)).createIndexes();
     trackOperations();
   }, 30_000);
 

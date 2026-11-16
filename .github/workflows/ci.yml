@@ -63,7 +63,7 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci --prefix server
-      - run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg
+      - run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg libchromaprint-tools util-linux
       - run: npm run test:isolated --prefix server
 
   browser:

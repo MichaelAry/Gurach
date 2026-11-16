@@ -33,6 +33,9 @@ export class ApiErrorBodyDto {
   @ApiPropertyOptional({ description: 'Existing active track for TRACK_DUPLICATE', pattern: '^[a-f0-9]{24}$' })
   existingTrackId?: string;
 
+  @ApiPropertyOptional({ enum: ['identity', 'file_sha256', 'decoded_audio_sha256', 'chromaprint'], description: 'What matched for TRACK_DUPLICATE. Chromaprint is approximate and not atomic.' })
+  duplicateReason?: 'identity' | 'file_sha256' | 'decoded_audio_sha256' | 'chromaprint';
+
   @ApiProperty({ example: '8ab23250-cc7d-49bb-9abe-386844de0871' })
   requestId!: string;
 }

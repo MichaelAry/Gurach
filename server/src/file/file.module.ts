@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { env } from '../common/env.js';
 import { FileService } from './file.service.js';
+import { AudioFingerprintService } from './audio-fingerprint.service.js';
 import { FFPROBE_EXECUTABLE, MediaValidatorService } from './media-validator.service.js';
 import { MEDIA_PUBLIC_ROOT, MEDIA_STAGING_ROOT, StagingService } from './staging.service.js';
 
@@ -9,12 +10,13 @@ import { MEDIA_PUBLIC_ROOT, MEDIA_STAGING_ROOT, StagingService } from './staging
 @Module({
   providers: [
     FileService,
+    AudioFingerprintService,
     MediaValidatorService,
     StagingService,
     { provide: FFPROBE_EXECUTABLE, useFactory: () => env.ffprobePath },
     { provide: MEDIA_STAGING_ROOT, useFactory: () => env.mediaStagingDir },
     { provide: MEDIA_PUBLIC_ROOT, useFactory: () => env.staticDir },
   ],
-  exports: [FileService, MediaValidatorService, StagingService],
+  exports: [FileService, MediaValidatorService, StagingService, AudioFingerprintService],
 })
 export class FileModule {}

@@ -101,6 +101,16 @@
             ],
             "type": "string"
           },
+          "duplicateReason": {
+            "description": "What matched for TRACK_DUPLICATE. Chromaprint is approximate and not atomic.",
+            "enum": [
+              "identity",
+              "file_sha256",
+              "decoded_audio_sha256",
+              "chromaprint"
+            ],
+            "type": "string"
+          },
           "existingTrackId": {
             "description": "Existing active track for TRACK_DUPLICATE",
             "pattern": "^[a-f0-9]{24}$",

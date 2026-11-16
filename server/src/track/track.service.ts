@@ -13,6 +13,7 @@ import type { Connection, Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { FileService, FileType } from '../file/file.service.js';
 import { MediaValidatorService } from '../file/media-validator.service.js';
+import { AudioFingerprintService, similarAudio, type AudioFingerprints } from '../file/audio-fingerprint.service.js';
 import {
   decodeCursor,
   decodeScopedCursor,
@@ -32,7 +33,7 @@ import { searchCursorScope, type SearchTracksQuery } from './dto/search-tracks-q
 import { toTrackDetail, toTrackListItem, type TrackListRecord } from './mappers/track.mapper.js';
 import { normalizeTrackIdentity } from './track-identity.js';
 import { DuplicateTrackError } from './duplicate-track.error.js';
-import { isTrackIdentityIndex, TRACK_IDENTITY_INDEX } from './schemas/track.schema.js';
+import { AUDIO_EXACT_INDEXES, isAudioExactIndex, isTrackIdentityIndex, TRACK_IDENTITY_INDEX } from './schemas/track.schema.js';
 import { Track, TrackDocument } from './schemas/track.schema.js';
 import { CacheEvent, CacheEventDocument } from '../maintenance/schemas/cache-event.schema.js';
 import { MediaOperation, MediaOperationDocument } from '../maintenance/schemas/media-operation.schema.js';
@@ -51,6 +52,7 @@ export class TrackService {
     @InjectConnection() private connection: Connection,
     private fileService: FileService,
     private mediaValidator: MediaValidatorService,
+    private fingerprints: AudioFingerprintService = new AudioFingerprintService(),
   ) {}
 
   async create(
@@ -75,6 +77,7 @@ export class TrackService {
     let intentCreated = false;
     let committed = false;
     let leaseToken: string | undefined;
+    let audioPrints: AudioFingerprints | undefined;
 
     const nameKey = normalizeTrackIdentity(dto.name);
     const artistKey = normalizeTrackIdentity(dto.artist);
@@ -86,6 +89,9 @@ export class TrackService {
       if (!indexes.some(isTrackIdentityIndex)) {
         throw new ServiceUnavailableException('Track identity index is missing; run migration 008-track-identity');
       }
+      if (!AUDIO_EXACT_INDEXES.every((definition) => indexes.some((index) => isAudioExactIndex(index, definition)))) {
+        throw new ServiceUnavailableException('Audio fingerprint indexes are missing; run migration 009-audio-fingerprint-indexes');
+      }
       const existing = await this.findDuplicate(nameKey, artistKey);
       if (existing) throw new DuplicateTrackError(existing);
       const [audioValidation, coverValidation] = await Promise.allSettled([
@@ -96,6 +102,9 @@ export class TrackService {
       if (coverValidation.status === 'rejected') throw coverValidation.reason;
       const audioMetadata = audioValidation.value;
       const coverMetadata = coverValidation.value;
+      // Still private: no allocated or public file exists when preflight rejects.
+      audioPrints = await this.fingerprints.compute(audio.path);
+      await this.assertNoAudioDuplicate(audioPrints);
       const audioFile = this.fileService.allocateFile(FileType.AUDIO, audio.originalname);
       const pictureFile = this.fileService.allocateFile(FileType.PICTURE, picture.originalname);
       const validatedMetadata = {
@@ -156,6 +165,7 @@ export class TrackService {
             artist: dto.artist,
             nameKey,
             artistKey,
+            ...audioPrints,
             text: dto.text,
             duration: audioMetadata.durationSeconds,
             listens: 0,
@@ -201,8 +211,35 @@ export class TrackService {
         const existing = await this.findDuplicate(nameKey, artistKey).catch(() => undefined);
         throw new DuplicateTrackError(existing);
       }
+      if (error instanceof mongoose.mongo.MongoServerError && error.code === 11000 && audioPrints) {
+        const definition = AUDIO_EXACT_INDEXES.find(({ name }) => error.message.includes(`index: ${name} dup key`));
+        if (definition) {
+          const existing = await this.trackModel.findOne({ lifecycle: 'active', [definition.field]: audioPrints[definition.field] })
+            .select('_id').lean().exec().catch(() => null);
+          throw new DuplicateTrackError(existing ? String(existing._id) : undefined,
+            definition.field === 'fileSha256' ? 'file_sha256' : 'decoded_audio_sha256');
+        }
+      }
       throw error;
     }
+  }
+
+  private async assertNoAudioDuplicate(prints: AudioFingerprints): Promise<void> {
+    for (const { field } of AUDIO_EXACT_INDEXES) {
+      const existing = await this.trackModel.findOne({ lifecycle: 'active', [field]: prints[field] }).select('_id').lean().exec();
+      if (existing) throw new DuplicateTrackError(String(existing._id), field === 'fileSha256' ? 'file_sha256' : 'decoded_audio_sha256');
+    }
+    const duration = prints.audioFingerprint.duration;
+    const candidates = this.trackModel.find({ lifecycle: 'active',
+      'audioFingerprint.duration': { $gte: duration - 2, $lte: duration + 2 },
+    }).select('_id audioFingerprint').lean().cursor();
+    try {
+      for await (const candidate of candidates) {
+        if (candidate.audioFingerprint && similarAudio(prints.audioFingerprint, candidate.audioFingerprint)) {
+          throw new DuplicateTrackError(String(candidate._id), 'chromaprint');
+        }
+      }
+    } finally { await candidates.close(); }
   }
 
   private async findDuplicate(nameKey: string, artistKey: string): Promise<string | undefined> {
