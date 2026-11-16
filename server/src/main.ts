@@ -21,7 +21,7 @@ const start = async () => {
       // Не `*`: браузерные запросы идут только с фронтенда (см. README),
       // медиа (<audio>/<img>) CORS не требуют.
       origin: env.corsOrigins,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
       // The audio worker reads byte-range metadata when warming the resume cache.
       exposedHeaders: ['Content-Range', 'Accept-Ranges'],
     });

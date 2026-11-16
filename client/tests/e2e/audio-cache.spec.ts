@@ -11,7 +11,7 @@ test('persists audio ranges and resumes at the saved position without the audio 
   await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.readyState >= 2 && !node.paused)).toBe(true)
   await audio.evaluate((node: HTMLAudioElement) => { node.pause(); node.currentTime = 6 })
   await expect.poll(() => page.evaluate(async () => {
-    const cache = await caches.open('gurach-audio-v1')
+    const cache = await caches.open('gurach-audio-v2')
     return (await cache.keys()).length
   })).toBeGreaterThanOrEqual(2)
   // Persist the real element time even if React's last timeupdate is older.
@@ -55,7 +55,7 @@ test('keeps a window near the middle of a long track and fetches uncached ranges
     return url
   })
   await expect.poll(() => page.evaluate(async () => {
-    const keys = await (await caches.open('gurach-audio-v1')).keys()
+    const keys = await (await caches.open('gurach-audio-v2')).keys()
     return keys.filter((entry) => new URL(entry.url).searchParams.get('url')?.endsWith('track-121.mp3')).length
   })).toBe(5)
   await context.setOffline(true)

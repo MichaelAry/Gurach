@@ -29,6 +29,7 @@ export async function provisionAccount(connection: Connection, input: {
     const user = await users.findOneAndUpdate({ username }, { $set: { displayName, role: input.role, passwordHash } }, { session, returnDocument: 'after', runValidators: true }).exec();
     if (!user) throw new NotFoundException('Account does not exist');
     await sessions.updateMany({ userId: user._id, revokedAt: null }, { $set: { revokedAt: new Date() } }, { session });
+    await connection.collection('recoverytokens').deleteMany({ userId: user._id }, { session });
     id = String(user._id);
   });
   return { id, operation: 'updated' as const };

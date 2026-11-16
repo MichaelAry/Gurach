@@ -428,3 +428,7 @@ authenticated Mongo replica-set integration и Playwright browser smoke. CI remo
 Миграция `011-playlist-indexes` устанавливает индексы владельца и хеша токена
 в коллекции `playlists`, не меняя существующие данные. Используйте существующий
 plan/apply/verify с этим ID и соблюдайте ограничения runner, описанные выше.
+
+Controlled registration, verified recovery, account upload quotas and moderation:
+[task 21 operating procedure](docs/implementation/controlled-registration.md).
+Registration remains disabled by default.

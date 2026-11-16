@@ -26,6 +26,18 @@ export class User {
   @Prop({ type: Number, default: 0, select: false })
   sessionWriteRevision: number;
 
+  @Prop({ type: String, select: false })
+  recoveryEmail?: string;
+
+  @Prop({ type: Date, select: false })
+  recoveryVerifiedAt?: Date;
+
+  @Prop({ type: Boolean, default: true, select: false })
+  quotaReady: boolean;
+
+  @Prop({ type: [Object], default: [], select: false })
+  quotaEntries: object[];
+
   @Prop({ type: Object, required: true, select: false })
   passwordHash: PasswordHash;
 }

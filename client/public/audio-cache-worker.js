@@ -2,13 +2,16 @@
  * Keep container headers/trailers as well as the resume window so the browser's
  * native demuxer can seek without replacing the audio source or its timeline.
  */
-const CACHE = 'gurach-audio-v1'
+const CACHE = 'gurach-audio-v2'
 const BLOCK = 256 * 1024
 const MAX_BLOCKS = 64 // 16 MiB, shared by all tracks/tabs.
 const jobs = new Map()
 
 self.addEventListener('install', (event) => event.waitUntil(self.skipWaiting()))
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+self.addEventListener('activate', (event) => event.waitUntil((async () => {
+  await caches.delete('gurach-audio-v1')
+  await self.clients.claim()
+})()))
 
 function key(url, block) {
   const result = new URL('/__audio_cache__', self.location.origin)
@@ -47,8 +50,19 @@ async function getBlock(cache, url, index, signal) {
   for (const entry of keys.slice(0, Math.max(0, keys.length - MAX_BLOCKS))) await cache.delete(entry)
   return stored
 }
+async function checkAvailable(cache, url, signal) {
+  let response
+  try { response = await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'omit', signal }) }
+  catch { return null } // Preserve already downloaded windows during offline recovery.
+  if (!response.ok) {
+    for (const entry of await cache.keys()) if (new URL(entry.url).searchParams.get('url') === url) await cache.delete(entry)
+  }
+  return response
+}
 async function warm(message, signal) {
   const cache = await caches.open(CACHE)
+  const access = await checkAvailable(cache, message.url, signal)
+  if (access && !access.ok) return
   const first = await getBlock(cache, message.url, 0, signal)
   if (!first) return
   const total = Number(first.headers.get('X-Audio-Total'))
@@ -97,6 +111,8 @@ async function cachedRange(request) {
   const cache = await caches.open(CACHE)
   const block = await cache.match(key(request.url, Math.floor(start / BLOCK)))
   if (!block) return fetch(request)
+  const access = await checkAvailable(cache, request.url, request.signal)
+  if (access && !access.ok) return access
   const total = Number(block.headers.get('X-Audio-Total'))
   const offset = start - Number(block.headers.get('X-Audio-Start'))
   const bytes = await block.arrayBuffer()

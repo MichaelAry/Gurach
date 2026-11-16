@@ -1,3 +1,5 @@
+import { MediaAccessMiddleware } from './file/media-access.middleware.js';
+import { BoundaryThrottlerGuard } from './auth/boundary-throttler.guard.js';
 import { PlaylistsModule } from './playlists/playlists.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { HomeModule } from './home/home.module.js';
@@ -5,9 +7,9 @@ import { FriendsModule } from './friends/friends.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AccountModule } from './account/account.module.js';
 import { QueueModule } from './queue/queue.module.js';
-import { Module } from '@nestjs/common';
+import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { env } from './common/env.js';
@@ -33,6 +35,7 @@ import { AuthModule } from './auth/auth.module.js';
     ServeStaticModule.forRoot({
       rootPath: env.staticDir,
       serveRoot: '/static',
+      serveStaticOptions: { cacheControl: false, etag: false, lastModified: false, index: false },
     }),
     // Глобальный rate limit: по умолчанию 100 запросов/мин на IP.
     // На конкретных эндпоинтах поверх ставится @Throttle(...) —
@@ -41,6 +44,10 @@ import { AuthModule } from './auth/auth.module.js';
       { ttl: env.throttle.ttlMs, limit: env.throttle.limit },
     ]),
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: BoundaryThrottlerGuard }],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(MediaAccessMiddleware).forRoutes('static/{*path}');
+  }
+}

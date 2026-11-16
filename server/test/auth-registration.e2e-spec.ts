@@ -1,3 +1,4 @@
+import { env } from '../src/common/env.js';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { randomBytes } from 'node:crypto';
@@ -14,8 +15,8 @@ const users = connection.model(User.name, UserSchema);
 const sessions = connection.model(Session.name, SessionSchema);
 const service = new SessionService(users, sessions, new PasswordService());
 const username = `reg_${randomBytes(8).toString('hex')}`;
-beforeAll(async () => { await connection.asPromise(); await service.onModuleInit(); await sessions.createIndexes(); });
-afterAll(async () => {
+beforeAll(async () => { Object.assign(env, { publicRegistration: true }); await connection.asPromise(); await service.onModuleInit(); await sessions.createIndexes(); });
+afterAll(async () => { Object.assign(env, { publicRegistration: false });
   const user = await users.findOne({ username });
   if (user) { await sessions.deleteMany({ userId: user._id }); await users.deleteOne({ _id: user._id }); }
   await connection.close();

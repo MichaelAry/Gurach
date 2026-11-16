@@ -1,7 +1,9 @@
+import { commitAccountQuota } from '../file/account-quota.js';
 import { PermissionService } from '../auth/permission.service.js';
 import type { Actor } from '../auth/session.service.js';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -175,6 +177,7 @@ export class TrackService {
             lifecycle: 'active',
             publishedAt: new Date(),
           });
+          await commitAccountQuota(this.connection, identity.id, operationId, trackId, audio.size + picture.size, session);
           await track.save({ session });
 
           const completed = await this.operationModel.updateOne(
@@ -400,8 +403,35 @@ export class TrackService {
     return result;
   }
 
-  async deleteOne(id: string, actor?: Actor): Promise<DeletionAccepted> {
+  async reports(actor: Actor) {
+    if (actor.role !== 'admin') throw new ForbiddenException('Moderator access required');
+    return this.connection.collection('trackreports').find({ state: 'open' }).sort({ _id: -1 }).limit(100).toArray();
+  }
+
+  async report(id: string, reason: string, actor: Actor): Promise<void> {
+    this.assertValidId(id);
+    if (!reason.trim()) throw new BadRequestException('A report reason is required');
+    if (!await this.trackModel.exists({ _id: id, lifecycle: 'active' })) throw new NotFoundException('Track not found');
+    const indexes = await this.connection.collection('trackreports').listIndexes().toArray().catch(() => []);
+    if (!indexes.some((index) => index.name === 'track_report_actor_unique' && index.unique)) throw new ServiceUnavailableException('Run migration 012-controlled-registration');
+    try {
+      await this.connection.collection('trackreports').updateOne({ trackId: new Types.ObjectId(id), reporterId: new Types.ObjectId(actor.id) },
+        { $setOnInsert: { reason: reason.trim(), createdAt: new Date(), state: 'open' } }, { upsert: true });
+    } catch (error) {
+      if (!(error instanceof mongoose.mongo.MongoServerError && error.code === 11000
+        && error.message.includes('track_report_actor_unique'))) throw error;
+    }
+  }
+
+  async unpublish(id: string, reason: string, actor: Actor): Promise<DeletionAccepted> {
+    if (actor.role !== 'admin') throw new ForbiddenException('Moderator access required');
+    if (!reason.trim()) throw new BadRequestException('A moderation reason is required');
+    return this.deleteOne(id, actor, reason.trim());
+  }
+
+  async deleteOne(id: string, actor?: Actor, moderationReason?: string): Promise<DeletionAccepted> {
     const identity = new PermissionService().requireActor(actor);
+    if (moderationReason && identity.role !== 'admin') throw new ForbiddenException('Moderator access required');
     this.assertValidId(id);
     const trackId = new Types.ObjectId(id);
     const newOperationId = randomUUID();
@@ -413,6 +443,13 @@ export class TrackService {
         if (!current) throw new NotFoundException(`Track with id "${id}" was not found`);
 
         new PermissionService().assertOwner(identity, current.ownerId);
+        if (moderationReason) {
+          await this.trackModel.updateOne({ _id: trackId }, { $set: {
+            moderationRemovedAt: new Date(), moderationActorId: new Types.ObjectId(identity.id), moderationReason,
+          } }, { session });
+          await this.connection.collection('trackreports').updateMany({ trackId, state: 'open' },
+            { $set: { state: 'removed', resolvedAt: new Date(), moderatorId: new Types.ObjectId(identity.id) } }, { session });
+        }
         if (current.lifecycle !== 'active') {
           const existing = await this.operationModel.findOne({ kind: 'delete', trackId }).session(session).lean().exec();
           if (!existing) throw new Error('Track lifecycle has no matching delete operation');

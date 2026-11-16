@@ -125,7 +125,23 @@ if (IS_PRODUCTION && !raw('PUBLIC_URL')) {
   );
 }
 
+const recoveryUrl = optionalStr('RECOVERY_DELIVERY_URL');
+const recoverySecret = optionalStr('RECOVERY_DELIVERY_SECRET');
+if (Boolean(recoveryUrl) !== Boolean(recoverySecret)) throw new Error('Recovery delivery URL and secret must be configured together');
+if (recoveryUrl && new URL(validateHttpUrl('RECOVERY_DELIVERY_URL', recoveryUrl)).protocol !== 'https:') throw new Error('Recovery delivery requires HTTPS');
+if (recoverySecret && !/^[A-Za-z0-9._~-]{32,256}$/.test(recoverySecret)) throw new Error('Invalid recovery delivery secret');
+const publicRegistration = str('PUBLIC_REGISTRATION_ENABLED', 'false');
+if (!['true', 'false'].includes(publicRegistration)) throw new Error('PUBLIC_REGISTRATION_ENABLED must be true or false');
+if (publicRegistration === 'true' && (!recoveryUrl || !recoverySecret)) throw new Error('Public registration requires configured recovery delivery');
+const proxySecret = optionalStr('BFF_PROXY_SECRET');
+if (proxySecret && !/^[A-Za-z0-9._~-]{32,256}$/.test(proxySecret)) throw new Error('Invalid BFF proxy secret');
+
 export const env = {
+  publicRegistration: publicRegistration === 'true',
+  recovery: { deliveryUrl: recoveryUrl, secret: recoverySecret, ttlMs: 15 * 60_000 },
+  proxySecret,
+  accountQuotaBytes: int('ACCOUNT_QUOTA_MB', 1024) * 1024 * 1024,
+  accountQuotaTracks: int('ACCOUNT_QUOTA_TRACKS', 1000),
   isProduction: IS_PRODUCTION,
   nodeEnv: str('NODE_ENV', 'development'),
 

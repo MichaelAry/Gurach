@@ -1,6 +1,8 @@
 import 'server-only'
 
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto'
+import { isIP } from 'node:net'
+import { headers as requestHeaders } from 'next/headers'
 import { apiUrl } from '@/config/env'
 import type { ApiErrorEnvelope } from '@/lib/api/error'
 import { readApiError } from '@/lib/api/error'
@@ -83,6 +85,21 @@ export async function proxyBackend(
     if (value) headers.set(name, value)
   }
   headers.set('x-request-id', requestId)
+  const proxySecret = process.env.BFF_PROXY_SECRET
+  const edgeSecret = process.env.EDGE_PROXY_SECRET
+  if (proxySecret && edgeSecret) {
+    try {
+      const incoming = await requestHeaders()
+      const proof = incoming.get('x-gurach-edge-secret') ?? ''
+      const ip = incoming.get('x-real-ip') ?? ''
+      const supplied = Buffer.from(proof)
+      const expected = Buffer.from(edgeSecret)
+      if (supplied.length === expected.length && timingSafeEqual(supplied, expected) && isIP(ip)) {
+        const identity = `${Date.now()}|${ip}`
+        headers.set('x-gurach-boundary', `${identity}|${createHmac('sha256', proxySecret).update(identity).digest('hex')}`)
+      }
+    } catch { /* Outside a request context, use the API's peer limit. */ }
+  }
   if (sessionToken && /^[A-Za-z0-9_-]{43}$/.test(sessionToken)) headers.set('authorization', `Bearer ${sessionToken}`)
   try {
     const response = await fetchBackend(path, { ...init, headers })

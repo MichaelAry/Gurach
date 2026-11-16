@@ -1,3 +1,4 @@
+import { readBoundedJson } from '@/lib/server/bounded-json'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { proxyBackend } from '@/lib/server/backend'
@@ -8,9 +9,9 @@ import { apiErrorResponse } from '@/lib/server/api-error-response'
 export async function POST(request: Request) {
   const rejected = checkBrowserMutation(request)
   if (rejected) return rejected
-  let body
-  try { body = await request.json() } catch { return apiErrorResponse(400, 'VALIDATION_ERROR', 'Invalid JSON') }
-  if (!body || typeof body.username !== 'string' || typeof body.password !== 'string' || body.username.length > 32 || body.password.length > 512) {
+  let body: unknown
+  try { body = await readBoundedJson(request, 4096) } catch { return apiErrorResponse(400, 'VALIDATION_ERROR', 'Invalid JSON') }
+  if (!body || typeof body !== 'object' || !('username' in body) || !('password' in body) || typeof body.username !== 'string' || typeof body.password !== 'string' || body.username.length > 32 || body.password.length > 512) {
     return apiErrorResponse(400, 'VALIDATION_ERROR', 'Invalid credentials format')
   }
   const upstream = await proxyBackend('/auth/login', {

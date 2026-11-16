@@ -1,3 +1,4 @@
+import { verifyPlatformIndexes } from '../scripts/migrations/012-controlled-registration.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { Schema } from 'mongoose';
 import { CacheEventSchema } from '../maintenance/schemas/cache-event.schema.js';
@@ -54,6 +55,7 @@ export class HealthController {
               !index.collation && !index.sparse && !index.hidden)) throw new Error('Critical index unavailable');
         }
       }
+      if (await verifyPlatformIndexes(db)) throw new Error('Platform indexes unavailable');
       const fingerprint = createTargetFingerprint(db.databaseName, hello);
       for (const migration of migrationDefinitions) {
         const state = await db.collection('_gurach_migration_state').findOne({ _id: migration.id as never });

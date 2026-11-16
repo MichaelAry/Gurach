@@ -19,6 +19,13 @@ export class Track {
   })
   lifecycle: TrackLifecycle;
 
+  @Prop({ type: Date, select: false })
+  moderationRemovedAt?: Date;
+  @Prop({ type: Types.ObjectId, select: false })
+  moderationActorId?: Types.ObjectId;
+  @Prop({ type: String, select: false, maxlength: 2000 })
+  moderationReason?: string;
+
   @Prop({ required: true })
   name: string;
 

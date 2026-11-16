@@ -1,3 +1,5 @@
+import { StagingService } from '../file/staging.service.js';
+import { releaseAccountQuota, quotaAccounts } from '../file/account-quota.js';
 import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'node:crypto';
@@ -49,6 +51,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     @InjectModel(CacheEvent.name) private readonly cacheEventModel: Model<CacheEventDocument>,
     @InjectConnection() private readonly connection: Connection,
     private readonly fileService: FileService,
+    private readonly staging?: StagingService,
   ) {}
 
   onModuleInit(): void {
@@ -95,6 +98,19 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
       eventsDelivered: 0,
       eventsRetried: 0,
     };
+    // Expiry fences publication: commitAccountQuota refuses expired holds.
+    const expired = quotaAccounts(this.connection).find({ 'quotaEntries': { $elemMatch: {
+      state: 'reserved', expiresAt: { $lte: new Date() },
+    } } }).limit(limit);
+    for await (const user of expired) {
+      for (const entry of user.quotaEntries ?? []) {
+        if (entry.state !== 'reserved' || !entry.expiresAt || entry.expiresAt > new Date()) continue;
+        await this.operationModel.updateOne({ operationId: entry.operationId, kind: 'upload', state: { $in: ['uploading', 'publishing'] } },
+          { $set: { state: 'cleanup', nextAttemptAt: new Date() }, $unset: { leaseToken: '', leaseUntil: '', leaseOwner: '' } }).exec();
+        await this.staging?.removeOperation(entry.operationId);
+        await releaseAccountQuota(this.connection, entry.operationId);
+      }
+    }
     while (result.claimed < limit) {
       const operation = await this.claimNext();
       if (!operation) break;
@@ -320,6 +336,10 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
           ).exec();
         }
       }
+
+      if (operation.kind === 'upload') await releaseAccountQuota(this.connection, operation.operationId, session);
+      else await quotaAccounts(this.connection).updateOne({ 'quotaEntries.trackId': operation.trackId },
+        { $pull: { quotaEntries: { trackId: operation.trackId, state: 'committed' } } }, { session });
 
       const completed = await this.operationModel.updateOne(
         {

@@ -1,3 +1,4 @@
+import { controlledRegistrationMigration } from './012-controlled-registration.js';
 import { playlistIndexesMigration } from './011-playlist-indexes.js';
 import { notificationIndexesMigration } from './010-notification-indexes.js';
 import { trackIdentityMigration } from './008-track-identity.js';
@@ -10,4 +11,4 @@ import { removeTrackCommentArraysMigration } from './003-remove-track-comment-ar
 import { authIndexesMigration } from './004-auth-indexes.js';
 import { queueIndexesMigration } from './006-queue-indexes.js';
 
-export const migrationDefinitions: readonly MigrationDefinition[] = [trackLifecycleMigration, commentParentsMigration, removeTrackCommentArraysMigration, authIndexesMigration, queueIndexesMigration, socialRelationsMigration, trackIdentityMigration, audioFingerprintIndexesMigration, notificationIndexesMigration, playlistIndexesMigration];
+export const migrationDefinitions: readonly MigrationDefinition[] = [trackLifecycleMigration, commentParentsMigration, removeTrackCommentArraysMigration, authIndexesMigration, queueIndexesMigration, socialRelationsMigration, trackIdentityMigration, audioFingerprintIndexesMigration, notificationIndexesMigration, playlistIndexesMigration, controlledRegistrationMigration];

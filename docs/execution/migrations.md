@@ -64,7 +64,7 @@ published-file cleanup retain the existing upload lifecycle.
 
 The ordered release manifest is `migrationDefinitions`: 001, 002, 003, 004,
 006, 007-social-relations, 008-track-identity, 009-audio-fingerprint-indexes,
-010-notification-indexes, 011-playlist-indexes. There is no registered 005.
+010-notification-indexes, 011-playlist-indexes, 012-controlled-registration. There is no registered 005.
 Runtime never applies migrations. Readiness requires every manifest version to
 be completed and checks track, comment, maintenance, auth, queue, social, audio, inbox and playlist indexes.
 Readiness also checks index options, including session TTL, without scanning

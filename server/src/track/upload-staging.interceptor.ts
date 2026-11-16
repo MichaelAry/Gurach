@@ -143,6 +143,7 @@ export class UploadStagingInterceptor implements NestInterceptor {
       throw error;
     } finally {
       reservation.release();
+      await reservation.releaseQuota?.();
       delete request[UPLOAD_RESERVATION];
     }
   }

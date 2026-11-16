@@ -1,3 +1,5 @@
+import { IsString, MinLength, MaxLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import type { Actor } from '../auth/session.service.js';
 import { TrackReadService } from './track-read.service.js';
 import { ResolveTracksDto, ResolveTracksResponse } from './dto/resolve-tracks.dto.js';
@@ -22,6 +24,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  ApiNoContentResponse,
   ApiBody,
   ApiAcceptedResponse,
   ApiConsumes,
@@ -52,6 +55,10 @@ import { UploadAdmissionGuard } from '../file/upload-admission.guard.js';
 import { UploadStagingInterceptor } from './upload-staging.interceptor.js';
 import type { Request } from 'express';
 import { UPLOAD_RESERVATION, type UploadRequestContext } from '../file/upload-reservation.js';
+
+export class TrackReportDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(2000) reason: string;
+}
 
 @Controller('/tracks')
 @ApiTags('tracks')
@@ -141,6 +148,11 @@ export class TrackController {
     return this.trackService.search(parseSearchTracksQuery(query));
   }
 
+  @Get('reports')
+  @ApiOkResponse({ schema: { type: 'array', items: { type: 'object', additionalProperties: true } } })
+  @ApiStandardErrors({ authenticated: true })
+  reports(@CurrentActor() actor: Actor) { return this.trackService.reports(actor); }
+
   @Public()
   @Get(':id')
   @ApiParam({ name: 'id', schema: { type: 'string', pattern: '^[a-fA-F0-9]{24}$' } })
@@ -166,6 +178,23 @@ export class TrackController {
   @ApiStandardErrors({ authenticated: true, notFound: true })
   deleteOne(@Param('id') id: string, @CurrentActor() actor: Actor) {
     return this.trackService.deleteOne(id, actor);
+  }
+
+  @Post(':id/reports')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiNoContentResponse()
+  @ApiStandardErrors({ authenticated: true, notFound: true, rateLimited: true })
+  report(@Param('id') id: string, @Body() dto: TrackReportDto, @CurrentActor() actor: Actor) {
+    return this.trackService.report(id, dto.reason, actor);
+  }
+
+  @Post(':id/unpublish')
+  @HttpCode(202)
+  @ApiAcceptedResponse({ type: DeletionAccepted })
+  @ApiStandardErrors({ authenticated: true, notFound: true })
+  unpublish(@Param('id') id: string, @Body() dto: TrackReportDto, @CurrentActor() actor: Actor) {
+    return this.trackService.unpublish(id, dto.reason, actor);
   }
 
   // Жёстче глобального лимита: накрутка прослушиваний банальным спамом запросов
