@@ -23,7 +23,7 @@ export function BackButton({ fallback = '/tracks' }: Props) {
   return (
     <IconButton
       onClick={handleBack}
-      aria-label="Go back"
+      aria-label="Назад"
       sx={{
         color: 'text.primary',
         '&:hover': { bgcolor: 'action.hover' },
