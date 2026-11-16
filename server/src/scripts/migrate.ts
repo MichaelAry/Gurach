@@ -44,15 +44,27 @@ async function main(): Promise<void> {
     const hello = await client.db('admin').command({ hello: 1 });
     const targetFingerprint = createTargetFingerprint(databaseName, hello);
     if (options.staging) await assertStagingTarget(db, options, uri, targetFingerprint);
-    if (options.staging && options.apply && options.report) {
-      await writePrivateReport(options.report, { command: options.command, database: databaseName, targetFingerprint, migrator: process.env.GURACH_MIGRATOR_USER, mode: 'staging', status: 'started' });
-      if (migration && options.command === 'db:migrate:apply') {
-        for (const predecessor of migrationDefinitions.slice(0, migrationDefinitions.indexOf(migration))) {
-          const state = await db.collection('_gurach_migration_state').findOne({ _id: predecessor.id as never });
-          if (state?.status !== 'completed' || state.migrationVersion !== predecessor.version || state.targetFingerprint !== targetFingerprint) throw new Error(`Predecessor incomplete: ${predecessor.id}`);
-          if ((await predecessor.verify(db, options.batchSize)).issueCount) throw new Error(`Predecessor verification failed: ${predecessor.id}`);
+    let preflight: Record<string, unknown> | undefined;
+    if (options.staging && migration &&
+        (options.command === 'db:migrate:preflight' || (options.command === 'db:migrate:apply' && options.apply))) {
+      for (const predecessor of migrationDefinitions.slice(0, migrationDefinitions.indexOf(migration))) {
+        const state = await db.collection('_gurach_migration_state').findOne({ _id: predecessor.id as never });
+        if (state?.status !== 'completed' || state.migrationVersion !== predecessor.version || state.targetFingerprint !== targetFingerprint) {
+          throw new Error(`Predecessor incomplete: ${predecessor.id}`);
+        }
+        if ((await predecessor.verify(db, options.batchSize)).issueCount) {
+          throw new Error(`Predecessor verification failed: ${predecessor.id}`);
         }
       }
+      // Scan the complete remaining plan before journaling or changing any records.
+      preflight = { ...(await new MigrationRunner(db).plan(migration, options)) };
+    }
+    if (options.staging && options.apply && options.report) {
+      await writePrivateReport(options.report, {
+        command: options.command, database: databaseName, targetFingerprint,
+        migrator: process.env.GURACH_MIGRATOR_USER, mode: 'staging', status: 'started',
+        startedAt: new Date().toISOString(), preflight,
+      });
     }
     if (options.command === 'db:migrate:rollback' && options.apply && options.expectedFingerprint !== targetFingerprint) {
       throw new Error('Mongo target fingerprint changed since the reviewed rollback dry-run');
@@ -69,13 +81,13 @@ async function main(): Promise<void> {
       throw new Error('A registered migration is required');
     } else {
       const runner = new MigrationRunner(db);
-      if (options.command === 'db:migrate:plan') {
+      if (options.command === 'db:migrate:plan' || options.command === 'db:migrate:preflight') {
         result = {
           command: options.command,
           database: databaseName,
           targetFingerprint,
           description: migration.description,
-          ...(await runner.plan(migration, options)),
+          ...(preflight ?? await runner.plan(migration, options)),
         };
       } else if (options.command === 'db:migrate:apply') {
         result = {
@@ -98,11 +110,16 @@ async function main(): Promise<void> {
           await writePrivateReport(options.report, initial, options.staging);
           const applied = await runner.rollback(migration, { ...rollbackOptions, dryRun: false });
           result = { command: options.command, database: databaseName, targetFingerprint, mode: 'apply', ...applied };
-          await writePrivateReport(options.report, result, true);
         } else {
           result = { command: options.command, database: databaseName, targetFingerprint, mode: 'dry-run', ...preview };
         }
       } else {
+        if (options.staging) {
+          const state = await db.collection('_gurach_migration_state').findOne({ _id: migration.id as never });
+          if (state?.status !== 'completed' || state.migrationVersion !== migration.version || state.targetFingerprint !== targetFingerprint) {
+            throw new Error('Staging verification requires a completed migration of the expected version and fingerprint');
+          }
+        }
         result = {
           command: options.command,
           database: databaseName,
@@ -115,9 +132,19 @@ async function main(): Promise<void> {
         };
       }
     }
-    if (options.staging) result = { ...result, mode: 'staging', migrator: process.env.GURACH_MIGRATOR_USER };
-    if (options.report && !(options.command === 'db:migrate:rollback' && options.apply)) await writePrivateReport(options.report, result, options.staging && options.apply);
+    if (options.staging) result = {
+      ...result, recordedAt: new Date().toISOString(), mode: 'staging',
+      migrator: process.env.GURACH_MIGRATOR_USER,
+      ...(options.apply ? { status: 'completed', preflight } : {}),
+    };
+    if (options.report) {
+      await writePrivateReport(options.report, result,
+        options.apply && (options.staging || options.command === 'db:migrate:rollback'));
+    }
     const stdoutResult = { ...result };
+    if (migration?.privateAudit && preflight && 'preflight' in stdoutResult) {
+      stdoutResult.preflight = { ...preflight, audit: undefined };
+    }
     if (migration?.privateAudit && typeof result.audit === 'object' && result.audit !== null) {
       const audit = result.audit as Record<string, unknown>;
       stdoutResult.audit = Object.fromEntries(
@@ -127,6 +154,7 @@ async function main(): Promise<void> {
       );
     }
     process.stdout.write(`${JSON.stringify(stdoutResult, null, 2)}\n`);
+    if (typeof result.issueCount === 'number' && result.issueCount !== 0) process.exitCode = 1;
   } finally {
     await client.close();
   }

@@ -2,7 +2,9 @@
 
 The server migration commands use `MONGODB_URI` from `server/.env` or the process environment. Never put a URI, credential, password, or token in command arguments. `--database` selects the database on that authenticated Mongo deployment; the tool prints a SHA-256 target fingerprint so a reviewed plan can be compared with a later apply.
 
-`db:audit`, `db:migrate:plan`, and `db:migrate:verify` are read-only. `db:audit` uses estimated collection counts and emits aggregate counts plus a checksum; it does not scan document contents. Reports written with `--report` must be files directly inside `.local/migration-private/`, are created with owner-only permissions, and are never overwritten. Full before-images are stored only in the target database's migration journal.
+`db:audit`, `db:migrate:preflight`, `db:migrate:plan`, and `db:migrate:verify` are read-only. `db:audit` uses estimated collection counts and emits aggregate counts plus a checksum; it does not scan document contents. Reports written with `--report` must be files directly inside `.local/migration-private/`, are created with owner-only permissions, and cannot reuse files from earlier invocations.
+An apply invocation reserves its report before writes and replaces that same
+private report with its final result. Full before-images are stored only in the target database's migration journal.
 
 Migration commands require explicit `--migration` and `--database` values. The batch size is bounded to 1–1000 and defaults to 100. Apply additionally requires `--apply` and currently accepts only targets named `gurach_test_*`. `--dry-run` previews the same plan without creating a journal or mutating source records. An explicit `--checkpoint` must match the stored checkpoint on apply/verify. Apply uses a lease, per-record before-image journal, expected-old-value compare-and-set, and resumable checkpoints. It does not wrap a full migration in a dataset-sized transaction.
 
@@ -64,7 +66,9 @@ The ordered release manifest is `migrationDefinitions`: 001, 002, 003, 004,
 006, 007-social-relations, 008-track-identity, 009-audio-fingerprint-indexes,
 010-notification-indexes, 011-playlist-indexes. There is no registered 005.
 Runtime never applies migrations. Readiness requires every manifest version to
-be completed and checks auth, queue, social, audio, inbox and playlist indexes.
+be completed and checks track, comment, maintenance, auth, queue, social, audio, inbox and playlist indexes.
+Readiness also checks index options, including session TTL, without scanning
+domain data or writing to Mongo.
 Deploying runtime before completing the manifest will return 503.
 
 Keep the normal isolated runner unchanged. Staging commands explicitly add
@@ -87,16 +91,36 @@ and `GURACH_STAGING_WRITERS_STOPPED` set to that fingerprint. Each apply require
 a fresh private report path, reserved before writes; a started-only report means
 interruption/failure and must be investigated against the Mongo journal.
 Predecessor versions, fingerprint and verification are checked before each apply.
-Run apply and verify for each manifest entry in order; verify issueCount must be
-zero. Retain reports and `_gurach_migration_state` / `_gurach_migration_journal`.
+Run `db:migrate:preflight`, apply and verify for each manifest entry in order.
+Preflight checks completed predecessor versions/fingerprints and their domain
+verification, then scans the selected remaining plan without writes. Run it
+after completing predecessors: for example, 003 cannot be planned on an
+unreconciled 002 dataset. Apply repeats this preflight before reserving its
+private report and before the first database write. Staging read commands also
+require explicit database and fresh private report paths. Staging verify
+requires completed schema state; any nonzero `issueCount` produces exit code 1
+after saving its report, so release automation must stop on command failure.
+Retain reports and `_gurach_migration_state` / `_gurach_migration_journal`.
 Never reuse a report path or edit journal checkpoints to bypass a failure.
+
+Example from the repository root (secrets already exported through the deployment
+secret store; use a new report filename for every invocation):
+
+```sh
+cd server
+npm run db:audit -- --staging --database "$GURACH_STAGING_DATABASE" --report .local/migration-private/release-audit.json
+npm run db:migrate:preflight -- --staging --database "$GURACH_STAGING_DATABASE" --migration 001-track-lifecycle --report .local/migration-private/release-001-preflight.json
+# Review the report and inventory, stop writers, and export the reviewed fingerprint.
+npm run db:migrate:apply -- --staging --database "$GURACH_STAGING_DATABASE" --migration 001-track-lifecycle --apply --expected-fingerprint "$GURACH_STAGING_WRITERS_STOPPED" --report .local/migration-private/release-001-apply.json
+npm run db:migrate:verify -- --staging --database "$GURACH_STAGING_DATABASE" --migration 001-track-lifecycle --report .local/migration-private/release-001-verify.json
+```
 
 Before backup or apply, disable ingress mutations and stop all API writers,
 uploads, queue sync, social/inbox/playlist writes, seeders, maintenance pollers
 and cache-event workers. Drain in-flight operations. Keep writes stopped until
 verification and HTTPS smoke checks finish. Take a consistent Mongo backup with
-replica-set metadata and a matching snapshot of STATIC_DIR including staging;
-record checksums, timestamps, storage locations and the application commit.
+replica-set metadata and matching snapshots of both STATIC_DIR and
+MEDIA_STAGING_DIR (which may be outside STATIC_DIR); record checksums, timestamps, storage locations and the application commit.
 Encrypt backups, restrict access, and verify restore credentials separately.
 Do not treat an estimated-count audit as a backup consistency proof.
 
@@ -131,3 +155,19 @@ production-cookie browser check also passed against its API fixture.
 This was an empty-database rehearsal, not a restore of production data or media;
 backup restoration and a full application HTTPS smoke against restored data
 remain operator acceptance steps before a real staging release.
+
+On 2026-11-17, the follow-up rehearsal used another disposable authenticated
+replica set with a synthetic legacy track, reverse comment reference and media
+file. `mongodump`/`mongorestore` restored that fixture into a separate staging
+database; independent public-media and staging-directory copies were restored
+and checked against their original contents/hash. All ten migrations passed
+preflight/apply/verify in order. Wrong fingerprints, missing writer-freeze
+confirmation, runtime-account migration attempts, incomplete predecessors and
+verification without completed state were rejected. Preflight left migration
+state unchanged. HTTPS probes trusted the generated local certificate and used
+a read-only runtime Mongo account: readiness returned 200, returned 503 for a
+missing playlist/comment index or wrong schema version, and returned 200 after
+explicit recovery. CLI verify returned nonzero for the missing playlist index.
+This checks synthetic backup/restore and the real readiness controller through
+an HTTPS harness; it does not establish production-data recovery, browser login,
+playback or a full deployed application smoke test.

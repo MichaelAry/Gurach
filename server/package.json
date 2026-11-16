@@ -27,6 +27,7 @@
     "openapi:generate": "npm run tools:build && node .tools/src/scripts/openapi.js",
     "contracts:check": "npm run tools:build && node scripts/check-contracts.mjs",
     "db:audit": "npm run tools:build && node .tools/src/scripts/migrate.js db:audit",
+    "db:migrate:preflight": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:preflight",
     "db:migrate:plan": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:plan",
     "db:migrate:apply": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:apply",
     "db:migrate:verify": "npm run tools:build && node .tools/src/scripts/migrate.js db:migrate:verify",

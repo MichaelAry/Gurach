@@ -7,6 +7,7 @@ import { env } from '../../common/env.js';
 
 export type MigrationCommand =
   | 'db:audit'
+  | 'db:migrate:preflight'
   | 'db:migrate:plan'
   | 'db:migrate:apply'
   | 'db:migrate:verify'
@@ -32,8 +33,8 @@ const SYSTEM_DATABASES = new Set(['admin', 'config', 'local']);
 
 export function parseMigrationArguments(argv: string[]): MigrationCliOptions {
   const command = argv[0] as MigrationCommand | undefined;
-  if (!command || !['db:audit', 'db:migrate:plan', 'db:migrate:apply', 'db:migrate:verify', 'db:migrate:rollback'].includes(command)) {
-    throw new Error('Usage: db:audit|db:migrate:plan|db:migrate:apply|db:migrate:verify|db:migrate:rollback [options]');
+  if (!command || !['db:audit', 'db:migrate:preflight', 'db:migrate:plan', 'db:migrate:apply', 'db:migrate:verify', 'db:migrate:rollback'].includes(command)) {
+    throw new Error('Usage: db:audit|db:migrate:preflight|db:migrate:plan|db:migrate:apply|db:migrate:verify|db:migrate:rollback [options]');
   }
   const values = new Map<string, string>();
   const flags = new Set<string>();
@@ -66,7 +67,7 @@ export function parseMigrationArguments(argv: string[]): MigrationCliOptions {
   }
   if (migration && !MIGRATION_ID.test(migration)) throw new Error('--migration has an invalid ID');
   if (database) validateDatabaseName(database);
-  if (['db:migrate:plan', 'db:migrate:apply', 'db:migrate:verify', 'db:migrate:rollback'].includes(command)) {
+  if (['db:migrate:preflight', 'db:migrate:plan', 'db:migrate:apply', 'db:migrate:verify', 'db:migrate:rollback'].includes(command)) {
     if (!migration) throw new Error('--migration is required for migration commands');
     if (!database) throw new Error('--database is required for migration commands');
   } else if (migration) {
@@ -93,10 +94,14 @@ export function parseMigrationArguments(argv: string[]): MigrationCliOptions {
     if (!values.get('--report')) throw new Error('db:migrate:rollback requires --report inside .local/migration-private');
     if (apply && !expectedFingerprint) throw new Error('db:migrate:rollback --apply requires --expected-fingerprint from the reviewed dry-run');
   }
-  if (migration === '002-comment-parents' && ['db:migrate:plan', 'db:migrate:apply'].includes(command) && !values.has('--report')) {
+  if (migration === '002-comment-parents' && ['db:migrate:preflight', 'db:migrate:plan', 'db:migrate:apply'].includes(command) && !values.has('--report')) {
     throw new Error('Comment-parent plan/apply requires a private --report path');
   }
   if (command === 'db:migrate:apply' && expectedFingerprint && !flags.has('--staging')) throw new Error('--expected-fingerprint is only valid with db:migrate:rollback --apply');
+
+  if (flags.has('--staging') && (!database || !values.get('--report'))) {
+    throw new Error('Staging commands require an explicit --database and private --report');
+  }
 
   return {
     command,
@@ -195,7 +200,7 @@ export async function assertStagingTarget(db: Db, options: MigrationCliOptions, 
   const migratorUri = new URL(uri);
   const status = await db.command({ connectionStatus: 1 });
   const users = status.authInfo?.authenticatedUsers as { user: string; db: string }[] | undefined;
-  if (!expectedUser || expectedUser === decodeURIComponent(runtimeUri.username) ||
+  if (!runtimeUri.username || !expectedUser || expectedUser === decodeURIComponent(runtimeUri.username) ||
       decodeURIComponent(migratorUri.username) !== expectedUser || users?.length !== 1 || users[0].user !== expectedUser ||
       users[0].db !== db.databaseName) throw new Error('Staging requires a separate authenticated database-scoped migrator account');
   const roles = status.authInfo?.authenticatedUserRoles as { role: string; db: string }[] | undefined;
