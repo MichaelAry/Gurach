@@ -57,3 +57,77 @@ filter before publishing; missing or incompatible indexes stop uploads. The
 prepublication lookup also normalizes unkeyed legacy rows. Publication races
 return `409 TRACK_DUPLICATE`, optionally with `existingTrackId`; both staged and
 published-file cleanup retain the existing upload lifecycle.
+
+## Staging release and recovery
+
+The ordered release manifest is `migrationDefinitions`: 001, 002, 003, 004,
+006, 007-social-relations, 008-track-identity, 009-audio-fingerprint-indexes,
+010-notification-indexes, 011-playlist-indexes. There is no registered 005.
+Runtime never applies migrations. Readiness requires every manifest version to
+be completed and checks auth, queue, social, audio, inbox and playlist indexes.
+Deploying runtime before completing the manifest will return 503.
+
+Keep the normal isolated runner unchanged. Staging commands explicitly add
+`--staging --database gurach_staging_<name>`. Configure secrets through the
+process environment, never CLI arguments: `MIGRATOR_MONGODB_URI` authenticates a
+separate database-scoped migration user, `GURACH_MIGRATOR_USER` confirms its name,
+and `GURACH_STAGING_DATABASE` confirms the database. The normal `MONGODB_URI`
+continues to identify the distinct runtime account. Grant migrator readWrite
+and dbAdmin on this staging database only; do not grant cluster or production
+roles. Runtime needs reads of migration state and index metadata, not DDL rights.
+
+Preflight: run `db:audit` and each `db:migrate:plan` with `--staging`, a fresh
+`--report .local/migration-private/<release>-<id>-plan.json`, and the explicit
+database. Verify writable replica-set connectivity, authenticated identity,
+backup inventory, free space and all plan conflicts before approving writes.
+Review target fingerprint with the deployment inventory; fingerprint is target
+identity evidence, not a substitute for checking the URI/host and credentials.
+Staging apply additionally requires `--expected-fingerprint <reviewed sha256>`
+and `GURACH_STAGING_WRITERS_STOPPED` set to that fingerprint. Each apply requires
+a fresh private report path, reserved before writes; a started-only report means
+interruption/failure and must be investigated against the Mongo journal.
+Predecessor versions, fingerprint and verification are checked before each apply.
+Run apply and verify for each manifest entry in order; verify issueCount must be
+zero. Retain reports and `_gurach_migration_state` / `_gurach_migration_journal`.
+Never reuse a report path or edit journal checkpoints to bypass a failure.
+
+Before backup or apply, disable ingress mutations and stop all API writers,
+uploads, queue sync, social/inbox/playlist writes, seeders, maintenance pollers
+and cache-event workers. Drain in-flight operations. Keep writes stopped until
+verification and HTTPS smoke checks finish. Take a consistent Mongo backup with
+replica-set metadata and a matching snapshot of STATIC_DIR including staging;
+record checksums, timestamps, storage locations and the application commit.
+Encrypt backups, restrict access, and verify restore credentials separately.
+Do not treat an estimated-count audit as a backup consistency proof.
+
+Rehearse against an isolated restored copy and separate media directory with
+outbound deliveries disabled. Restore both snapshots, run the full ordered
+plan/apply/verify sequence, then start the release behind HTTPS. Check live and
+ready, login/cookies, catalogue/media playback, queue persistence, friends,
+private inbox and private/link playlists. Remove a critical index on the copy
+and confirm ready becomes 503; recover through the explicit migration workflow.
+Record actual commands, fingerprints, checksums and results privately.
+
+Recovery: keep writers frozen, preserve failure reports and journals, and first
+attempt the documented resumable apply only after resolving conflicts. Generic
+rollback is not supported. For a failed release restore the matching Mongo AND
+media snapshots into a new isolated target, verify checksums and rehearse the
+previous application version before switching staging traffic. Never restore
+one half of the pair or overwrite later writes without a reviewed data-loss
+window. The narrow 001 rollback evidence gate remains available; it is not a
+release-wide recovery strategy. This workflow authorizes no production migration
+or restoration.
+
+### Verification performed for this release workflow
+
+On 2026-11-16, an ephemeral authenticated Mongo replica set was provisioned
+using the existing isolated runner bootstrap. A new empty staging database and
+a separate database-scoped readWrite/dbAdmin migrator were used. All ten
+registered migrations passed plan/apply/verify in manifest order; incorrect
+fingerprints were rejected. The real HealthController was served through a
+local HTTPS harness: readiness returned 200, then 503 after dropping
+`playlist_owner`, then 200 after explicit index recovery. The existing HTTPS
+production-cookie browser check also passed against its API fixture.
+This was an empty-database rehearsal, not a restore of production data or media;
+backup restoration and a full application HTTPS smoke against restored data
+remain operator acceptance steps before a real staging release.

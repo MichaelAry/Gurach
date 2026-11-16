@@ -1,11 +1,12 @@
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { MongoClient, MongoError } from 'mongodb';
 import { redactSecrets } from '../common/env-validation.js';
 import {
+  migrationWorkspaceRoot,
   assertSafeApplyTarget,
+  assertStagingTarget,
   auditDatabase,
   createTargetFingerprint,
   databaseFromUri,
@@ -19,7 +20,8 @@ import { migrationDefinitions } from './migrations/registry.js';
 async function main(): Promise<void> {
   const options = parseMigrationArguments(process.argv.slice(2));
   if (options.report) resolveReportPath(options.report);
-  const uri = getMongoUri();
+  const uri = options.staging ? process.env.MIGRATOR_MONGODB_URI : getMongoUri();
+  if (!uri) throw new Error('MIGRATOR_MONGODB_URI is required for staging');
   const databaseName = options.database ?? databaseFromUri(uri);
   const migration = options.migration
     ? migrationDefinitions.find((candidate) => candidate.id === options.migration)
@@ -30,7 +32,7 @@ async function main(): Promise<void> {
       ? `Unknown migration ID. Registered IDs: ${registered.join(', ')}`
       : 'No domain migrations are registered yet; P4 will add the first migration.');
   }
-  if (options.apply) assertSafeApplyTarget(databaseName);
+  if (options.apply && !options.staging) assertSafeApplyTarget(databaseName);
 
   const client = new MongoClient(uri, {
     appName: 'gurach-migrations',
@@ -41,6 +43,17 @@ async function main(): Promise<void> {
     const db = client.db(databaseName);
     const hello = await client.db('admin').command({ hello: 1 });
     const targetFingerprint = createTargetFingerprint(databaseName, hello);
+    if (options.staging) await assertStagingTarget(db, options, uri, targetFingerprint);
+    if (options.staging && options.apply && options.report) {
+      await writePrivateReport(options.report, { command: options.command, database: databaseName, targetFingerprint, migrator: process.env.GURACH_MIGRATOR_USER, mode: 'staging', status: 'started' });
+      if (migration && options.command === 'db:migrate:apply') {
+        for (const predecessor of migrationDefinitions.slice(0, migrationDefinitions.indexOf(migration))) {
+          const state = await db.collection('_gurach_migration_state').findOne({ _id: predecessor.id as never });
+          if (state?.status !== 'completed' || state.migrationVersion !== predecessor.version || state.targetFingerprint !== targetFingerprint) throw new Error(`Predecessor incomplete: ${predecessor.id}`);
+          if ((await predecessor.verify(db, options.batchSize)).issueCount) throw new Error(`Predecessor verification failed: ${predecessor.id}`);
+        }
+      }
+    }
     if (options.command === 'db:migrate:rollback' && options.apply && options.expectedFingerprint !== targetFingerprint) {
       throw new Error('Mongo target fingerprint changed since the reviewed rollback dry-run');
     }
@@ -82,7 +95,7 @@ async function main(): Promise<void> {
         const preview = await runner.rollback(migration, rollbackOptions);
         if (options.apply && options.report) {
           const initial = { command: options.command, database: databaseName, targetFingerprint, mode: 'apply-in-progress', ...preview };
-          await writePrivateReport(options.report, initial);
+          await writePrivateReport(options.report, initial, options.staging);
           const applied = await runner.rollback(migration, { ...rollbackOptions, dryRun: false });
           result = { command: options.command, database: databaseName, targetFingerprint, mode: 'apply', ...applied };
           await writePrivateReport(options.report, result, true);
@@ -102,7 +115,8 @@ async function main(): Promise<void> {
         };
       }
     }
-    if (options.report && !(options.command === 'db:migrate:rollback' && options.apply)) await writePrivateReport(options.report, result);
+    if (options.staging) result = { ...result, mode: 'staging', migrator: process.env.GURACH_MIGRATOR_USER };
+    if (options.report && !(options.command === 'db:migrate:rollback' && options.apply)) await writePrivateReport(options.report, result, options.staging && options.apply);
     const stdoutResult = { ...result };
     if (migration?.privateAudit && typeof result.audit === 'object' && result.audit !== null) {
       const audit = result.audit as Record<string, unknown>;
@@ -120,7 +134,7 @@ async function main(): Promise<void> {
 
 async function writePrivateReport(rawPath: string, result: Record<string, unknown>, replace = false): Promise<void> {
   const destination = resolveReportPath(rawPath);
-  const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+  const workspaceRoot = migrationWorkspaceRoot();
   const localRoot = path.join(workspaceRoot, '.local');
   const privateRoot = path.join(localRoot, 'migration-private');
   if (path.dirname(destination) !== privateRoot) {

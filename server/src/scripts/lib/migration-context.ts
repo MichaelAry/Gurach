@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import type { Db } from 'mongodb';
@@ -21,6 +22,7 @@ export interface MigrationCliOptions {
   expectedFingerprint?: string;
   dryRun: boolean;
   apply: boolean;
+  staging: boolean;
 }
 
 const DATABASE_NAME = /^[a-zA-Z0-9_-]{1,63}$/;
@@ -35,7 +37,7 @@ export function parseMigrationArguments(argv: string[]): MigrationCliOptions {
   }
   const values = new Map<string, string>();
   const flags = new Set<string>();
-  const flagNames = new Set(['--dry-run', '--apply']);
+  const flagNames = new Set(['--dry-run', '--apply', '--staging']);
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
     if (!argument.startsWith('--')) throw new Error('Unexpected positional argument');
@@ -84,7 +86,7 @@ export function parseMigrationArguments(argv: string[]): MigrationCliOptions {
   if (apply && !['db:migrate:apply', 'db:migrate:rollback'].includes(command)) throw new Error('--apply is valid only with migration apply or rollback');
   if (dryRun && !['db:migrate:apply', 'db:migrate:rollback'].includes(command)) throw new Error('--dry-run is valid only with migration apply or rollback');
   const expectedFingerprint = values.get('--expected-fingerprint');
-  if (expectedFingerprint && (!/^[a-f0-9]{64}$/.test(expectedFingerprint) || command !== 'db:migrate:rollback' || !apply)) {
+  if (expectedFingerprint && (!/^[a-f0-9]{64}$/.test(expectedFingerprint) || (!flags.has('--staging') && (command !== 'db:migrate:rollback' || !apply)))) {
     throw new Error('--expected-fingerprint requires db:migrate:rollback --apply and a lowercase SHA-256 fingerprint');
   }
   if (command === 'db:migrate:rollback') {
@@ -94,10 +96,11 @@ export function parseMigrationArguments(argv: string[]): MigrationCliOptions {
   if (migration === '002-comment-parents' && ['db:migrate:plan', 'db:migrate:apply'].includes(command) && !values.has('--report')) {
     throw new Error('Comment-parent plan/apply requires a private --report path');
   }
-  if (command === 'db:migrate:apply' && expectedFingerprint) throw new Error('--expected-fingerprint is only valid with db:migrate:rollback --apply');
+  if (command === 'db:migrate:apply' && expectedFingerprint && !flags.has('--staging')) throw new Error('--expected-fingerprint is only valid with db:migrate:rollback --apply');
 
   return {
     command,
+    staging: flags.has('--staging'),
     ...(migration ? { migration } : {}),
     ...(database ? { database } : {}),
     batchSize,
@@ -168,7 +171,7 @@ export async function auditDatabase(db: Db): Promise<{
 }
 
 export function resolveReportPath(rawPath: string): string {
-  const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+  const workspaceRoot = migrationWorkspaceRoot();
   const privateRoot = path.join(workspaceRoot, '.local', 'migration-private');
   const destination = path.resolve(workspaceRoot, rawPath);
   if (destination === privateRoot || !destination.startsWith(`${privateRoot}${path.sep}`)) {
@@ -179,4 +182,42 @@ export function resolveReportPath(rawPath: string): string {
 
 export function getMongoUri(): string {
   return env.mongodbUri;
+}
+
+/** Staging is an explicit CLI capability, never a relaxation of the test runner. */
+export async function assertStagingTarget(db: Db, options: MigrationCliOptions, uri: string, fingerprint: string): Promise<void> {
+  if (!/^gurach_staging_[a-zA-Z0-9_-]+$/.test(db.databaseName) ||
+      process.env.GURACH_STAGING_DATABASE !== db.databaseName || databaseFromUri(uri) !== db.databaseName) {
+    throw new Error('Staging requires matching gurach_staging_* URI, --database and GURACH_STAGING_DATABASE');
+  }
+  const expectedUser = process.env.GURACH_MIGRATOR_USER;
+  const runtimeUri = new URL(getMongoUri());
+  const migratorUri = new URL(uri);
+  const status = await db.command({ connectionStatus: 1 });
+  const users = status.authInfo?.authenticatedUsers as { user: string; db: string }[] | undefined;
+  if (!expectedUser || expectedUser === decodeURIComponent(runtimeUri.username) ||
+      decodeURIComponent(migratorUri.username) !== expectedUser || users?.length !== 1 || users[0].user !== expectedUser ||
+      users[0].db !== db.databaseName) throw new Error('Staging requires a separate authenticated database-scoped migrator account');
+  const roles = status.authInfo?.authenticatedUserRoles as { role: string; db: string }[] | undefined;
+  if (!roles?.length || roles.some(role => role.db !== db.databaseName || !['readWrite', 'dbAdmin'].includes(role.role)) ||
+      !['readWrite', 'dbAdmin'].every(role => roles.some(value => value.role === role))) {
+    throw new Error('Migrator must have only readWrite and dbAdmin roles on the staging database');
+  }
+  const hello = await db.admin().command({ hello: 1 });
+  if (!hello.isWritablePrimary || !hello.setName) throw new Error('Staging requires a writable replica set primary');
+  if (options.apply && (options.expectedFingerprint !== fingerprint || !options.report ||
+      process.env.GURACH_STAGING_WRITERS_STOPPED !== fingerprint)) {
+    throw new Error('Staging writes require reviewed fingerprint, private report and GURACH_STAGING_WRITERS_STOPPED confirmation');
+  }
+}
+
+// Resolve equally from src/ and compiled .tools/src/; never depend on cwd.
+export function migrationWorkspaceRoot(): string {
+  let directory = path.dirname(fileURLToPath(import.meta.url));
+  while (!existsSync(path.join(directory, 'nest-cli.json'))) {
+    const parent = path.dirname(directory);
+    if (parent === directory) throw new Error('Cannot locate migration workspace');
+    directory = parent;
+  }
+  return path.dirname(directory);
 }

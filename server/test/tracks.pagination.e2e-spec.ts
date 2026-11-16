@@ -122,9 +122,9 @@ describe('GET /tracks cursor API (Mongo integration)', () => {
     expect(new Set(actual).size).toBe(count);
   });
 
-  it('exposes liveness and Mongo primary readiness', async () => {
+  it('exposes liveness and rejects an unversioned Mongo schema', async () => {
     await request(app.getHttpServer()).get('/health/live').expect(200, { status: 'ok' });
-    await request(app.getHttpServer()).get('/health/ready').expect(200, { status: 'ok' });
+    await request(app.getHttpServer()).get('/health/ready').expect(503);
   });
 
   it('uses a sanitized request ID and returns a stable validation envelope', async () => {
