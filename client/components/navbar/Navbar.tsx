@@ -26,7 +26,7 @@ function NavigationLinks() {
 export const Navbar = () => (
   <Paper
     component="nav"
-    aria-label="Main navigation"
+    aria-label="Основная навигация"
     variant="outlined"
     sx={{
       display: 'flex',
