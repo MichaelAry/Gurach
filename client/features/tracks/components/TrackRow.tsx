@@ -31,7 +31,8 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
         p: 1.5,
         display: 'flex',
         alignItems: 'center',
-        gap: 2,
+        gap: { xs: 1, sm: 2 },
+        flexWrap: { xs: 'wrap', sm: 'nowrap' },
         transition: 'background-color 120ms ease',
 
         // активный трек: подсветка не пропадает на hover
@@ -45,19 +46,21 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
             }),
       }}
     >
-      <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>
+      <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex', order: 0, flexShrink: 0 }}>
         <PlayButton track={track} />
       </Box>
-      {selectionEnabled && <Checkbox sx={{ position: 'relative', zIndex: 1 }} size="small" checked={selected} disabled={!track.audio} onChange={(event) => onSelectionChange?.(event.target.checked)} slotProps={{ input: { 'aria-label': `Выбрать ${track.name}` } }} />}
+      {selectionEnabled && <Checkbox sx={{ position: 'relative', zIndex: 1, order: 1, flexShrink: 0 }} size="small" checked={selected} disabled={!track.audio} onChange={(event) => onSelectionChange?.(event.target.checked)} slotProps={{ input: { 'aria-label': `Выбрать ${track.name}` } }} />}
 
       <Stack
-        direction="row"
+        direction={{ xs: 'column', sm: 'row' }}
         sx={{
+          order: { xs: 2, sm: 0 },
           flex: 1,
+          flexBasis: { xs: '100%', sm: 'auto' },
           minWidth: 0, // ← обязательно: иначе noWrap не сработает
           justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 2,
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: { xs: 0, sm: 2 },
         }}
       >
         <Typography
@@ -77,7 +80,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
         >
           {track.name}
         </Typography>
-        <Typography noWrap sx={{ color: 'text.secondary', flexShrink: 0 }}>
+        <Typography noWrap sx={{ color: 'text.secondary', minWidth: 0, flexShrink: { xs: 1, sm: 0 } }}>
           {track.artist ?? '—'}
         </Typography>
       </Stack>
@@ -87,15 +90,16 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
           color: 'text.secondary',
           fontSize: '0.85rem',
           flexShrink: 0,
+          order: { xs: 3, sm: 0 },
           fontVariantNumeric: 'tabular-nums',
         }}
       >
         {formatListens(listens)}
       </Typography>
-      <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>
+      <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex', order: { xs: 4, sm: 0 }, flexShrink: 0 }}>
         <FavoriteButton trackId={track._id} name={track.name} />
       </Box>
-      <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>
+      <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex', order: { xs: 5, sm: 0 }, flexShrink: 0 }}>
         <QueueTrackActions track={track} />
       </Box>
     </Card>
