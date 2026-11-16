@@ -159,7 +159,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
     const date = new Date()
     date.setDate(date.getDate() - 6 + i)
     return {
-      day: date.toLocaleDateString('ru', { weekday: 'short' }),
+      day: date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric' }),
       count:
         history.data?.items.filter(
           (item) => new Date(item.listenedAt).toDateString() === date.toDateString(),
@@ -199,10 +199,13 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
             {artists.length > 0 && (
               <Typography variant="body2">Недавние исполнители: {artists.join(', ')}</Typography>
             )}
-            {week.some((d) => d.count > 0) && (
+            {history.data && (
               <Typography variant="body2" color="text.secondary">
-                Последние 30 прослушиваний за неделю:{' '}
-                {week.map((d) => `${d.day} ${d.count}`).join(' · ')}
+                {week.some((day) => day.count > 0)
+                  ? <>Прослушивания за последние 7 дней (по выборке из 30 последних):{' '}
+                      {week.map((day) => `${day.day}: ${day.count}`).join(' · ')}
+                    </>
+                  : 'Среди 30 последних прослушиваний нет событий за последние 7 дней.'}
               </Typography>
             )}
             {history.data && (
