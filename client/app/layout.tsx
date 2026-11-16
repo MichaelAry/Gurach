@@ -1,6 +1,8 @@
 // app/layout.tsx
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter'
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import { LocaleProvider, type Locale } from '@/i18n/LocaleProvider'
 import localFont from 'next/font/local'
 
 import { AppThemeProvider } from '@/theme/AppThemeProvider'
@@ -18,7 +20,7 @@ const onest = localFont({
 
 export const metadata: Metadata = {
   title: 'Gurach',
-  description: 'Музыкальный плеер',
+  description: 'Music player',
   openGraph: {
     title: 'Gurach',
     description: 'Музыкальный плеер',
@@ -26,12 +28,14 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const savedLocale = (await cookies()).get('NEXT_LOCALE')?.value
+  const locale: Locale = savedLocale === 'ru' ? 'ru' : 'en'
   return (
-    <html lang="ru" className={onest.variable}>
+    <html lang={locale} className={onest.variable}>
       <body suppressHydrationWarning>
         <AppRouterCacheProvider>
-          <AppThemeProvider>{children}</AppThemeProvider>
+          <AppThemeProvider><LocaleProvider initialLocale={locale}>{children}</LocaleProvider></AppThemeProvider>
         </AppRouterCacheProvider>
       </body>
     </html>
