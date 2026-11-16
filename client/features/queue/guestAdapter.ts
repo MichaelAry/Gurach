@@ -1,3 +1,4 @@
+import { message as localMessage } from '@/i18n/messages'
 import { resolveTracks } from './api/resolveTracks'
 import { randomQueueEntries } from './api/randomTracks'
 import { QueueTransportError } from './queueStore'
@@ -7,7 +8,8 @@ const STORAGE_KEY = 'gurach:guest-queue'
 const QUARANTINE_KEY = 'gurach:guest-queue:invalid'
 const CHANNEL_NAME = 'gurach:guest-queue'
 const LOCK_NAME = 'gurach:guest-queue:write'
-export const INVALID_GUEST_QUEUE_WARNING = 'Сохранённая гостевая очередь повреждена или создана другой версией. Исходные данные сохранены; сбросьте их, чтобы начать заново.'
+export const INVALID_GUEST_QUEUE_WARNING = localMessage('theSavedGuestQueueIsDamagedOrWasCreated')
+export const MEMORY_GUEST_QUEUE_WARNING = localMessage('theGuestQueueIsStoredOnlyInThisTab')
 const EMPTY: QueueSnapshot = { revision: 0, capacity: 100, entries: [], updatedAt: null }
 type StoredQueue = { version: 1; snapshot: QueueSnapshot; lastMutationId?: string; lastMutationHash?: string }
 type GuestAdapterOptions = { onStatus?: (status: { persistent: boolean; warning: string | null }) => void }
@@ -56,16 +58,16 @@ export function guestQueueAdapter(options: GuestAdapterOptions = {}): QueueAdapt
   let mode: 'unknown' | 'persistent' | 'memory' = 'unknown'
   const listeners = new Set<() => void>()
   const memoryAdapter = async () => {
-    if (mode !== 'memory') { mode = 'memory'; options.onStatus?.({ persistent: false, warning: 'Гостевая очередь хранится только в этой вкладке: браузер не поддерживает безопасную синхронизацию или хранилище недоступно.' }) }
+    if (mode !== 'memory') { mode = 'memory'; options.onStatus?.({ persistent: false, warning: MEMORY_GUEST_QUEUE_WARNING }) }
   }
   const resolveEntries = async (current: QueueSnapshot, entries: QueueWriteEntry[], signal?: AbortSignal): Promise<QueueSnapshot> => {
-    if (entries.length > 100 || new Set(entries.map((entry) => entry.entryId.toLowerCase())).size !== entries.length) throw new QueueTransportError(400, 'Invalid guest queue')
+    if (entries.length > 100 || new Set(entries.map((entry) => entry.entryId.toLowerCase())).size !== entries.length) throw new QueueTransportError(400, localMessage('apiQueueInvalid'))
     const previous = new Map(current.entries.map((entry) => [entry.entryId, entry]))
     const resolved = new Map((await resolveTracks(entries.map((entry) => entry.trackId), signal)).items.map((item) => [item.trackId, item]))
     const nextEntries = entries.map((entry) => {
       const old = previous.get(entry.entryId), item = resolved.get(entry.trackId)
       if (old && old.trackId !== entry.trackId) throw new QueueTransportError(400, 'Entry changed')
-      if (!old && !item?.track?.audio) throw new QueueTransportError(400, 'Track unavailable')
+      if (!old && !item?.track?.audio) throw new QueueTransportError(400, localMessage('trackUnavailable'))
       return { ...entry, source: entry.source ?? old?.source ?? 'manual', display: old?.display ?? { name: item!.track!.name, artist: item!.track!.artist }, track: item?.track ?? null,
         availability: item?.availability ?? 'unavailable' as const, reason: item ? item.reason : 'deleted' as const }
     })
@@ -141,7 +143,7 @@ export function guestQueueAdapter(options: GuestAdapterOptions = {}): QueueAdapt
     save: async (_revision, _mutationId, entries: QueueWriteEntry[], signal) => {
       if (mode === 'memory' || !persistent()) {
         await memoryAdapter()
-        if (memory.revision !== _revision) throw new QueueTransportError(409, 'Guest queue changed')
+        if (memory.revision !== _revision) throw new QueueTransportError(409, localMessage('theQueueChangedInAnotherWindowRefreshItBefore'))
         memory = await resolveEntries(memory, entries, signal)
         return memory
       }
@@ -152,10 +154,10 @@ export function guestQueueAdapter(options: GuestAdapterOptions = {}): QueueAdapt
         const mutationHash = JSON.stringify({ revision: _revision, entries })
         const previousSave = raw ? JSON.parse(raw) as StoredQueue : null
         if (previousSave?.lastMutationId === _mutationId) {
-          if (previousSave.lastMutationHash !== mutationHash) throw new QueueTransportError(400, 'Mutation changed')
+          if (previousSave.lastMutationHash !== mutationHash) throw new QueueTransportError(400, localMessage('apiQueueInvalid'))
           return hydrate(current, signal)
         }
-        if (current.revision !== _revision) throw new QueueTransportError(409, 'Guest queue changed')
+        if (current.revision !== _revision) throw new QueueTransportError(409, localMessage('theQueueChangedInAnotherWindowRefreshItBefore'))
         const hydratedCurrent = await hydrate(current, signal)
         const saved = await resolveEntries(hydratedCurrent, entries, signal)
         try {

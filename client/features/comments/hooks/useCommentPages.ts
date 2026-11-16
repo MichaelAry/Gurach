@@ -1,4 +1,5 @@
 'use client'
+import { message as localMessage } from '@/i18n/messages'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CommentResponse } from '../types'
@@ -15,6 +16,7 @@ interface CommentPagesState {
 }
 
 export function useCommentPages(trackId: string) {
+
   const [state, setState] = useState<CommentPagesState>({
     trackId, items: [], nextCursor: null, loading: true, loadingMore: false, error: null,
   })
@@ -51,7 +53,7 @@ export function useCommentPages(trackId: string) {
       if (controller.signal.aborted || generation.current !== currentGeneration) return
       setState((previous) => ({
         ...previous, trackId, loading: false, loadingMore: false,
-        error: cause instanceof Error ? cause.message : 'Не удалось загрузить комментарии',
+        error: cause instanceof Error ? cause.message : localMessage('couldNotLoadComments'),
       }))
     }).finally(() => {
       if (request.current === controller) request.current = null
@@ -96,7 +98,7 @@ export function useCommentPages(trackId: string) {
     } catch (cause) {
       if (!controller.signal.aborted && generation.current === currentGeneration) {
         setState((previous) => previous.trackId === trackId
-          ? { ...previous, loadingMore: false, error: cause instanceof Error ? cause.message : 'Не удалось загрузить комментарии' }
+          ? { ...previous, loadingMore: false, error: cause instanceof Error ? cause.message : localMessage('couldNotLoadComments') }
           : previous)
       }
     } finally {
@@ -134,7 +136,7 @@ export function useCommentPages(trackId: string) {
             ...previous, items: [...new Map([...previous.items, item].map((row) => [row._id, row])).values()].sort((a, b) => b._id.localeCompare(a._id)),
           } : previous)
         }).catch((cause: unknown) => {
-          if (!signal.aborted) setTargetError(cause instanceof Error ? cause.message : 'Комментарий недоступен')
+          if (!signal.aborted) setTargetError(cause instanceof Error ? cause.message : localMessage('commentUnavailable'))
         })
     }
     resolve()
@@ -166,7 +168,7 @@ export function useCommentPages(trackId: string) {
       } : previous)
       return true
     } catch (cause) {
-      setMutationError(cause instanceof Error ? cause.message : 'Не удалось выполнить запрос')
+      setMutationError(cause instanceof Error ? cause.message : localMessage('couldNotCompleteTheRequest'))
       return false
     } finally {
       mutationLock.current = false

@@ -8,6 +8,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:3200',
+    storageState: { cookies: [{ name: 'NEXT_LOCALE', value: 'ru', domain: '127.0.0.1', path: '/', expires: -1, httpOnly: false, secure: false, sameSite: 'Lax' }], origins: [] },
     ...devices['Desktop Chrome'],
   },
   webServer: [

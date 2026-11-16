@@ -1,15 +1,16 @@
+import { message as localMessage } from '@/i18n/messages'
 import { readApiError, formatApiError } from '@/lib/api/error'
 import type { QueueAdapter, QueueSnapshot } from './types'
 import { QueueTransportError } from './queueStore'
 async function read(response: Response): Promise<QueueSnapshot> {
-  if (!response.ok) throw new QueueTransportError(response.status, formatApiError((await readApiError(response))?.error ?? null, 'Не удалось сохранить очередь'))
+  if (!response.ok) throw new QueueTransportError(response.status, formatApiError((await readApiError(response))?.error ?? null, localMessage('couldNotSaveTheQueue')))
   const value = await response.json() as QueueSnapshot
-  if (!Number.isSafeInteger(value.revision) || value.revision < 0 || value.capacity !== 100 || !Array.isArray(value.entries) || value.entries.length > 100 || new Set(value.entries.map((entry) => entry.entryId)).size !== value.entries.length) throw new Error('Некорректный ответ очереди')
+  if (!Number.isSafeInteger(value.revision) || value.revision < 0 || value.capacity !== 100 || !Array.isArray(value.entries) || value.entries.length > 100 || new Set(value.entries.map((entry) => entry.entryId)).size !== value.entries.length) throw new Error(localMessage('invalidQueueResponse'))
   return value
 }
 export function accountQueueAdapter(isSessionConfirmed: () => boolean): QueueAdapter {
   let channel: BroadcastChannel | null = null
-  const assertSession = () => { if (!isSessionConfirmed()) throw new QueueTransportError(503, 'Сессия временно не подтверждена. Проверьте сессию и повторите операцию.') }
+  const assertSession = () => { if (!isSessionConfirmed()) throw new QueueTransportError(503, localMessage('yourSessionCouldNotBeConfirmedCheckYourSession246')) }
   return {
     load: async (signal) => { assertSession(); return read(await fetch('/api/queue', { cache: 'no-store', signal })) },
     save: async (expectedRevision, mutationId, entries, signal) => {

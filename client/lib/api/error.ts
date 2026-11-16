@@ -1,3 +1,4 @@
+import { message, type UiKey } from '@/i18n/messages'
 export interface ApiErrorEnvelope {
   error: {
     code: string
@@ -26,7 +27,18 @@ export async function readApiError(response: Response): Promise<ApiErrorEnvelope
   }
 }
 
+const publicErrorKeys: Record<string, UiKey> = {
+  VALIDATION_ERROR: 'apiValidation', UNAUTHORIZED: 'apiUnauthorized', FORBIDDEN: 'apiForbidden',
+  NOT_FOUND: 'apiNotFound', CONFLICT: 'apiConflict', PAYLOAD_TOO_LARGE: 'apiTooLarge',
+  UNSUPPORTED_MEDIA_TYPE: 'apiMedia', RATE_LIMITED: 'apiRateLimit',
+  INTERNAL_ERROR: 'apiUnavailable', BACKEND_UNAVAILABLE: 'apiUnavailable', BACKEND_TIMEOUT: 'apiUnavailable',
+  TRACK_UNAVAILABLE: 'trackUnavailable', QUEUE_FULL: 'apiQueueFull', QUEUE_ENTRY_INVALID: 'apiQueueInvalid',
+  QUEUE_CONFLICT: 'apiConflict', TRACK_DUPLICATE: 'theServerDetectedADuplicateOfAnExistingTrack',
+}
 export function formatApiError(error: ApiErrorEnvelope['error'] | null, fallback: string): string {
   if (!error) return fallback
-  return `${error.message} [${error.code}; request ${error.requestId}]`
+  return message('apiErrorReference', {
+    message: publicErrorKeys[error.code] ? message(publicErrorKeys[error.code]) : fallback,
+    code: error.code, requestId: error.requestId,
+  })
 }

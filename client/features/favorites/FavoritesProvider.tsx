@@ -1,4 +1,6 @@
 'use client'
+import { useText, useMessage } from '@/i18n/LocaleProvider'
+import { message as localMessage } from '@/i18n/messages'
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, Snackbar } from '@mui/material'
@@ -20,6 +22,10 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
 }
 
 function FavoritesSession({ children, authenticated, sessionLoading }: { children: ReactNode; authenticated: boolean; sessionLoading: boolean }) {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const { user, isConfirmed } = useViewer()
   const [ids, setIds] = useState<Set<string>>(new Set())
   const [pending, setPending] = useState<Set<string>>(new Set())
@@ -45,7 +51,7 @@ function FavoritesSession({ children, authenticated, sessionLoading }: { childre
         setIds(new Set(values)); setReady(true); setError(null); setRevision((old) => old + 1)
       }
     }).catch(() => {
-      if (active.current && !request.signal.aborted && version === generation.current) setError('Не удалось загрузить избранное. Повторите попытку.')
+      if (active.current && !request.signal.aborted && version === generation.current) setError(localMessage('couldNotLoadFavoritesTryAgain'))
     })
   }, [authenticated, isConfirmed, user?.id])
 
@@ -73,7 +79,7 @@ function FavoritesSession({ children, authenticated, sessionLoading }: { childre
         setRevision((old) => old + 1)
       }
     } catch {
-      if (active.current) setError('Не удалось изменить избранное. Попробуйте ещё раз.')
+      if (active.current) setError(localMessage('couldNotUpdateFavoritesTryAgain'))
     } finally {
       busy.current.delete(id)
       if (active.current) setPending(new Set(busy.current))
@@ -83,7 +89,7 @@ function FavoritesSession({ children, authenticated, sessionLoading }: { childre
   return <FavoritesContext.Provider value={{ ids, pending, loading: sessionLoading || (authenticated && !ready), revision, toggle, refresh }}>
     {children}
     <Snackbar open={Boolean(error)} onClose={() => setError(null)}>
-      <Alert severity="error" onClose={() => setError(null)} action={<Button color="inherit" onClick={refresh}>Повторить</Button>}>{error}</Alert>
+      <Alert severity="error" onClose={() => setError(null)} action={<Button color="inherit" onClick={refresh}>{lt('tryAgain')}</Button>}>{resolve(error)}</Alert>
     </Snackbar>
   </FavoritesContext.Provider>
 }

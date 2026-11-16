@@ -147,6 +147,27 @@ it('persists favorites idempotently, isolates users, paginates and permits remov
   expect((await auth('get', '/account/favorite-ids').expect(200)).body).toEqual([String(owned[1])]);
 });
 
+it('persists locale per account, validates input, and initializes a legacy account only once', async () => {
+  await request(app.getHttpServer()).put('/account/preferences').send({ preferredLocale: 'ru' }).expect(401);
+  expect((await auth('get', '/account/preferences').expect(200)).body).toEqual({ preferredLocale: null });
+  for (const preferredLocale of ['de', 'RU', '', null, 1]) {
+    await auth('put', '/account/preferences').send({ preferredLocale }).expect(400);
+  }
+  await auth('put', '/account/preferences').send({ preferredLocale: 'ru', initialize: null }).expect(400);
+  await auth('put', '/account/preferences').send({ preferredLocale: 'ru' }).expect(200);
+  expect((await auth('get', '/auth/me').expect(200)).body.user.preferredLocale).toBe('ru');
+  expect((await auth('get', '/account/preferences', 1).expect(200)).body.preferredLocale).toBeNull();
+  const initialized = await Promise.all(['en', 'ru'].map(preferredLocale => auth('put', '/account/preferences', 1)
+    .send({ preferredLocale, initialize: true }).expect(200)));
+  expect(initialized[0].body.preferredLocale).toBe(initialized[1].body.preferredLocale);
+  await auth('put', '/account/preferences').send({ preferredLocale: 'en', initialize: true }).expect(200);
+  expect((await auth('get', '/account/preferences').expect(200)).body.preferredLocale).toBe('ru');
+  const updated = await auth('put', '/account/preferences').send({ preferredLocale: 'en', userId: String(actors[1].id) }).expect(200);
+  expect(updated.headers['cache-control']).toBe('private, no-store');
+  expect(updated.body.preferredLocale).toBe('en');
+  expect((await auth('get', '/account/preferences', 1).expect(200)).body.preferredLocale).toBe(initialized[0].body.preferredLocale);
+});
+
 it('rejects a revoked session without exposing account data or recording events', async () => {
   await db.collection('sessions').updateOne({ userId: actors[1].id }, { $set: { revokedAt: new Date() } });
   await auth('get', '/account/statistics', 1).expect(401);

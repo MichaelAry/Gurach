@@ -1,4 +1,5 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 import { useTranslations } from '@/i18n/LocaleProvider'
 import type { components } from '@/lib/api/schema'
 import { useViewer } from '@/features/auth/ViewerProvider'
@@ -159,11 +160,13 @@ function Releases({ block }: { block: ReleasesBlock }) {
   )
 }
 export default function HomePage() {
+  const lt = useText()
+
   const viewer = useViewer()
   if (viewer.loading)
     return (
       <Box sx={{ width: '100%', p: 3 }}>
-        <LinearProgress aria-label="Загрузка главной страницы" />
+        <LinearProgress aria-label={lt('loadingHomePage')} />
       </Box>
     )
   return <HomeContent />
@@ -180,7 +183,7 @@ function HomeContent() {
       sx={{ maxWidth: 1000, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 4 } }}
     >
       <Typography variant="overline" color="text.secondary">
-        GURACH / MUSIC
+        {t('brandCaption')}
       </Typography>
       <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
         {t('hero')}

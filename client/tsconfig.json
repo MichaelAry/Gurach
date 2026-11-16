@@ -40,7 +40,9 @@
     ".next-e2e-random-queue/types/**/*.ts",
     ".next-e2e-random-queue/dev/types/**/*.ts",
     ".next-e2e-audio-cache/types/**/*.ts",
-    ".next-e2e-audio-cache/dev/types/**/*.ts"
+    ".next-e2e-audio-cache/dev/types/**/*.ts",
+    ".next-e2e/types/**/*.ts",
+    ".next-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

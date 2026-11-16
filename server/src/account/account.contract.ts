@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsMongoId, IsUUID } from 'class-validator';
+import { IsMongoId, IsUUID, IsIn, IsBoolean, ValidateIf } from 'class-validator';
 import { TrackListItem } from '../contracts/track.contract.js';
 
 export class RecordAccountListenDto {
@@ -22,4 +22,12 @@ export class AccountHistoryItem {
 export class AccountHistoryPage {
   @ApiProperty({ type: [AccountHistoryItem], maxItems: 100 }) items: AccountHistoryItem[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+export class AccountPreferences {
+  @ApiProperty({ enum: ['en', 'ru'], nullable: true }) preferredLocale: 'en' | 'ru' | null;
+}
+export class UpdateAccountPreferences {
+  @ApiProperty({ enum: ['en', 'ru'] }) @IsIn(['en', 'ru']) preferredLocale: 'en' | 'ru';
+  @ApiProperty({ required: false, default: false }) @ValidateIf((_object, value) => value !== undefined) @IsBoolean() initialize?: boolean;
 }

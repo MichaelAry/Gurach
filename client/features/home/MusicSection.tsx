@@ -1,9 +1,12 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 import Link from 'next/link'
 import { Avatar, Box, Button, Stack, Typography } from '@mui/material'
 import type { TrackListItem } from '@/features/tracks/types'
 import { PlayButton } from '@/features/tracks/components/PlayButton'
 export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
+  const lt = useText()
+
   return (
     <Stack spacing={0.5}>
       {tracks.map((track) => (
@@ -42,7 +45,7 @@ export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
               {track.name}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap>
-              {track.artist || 'Неизвестный исполнитель'}
+              {track.artist || lt('unknownArtist')}
             </Typography>
           </Box>
           <Typography variant="caption" color="text.secondary">
@@ -65,6 +68,8 @@ export function Section({
   children: React.ReactNode
   href?: string
 }) {
+  const lt = useText()
+
   return (
     <Box
       component="section"
@@ -86,8 +91,7 @@ export function Section({
         </Typography>
         {href && (
           <Button component={Link} href={href} size="small">
-            Все →
-          </Button>
+            {lt('viewAll')}</Button>
         )}
       </Stack>
       {children}

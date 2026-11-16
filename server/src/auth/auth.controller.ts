@@ -39,6 +39,7 @@ class RecoveryAcceptedDto {
   @ApiProperty({ example: 'If eligible, instructions will be sent to the confirmed channel.' }) message: string;
 }
 class AuthUserDto {
+  @ApiProperty({ enum: ['en', 'ru'], required: false }) preferredLocale?: 'en' | 'ru';
   @ApiProperty() id: string;
   @ApiProperty() username: string;
   @ApiProperty() displayName: string;

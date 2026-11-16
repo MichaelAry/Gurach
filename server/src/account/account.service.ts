@@ -1,3 +1,4 @@
+import { User } from '../auth/schemas/user.schema.js';
 import { AccountFavorite } from './favorite.schema.js';
 import { BadRequestException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
@@ -16,6 +17,7 @@ import type { ListenResult, TrackListPage } from '../contracts/track.contract.js
 @Injectable()
 export class AccountService implements OnModuleInit {
   constructor(
+    @InjectModel(User.name) private readonly users: Model<User>,
     @InjectModel(AccountFavorite.name) private readonly favoriteEntries: Model<AccountFavorite>,
     @InjectModel(AccountListen.name) private readonly listens: Model<AccountListen>,
     @InjectModel(Track.name) private readonly tracks: Model<Track>,
@@ -31,6 +33,19 @@ export class AccountService implements OnModuleInit {
     await this.favoriteEntries.createIndexes();
     await this.listens.createCollection();
     await this.listens.createIndexes();
+  }
+
+  async preferences(userId: string) {
+    const user = await this.users.findOne({ _id: userId, disabled: false }).select('preferredLocale').lean().exec();
+    if (!user) throw new NotFoundException('Account unavailable');
+    return { preferredLocale: user.preferredLocale ?? null };
+  }
+
+  async updatePreferences(userId: string, preferredLocale: 'en' | 'ru', initialize = false) {
+    await this.users.updateOne({ _id: userId, disabled: false,
+      ...(initialize ? { preferredLocale: { $exists: false } } : {}),
+    }, { $set: { preferredLocale } }).exec();
+    return this.preferences(userId);
   }
 
   async statistics(userId: string): Promise<AccountStatistics> {

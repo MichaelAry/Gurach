@@ -1,4 +1,5 @@
 'use client'
+import { useLocale, useText, useMessage } from '@/i18n/LocaleProvider'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -10,6 +11,10 @@ import { useCommentPages } from '../hooks/useCommentPages'
 function CommentCard({ comment, canDelete, deleting, onDelete }: {
   comment: CommentResponse; canDelete: boolean; deleting: boolean; onDelete: () => void
 }) {
+  const { locale } = useLocale()
+
+  const lt = useText()
+
   return (
     <Box id={`comment-${comment._id}`} tabIndex={-1} sx={{ p: 1.5, bgcolor: 'background.default', borderRadius: 1, '&:target': { outline: '2px solid', outlineColor: 'primary.main' } }}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
@@ -18,18 +23,22 @@ function CommentCard({ comment, canDelete, deleting, onDelete }: {
           {comment.rating != null ? ` · ${comment.rating}/10` : ''}
         </Typography>
         <Typography color="text.secondary" sx={{ fontSize: '0.75rem', textAlign: 'right' }}>
-          {comment.createdAt ? new Date(comment.createdAt).toLocaleString('ru-RU') : 'Дата неизвестна'}
+          {comment.createdAt ? new Date(comment.createdAt).toLocaleString(locale) : lt('dateUnknown')}
         </Typography>
       </Stack>
       <Typography sx={{ fontSize: '0.875rem', py: 1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
         {comment.text}
       </Typography>
-      {canDelete && <Button size="small" disabled={deleting} onClick={onDelete}>Удалить комментарий</Button>}
+      {canDelete && <Button size="small" disabled={deleting} onClick={onDelete}>{lt('deleteComment')}</Button>}
     </Box>
   )
 }
 
 export function CommentsSection({ trackId }: { trackId: string }) {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const { user, loading: viewerLoading, error: viewerError, confirmed, isConfirmed } = useViewer()
   const { items, nextCursor, loading, loadingMore, error, loadMore, retry,
     addComment, deleteComment, mutating, mutationError, targetError, retryTarget } = useCommentPages(trackId)
@@ -47,11 +56,10 @@ export function CommentsSection({ trackId }: { trackId: string }) {
   return (
     <Box component="section" aria-labelledby="comments-heading" sx={{ my: 2 }}>
       <Typography id="comments-heading" variant="h6" sx={{ fontSize: '0.875rem', mb: 2 }}>
-        Комментарии
-      </Typography>
+        {lt('comments')}</Typography>
 
-      {viewerError ? <Alert severity="error">Не удалось проверить сессию. Обновите страницу.</Alert> : viewerLoading ? (
-        <Typography role="status">Проверяем сессию…</Typography>
+      {viewerError ? <Alert severity="error">{lt('couldNotCheckYourSessionRefreshThePage')}</Alert> : viewerLoading ? (
+        <Typography role="status">{lt('checkingSession')}</Typography>
       ) : user ? (
         <Box component="form" sx={{ mb: 2 }} onSubmit={(event) => {
           event.preventDefault()
@@ -61,43 +69,41 @@ export function CommentsSection({ trackId }: { trackId: string }) {
           })
         }}>
           <Stack spacing={1}>
-            <TextField label="Комментарий" multiline minRows={2} required value={text}
+            <TextField label={lt('comment')} multiline minRows={2} required value={text}
               disabled={!confirmed || mutating} slotProps={{ htmlInput: { maxLength: 5000 } }} onChange={(event) => setText(event.target.value)} />
-            <TextField select label="Оценка (необязательно)" value={rating} disabled={!confirmed || mutating} onChange={(event) => setRating(event.target.value)}>
-              <MenuItem value="">Без оценки</MenuItem>
+            <TextField select label={lt('ratingOptional')} value={rating} disabled={!confirmed || mutating} onChange={(event) => setRating(event.target.value)}>
+              <MenuItem value="">{lt('noRating')}</MenuItem>
               {Array.from({ length: 10 }, (_, index) => <MenuItem key={index + 1} value={String(index + 1)}>{index + 1}/10</MenuItem>)}
             </TextField>
             <Button type="submit" variant="outlined" disabled={!confirmed || mutating || loading || !text.trim()}>
-              {mutating ? 'Сохраняем…' : 'Отправить комментарий'}
+              {mutating ? lt('saving') : lt('postComment')}
             </Button>
           </Stack>
         </Box>
       ) : (
         <Button component={Link} href={loginHref}>
-          Войти, чтобы оставить комментарий
-        </Button>
+          {lt('signInToComment')}</Button>
       )}
-      {mutationError && <Alert severity="error" sx={{ mb: 2 }}>{mutationError} <Link href={loginHref}>Войти снова</Link></Alert>}
-      {targetError && <Alert severity="warning" action={<Button onClick={retryTarget}>Повторить</Button>}>{targetError}</Alert>}
+      {mutationError && <Alert severity="error" sx={{ mb: 2 }}>{resolve(mutationError)} <Link href={loginHref}>{lt('signInAgain')}</Link></Alert>}
+      {targetError && <Alert severity="warning" action={<Button onClick={retryTarget}>{lt('tryAgain')}</Button>}>{resolve(targetError)}</Alert>}
 
       {loading && (
         <Stack direction="row" spacing={1} role="status" sx={{ alignItems: 'center', color: 'text.secondary' }}>
-          <CircularProgress size={18} aria-label="Загрузка комментариев" />
-          <Typography variant="body2">Загружаем комментарии…</Typography>
+          <CircularProgress size={18} aria-label={lt('loadingComments')} />
+          <Typography variant="body2">{lt('loadingComments142')}</Typography>
         </Stack>
       )}
 
       {!loading && error && items.length === 0 && (
         <Stack spacing={1}>
-          <Alert severity="error">{error}</Alert>
-          <Button variant="outlined" onClick={retry} sx={{ alignSelf: 'flex-start' }}>Повторить</Button>
+          <Alert severity="error">{resolve(error)}</Alert>
+          <Button variant="outlined" onClick={retry} sx={{ alignSelf: 'flex-start' }}>{lt('tryAgain')}</Button>
         </Stack>
       )}
 
       {!loading && !error && items.length === 0 && (
         <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-          Пока нет комментариев.
-        </Typography>
+          {lt('noCommentsYet')}</Typography>
       )}
 
       {items.length > 0 && (
@@ -108,16 +114,16 @@ export function CommentsSection({ trackId }: { trackId: string }) {
         </Stack>
       )}
 
-      {!loading && error && items.length > 0 && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      {!loading && error && items.length > 0 && <Alert severity="error" sx={{ mt: 2 }}>{resolve(error)}</Alert>}
 
       {!loading && !error && nextCursor && (
         <Button variant="outlined" onClick={() => void loadMore()} disabled={loadingMore} sx={{ mt: 2 }}>
-          {loadingMore ? 'Загружаем…' : 'Показать ещё комментарии'}
+          {loadingMore ? lt('loading') : lt('loadMoreComments')}
         </Button>
       )}
       {error && items.length > 0 && nextCursor && (
         <Button variant="outlined" onClick={() => void loadMore()} disabled={loadingMore} sx={{ mt: 2 }}>
-          {loadingMore ? 'Загружаем…' : 'Повторить загрузку'}
+          {loadingMore ? lt('loading') : lt('retryLoading')}
         </Button>
       )}
     </Box>

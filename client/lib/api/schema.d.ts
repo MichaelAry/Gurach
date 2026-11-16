@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AccountController_preferences"];
+        put: operations["AccountController_updatePreferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account/statistics": {
         parameters: {
             query?: never;
@@ -867,6 +883,10 @@ export interface components {
             items: components["schemas"]["AccountHistoryItem"][];
             nextCursor: string | null;
         };
+        AccountPreferences: {
+            /** @enum {string|null} */
+            preferredLocale: "en" | "ru" | null;
+        };
         AccountStatistics: {
             comments: number;
             receivedListens: number;
@@ -903,6 +923,8 @@ export interface components {
         AuthUserDto: {
             displayName: string;
             id: string;
+            /** @enum {string} */
+            preferredLocale?: "en" | "ru";
             /** @enum {string} */
             role: "user" | "admin";
             username: string;
@@ -1248,6 +1270,12 @@ export interface components {
         };
         UnreadNotifications: {
             count: number;
+        };
+        UpdateAccountPreferences: {
+            /** @default false */
+            initialize: boolean;
+            /** @enum {string} */
+            preferredLocale: "en" | "ru";
         };
         UpdateTrackDto: {
             /** @example Artist name */
@@ -1616,6 +1644,116 @@ export interface operations {
             };
             /** @description Rate limit exceeded */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+        };
+    };
+    AccountController_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountPreferences"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+        };
+    };
+    AccountController_updatePreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAccountPreferences"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountPreferences"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

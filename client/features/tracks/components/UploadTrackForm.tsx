@@ -1,8 +1,11 @@
 'use client'
+import { useText, useMessage } from '@/i18n/LocaleProvider'
+import { message as localMessage } from '@/i18n/messages'
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Alert, Button, LinearProgress, Stack, TextField } from '@mui/material'
 import Link from 'next/link'
+import { UploadFileField } from './UploadFileField'
 import { DuplicateTrackError, UploadJobFailedError, uploadTrack, waitForUpload } from '../api/uploadTrack'
 import { useRouter } from 'next/navigation'
 import { useViewer } from '@/features/auth/ViewerProvider'
@@ -10,21 +13,26 @@ import { useViewer } from '@/features/auth/ViewerProvider'
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac']
 const COVER_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']
 
-function validateFile(event: ChangeEvent<HTMLInputElement>, extensions: string[], maxMiB: number) {
+function validateFile(event: ChangeEvent<HTMLInputElement>, extensions: string[], maxMiB: number, resolve: ReturnType<typeof useMessage>) {
   const input = event.currentTarget
   const file = input.files?.[0]
   let error = ''
   if (file) {
     const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? '' : ''
-    if (!extensions.includes(extension)) error = `Поддерживаются форматы: ${extensions.join(', ')}.`
-    else if (file.size === 0) error = 'Файл пуст. Выберите другой файл.'
-    else if (file.size > maxMiB * 1024 * 1024) error = `Размер файла не должен превышать ${maxMiB} МиБ.`
+    if (!extensions.includes(extension)) error = localMessage('supportedFormats', { p0: extensions.join(', ') })
+    else if (file.size === 0) error = localMessage('theFileIsEmptyChooseAnotherFile')
+    else if (file.size > maxMiB * 1024 * 1024) error = localMessage('theFileMustBeNoLargerThanMib', { p0: maxMiB })
   }
-  input.setCustomValidity(error)
+  input.dataset.gurachValidationMessage = error
+  input.setCustomValidity(resolve(error))
   return error
 }
 
 export function UploadTrackForm() {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const { user, confirmed, isConfirmed } = useViewer()
   const router = useRouter()
   const [audioError, setAudioError] = useState('')
@@ -55,7 +63,7 @@ export function UploadTrackForm() {
         router.refresh()
       } catch (cause) {
         if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : 'Не удалось проверить обработку.')
+          setError(cause instanceof Error ? cause.message : localMessage('couldNotCheckProcessingStatus'))
           if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) sessionStorage.removeItem(`gurach-upload:${user.id}`)
           setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
         }
@@ -93,7 +101,7 @@ export function UploadTrackForm() {
     } catch (cause) {
       if (!controller.signal.aborted) {
         if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) sessionStorage.removeItem(`gurach-upload:${user.id}`)
-        setError(cause instanceof Error ? cause.message : 'Не удалось загрузить трек.')
+        setError(cause instanceof Error ? cause.message : localMessage('couldNotLoadTheTrack'))
         setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
       }
     } finally {
@@ -107,61 +115,49 @@ export function UploadTrackForm() {
   return (
     <Stack component="form" noValidate spacing={2.5} onSubmit={submit} aria-busy={pending}>
       <Stack component="fieldset" disabled={!confirmed || pending || uploaded} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
+        <UploadFileField label={lt('audioFile')} name="audio"
+          accept={AUDIO_EXTENSIONS.map(extension => `.${extension}`).join(',')}
+          error={Boolean(audioError)} helperText={resolve(audioError) || lt('mpWavOggOgaMAFlacAacUp')}
+          disabled={!confirmed || pending || uploaded}
+          onChange={event => setAudioError(validateFile(event, AUDIO_EXTENSIONS, 50, resolve))} />
+        <UploadFileField label={lt('cover')} name="picture"
+          accept={COVER_EXTENSIONS.map(extension => `.${extension}`).join(',')}
+          error={Boolean(coverError)} helperText={resolve(coverError) || lt('jpgJpegPngWebpAvifGifUpToMib')}
+          disabled={!confirmed || pending || uploaded}
+          onChange={event => setCoverError(validateFile(event, COVER_EXTENSIONS, 10, resolve))} />
         <TextField
-          label="Аудиофайл"
-          name="audio"
-          type="file"
-          required
-          error={Boolean(audioError)}
-          helperText={audioError || 'MP3, WAV, OGG, OGA, M4A, FLAC, AAC — до 50 МиБ и одного часа. После приёма сервер подготовит версию для плеера в фоне.'}
-          slotProps={{
-            inputLabel: { shrink: true },
-            htmlInput: { accept: AUDIO_EXTENSIONS.map((extension) => `.${extension}`).join(',') },
-          }}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => setAudioError(validateFile(event, AUDIO_EXTENSIONS, 50))}
-        />
-        <TextField
-          label="Обложка"
-          name="picture"
-          type="file"
-          required
-          error={Boolean(coverError)}
-          helperText={coverError || 'JPG, JPEG, PNG, WebP, AVIF, GIF — до 10 МиБ.'}
-          slotProps={{
-            inputLabel: { shrink: true },
-            htmlInput: { accept: COVER_EXTENSIONS.map((extension) => `.${extension}`).join(',') },
-          }}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => setCoverError(validateFile(event, COVER_EXTENSIONS, 10))}
-        />
-        <TextField
-          label="Название трека"
+          label={lt('trackTitle')}
           name="name"
           required
           slotProps={{ htmlInput: { maxLength: 200 } }}
-          helperText="До 200 символов."
-          onChange={(event) => event.target.setCustomValidity(event.target.value.trim() ? '' : 'Введите название трека.')}
+          helperText={lt('upToCharacters')}
+          onChange={(event) => {
+            const error = event.target.value.trim() ? '' : localMessage('enterATrackTitle')
+            event.target.dataset.gurachValidationMessage = error
+            event.target.setCustomValidity(resolve(error))
+          }}
         />
         <TextField
-          label="Исполнитель"
+          label={lt('artist')}
           name="artist"
           slotProps={{ htmlInput: { maxLength: 200 } }}
-          helperText="Необязательно, до 200 символов."
+          helperText={lt('optionalUpToCharacters')}
         />
         <TextField
-          label="Текст песни"
+          label={lt('lyrics105')}
           name="text"
           multiline
           minRows={4}
           maxRows={12}
           slotProps={{ htmlInput: { maxLength: 100_000 } }}
-          helperText="Необязательно, до 100 000 символов."
+          helperText={lt('optionalUpToCharacters354')}
         />
       </Stack>
-      {pending && <LinearProgress aria-label="Загрузка трека" />}
-      {progress && <Alert severity="info">{progress}</Alert>}
-      {error && <Alert severity="error">{error}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>Открыть существующий трек</Link></>}</Alert>}
-      {uploaded && <Alert severity="success">Трек успешно загружен. Открываем страницу трека…</Alert>}
-      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? 'Трек загружен' : pending ? 'Загружаем…' : 'Загрузить трек'}</Button>
+      {pending && <LinearProgress aria-label={lt('uploadingTrack')} />}
+      {progress && <Alert severity="info">{resolve(progress)}</Alert>}
+      {error && <Alert severity="error">{resolve(error)}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>{lt('openExistingTrack')}</Link></>}</Alert>}
+      {uploaded && <Alert severity="success">{lt('trackUploadedOpeningTheTrackPage')}</Alert>}
+      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? lt('trackUploaded') : pending ? lt('loading') : lt('uploadTrack')}</Button>
     </Stack>
   )
 }

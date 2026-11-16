@@ -1,3 +1,4 @@
+import { resolveMessage } from '@/i18n/messages'
 import { afterEach, expect, it, vi } from 'vitest'
 import { uploadTrack } from './uploadTrack'
 
@@ -16,7 +17,7 @@ it('sends multipart with browser-generated boundary and CSRF header', async () =
 
 it.each([{}, { _id: 'javascript:alert(1)' }, { _id: '../login' }, null])('does not navigate using invalid success payload %j', async (payload) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(payload, { status: 201 })))
-  await expect(uploadTrack(new FormData(), new AbortController().signal)).rejects.toThrow('Проверьте каталог')
+  await expect(uploadTrack(new FormData(), new AbortController().signal)).rejects.toSatisfy((error: Error) => resolveMessage('ru', error.message).includes('Проверьте каталог'))
 })
 
 it.each([
@@ -25,12 +26,12 @@ it.each([
   [502, 'недоступен'], [504, 'трек мог загрузиться'], [500, 'Не удалось загрузить'],
 ] as const)('explains HTTP %s without exposing upstream details', async (status, message) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('private details', { status })))
-  await expect(uploadTrack(new FormData(), new AbortController().signal)).rejects.toThrow(message)
+  await expect(uploadTrack(new FormData(), new AbortController().signal)).rejects.toSatisfy((error: Error) => resolveMessage('ru', error.message).includes(message))
 })
 
 it('explains lost connections and does not automatically retry', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-  await expect(uploadTrack(new FormData(), new AbortController().signal)).rejects.toThrow('Соединение прервано')
+  await expect(uploadTrack(new FormData(), new AbortController().signal)).rejects.toSatisfy((error: Error) => resolveMessage('ru', error.message).includes('Соединение прервано'))
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 

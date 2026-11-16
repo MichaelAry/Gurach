@@ -51,6 +51,22 @@
         ],
         "type": "object"
       },
+      "AccountPreferences": {
+        "properties": {
+          "preferredLocale": {
+            "enum": [
+              "en",
+              "ru"
+            ],
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "preferredLocale"
+        ],
+        "type": "object"
+      },
       "AccountStatistics": {
         "properties": {
           "comments": {
@@ -174,6 +190,13 @@
             "type": "string"
           },
           "id": {
+            "type": "string"
+          },
+          "preferredLocale": {
+            "enum": [
+              "en",
+              "ru"
+            ],
             "type": "string"
           },
           "role": {
@@ -1447,6 +1470,25 @@
         ],
         "type": "object"
       },
+      "UpdateAccountPreferences": {
+        "properties": {
+          "initialize": {
+            "default": false,
+            "type": "boolean"
+          },
+          "preferredLocale": {
+            "enum": [
+              "en",
+              "ru"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "preferredLocale"
+        ],
+        "type": "object"
+      },
       "UpdateTrackDto": {
         "properties": {
           "artist": {
@@ -1972,6 +2014,136 @@
               }
             },
             "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/account/preferences": {
+      "get": {
+        "operationId": "AccountController_preferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPreferences"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "account"
+        ]
+      },
+      "put": {
+        "operationId": "AccountController_updatePreferences",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountPreferences"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPreferences"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
           },
           "500": {
             "content": {

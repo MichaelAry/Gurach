@@ -1,8 +1,9 @@
 // app/layout.tsx
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter'
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
-import { LocaleProvider, type Locale } from '@/i18n/LocaleProvider'
+import { getText, getLocale } from '@/i18n/server'
+import { FormValidation } from '@/i18n/FormValidation'
+import { LocaleProvider } from '@/i18n/LocaleProvider'
 import localFont from 'next/font/local'
 
 import { AppThemeProvider } from '@/theme/AppThemeProvider'
@@ -22,24 +23,18 @@ const onest = localFont({
   adjustFontFallback: 'Arial',
 })
 
-export const metadata: Metadata = {
-  title: 'Gurach',
-  description: 'Music player',
-  openGraph: {
-    title: 'Gurach',
-    description: 'Музыкальный плеер',
-    type: 'website',
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const lt = await getText()
+  return { title: 'Gurach', description: lt('musicPlayer'), openGraph: { title: 'Gurach', description: lt('musicPlayer'), type: 'website' } }
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const savedLocale = (await cookies()).get('NEXT_LOCALE')?.value
-  const locale: Locale = savedLocale === 'ru' ? 'ru' : 'en'
+  const locale = await getLocale()
   return (
     <html lang={locale} className={onest.variable}>
       <body suppressHydrationWarning>
         <AppRouterCacheProvider>
-          <AppThemeProvider><LocaleProvider initialLocale={locale}>{children}</LocaleProvider></AppThemeProvider>
+          <LocaleProvider initialLocale={locale}><AppThemeProvider><FormValidation />{children}</AppThemeProvider></LocaleProvider>
         </AppRouterCacheProvider>
       </body>
     </html>

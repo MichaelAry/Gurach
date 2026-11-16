@@ -437,3 +437,6 @@ Registration remains disabled by default.
 описаны в [background-media.md](docs/implementation/background-media.md).
 `MEDIA_STAGING_DIR` содержит приватные оригиналы опубликованных фоновых загрузок
 и входит в согласованную резервную копию вместе с MongoDB и `STATIC_DIR`.
+
+Полная локализация EN/RU, сохранение языка в браузере и аккаунте, API и проверки:
+[Локализация](docs/implementation/localization.md).

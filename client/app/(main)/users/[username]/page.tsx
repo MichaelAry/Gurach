@@ -1,3 +1,4 @@
+import { getText } from '@/i18n/server'
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { Typography } from '@mui/material'
@@ -9,6 +10,8 @@ async function PrivateUserPage({ params }: Props) {
   if (!await getViewerSession()) redirect(`/login?returnTo=${encodeURIComponent(`/users/${username}`)}`)
   return <UserProfile username={username} />
 }
-export default function Page(props: Props) {
-  return <Suspense fallback={<Typography role="status" sx={{ p: 3 }}>Проверяем сессию…</Typography>}><PrivateUserPage {...props} /></Suspense>
+export default async function Page(props: Props) {
+  const lt = await getText()
+
+  return <Suspense fallback={<Typography role="status" sx={{ p: 3 }}>{lt('checkingSession')}</Typography>}><PrivateUserPage {...props} /></Suspense>
 }

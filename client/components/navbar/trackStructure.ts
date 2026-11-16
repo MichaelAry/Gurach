@@ -1,3 +1,4 @@
+import { message as localMessage } from '@/i18n/messages'
 import type { Section, TrackItem } from './types'
 
 export function buildTrackStructure(sections: Section[]): TrackItem[] {
@@ -22,6 +23,6 @@ export function buildTrackStructure(sections: Section[]): TrackItem[] {
 export const trackStructure: TrackItem[] = buildTrackStructure([
   { label: 'Main', href: '/', trackCount: 14 },
   { label: 'All tracks', href: '/tracks', trackCount: 20 },
-  { label: 'Избранное', href: '/favorites', trackCount: 8 },
-  { label: 'Друзья', href: '/friends', trackCount: 8 },
+  { label: localMessage('favorites'), href: '/favorites', trackCount: 8 },
+  { label: localMessage('friends'), href: '/friends', trackCount: 8 },
 ])

@@ -1,8 +1,11 @@
 'use client'
+import { useLocale } from '@/i18n/LocaleProvider'
 import Link from 'next/link'
 import { Avatar, Box, Paper, Stack, Typography } from '@mui/material'
 import { FriendActions, type FriendActionsProps } from './FriendActions'
 export function FriendCard(props: FriendActionsProps & { requestedAt?: string | null }) {
+  const { locale } = useLocale()
+
   const { profile, requestedAt } = props
   return <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3 }}>
     <Stack spacing={2} direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
@@ -11,7 +14,7 @@ export function FriendCard(props: FriendActionsProps & { requestedAt?: string | 
         <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
           <Typography component={Link} href={`/users/${encodeURIComponent(profile.username)}`} sx={{ color: 'text.primary', textDecoration: 'none', fontWeight: 600 }}>{profile.displayName}</Typography>
           <Typography variant="body2" color="text.secondary">@{profile.username}</Typography>
-          {requestedAt && <Typography component="time" dateTime={requestedAt} variant="caption" color="text.secondary">{new Date(requestedAt).toLocaleString('ru-RU')}</Typography>}
+          {requestedAt && <Typography component="time" dateTime={requestedAt} variant="caption" color="text.secondary">{new Date(requestedAt).toLocaleString(locale)}</Typography>}
         </Box>
       </Stack>
       <FriendActions {...props} />

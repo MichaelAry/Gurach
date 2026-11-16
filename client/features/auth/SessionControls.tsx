@@ -1,4 +1,5 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 import { useState } from 'react'
 import { Alert, Button, Stack, Typography } from '@mui/material'
 import Link from 'next/link'
@@ -6,11 +7,13 @@ import { NotificationIndicator } from '@/features/notifications/NotificationIndi
 import { useViewer } from './ViewerProvider'
 
 export function SessionControls() {
+  const lt = useText()
+
   const { user, loading, error, refresh, confirmed } = useViewer()
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
-  if (loading) return <Typography variant="caption">Проверяем сессию…</Typography>
-  if (!user) return <Stack>{error && <Typography variant="caption">Сессия недоступна <Button onClick={refresh}>Проверить сессию</Button></Typography>}<Button component={Link} href="/login">Войти</Button></Stack>
+  if (loading) return <Typography variant="caption">{lt('checkingSession')}</Typography>
+  if (!user) return <Stack>{error && <Typography variant="caption">{lt('sessionUnavailable')}<Button onClick={refresh}>{lt('checkSession')}</Button></Typography>}<Button component={Link} href="/login">{lt('signIn')}</Button></Stack>
   async function logout() {
     setPending(true)
     try {
@@ -21,10 +24,10 @@ export function SessionControls() {
   }
   return <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 1, flexWrap: 'wrap' }}>
     {confirmed && <NotificationIndicator />}
-    <Button component={Link} href="/playlists">Плейлисты</Button>
-    <Button component={Link} href="/account" aria-label="Мой аккаунт">{user.displayName}</Button>
-    <Button disabled={pending} onClick={() => void logout()}>{pending ? 'Выходим…' : 'Выйти'}</Button>
-    {error && <Typography variant="caption">Сессия временно не подтверждена. <Button onClick={refresh}>Проверить сессию</Button></Typography>}
-    {failed && <Alert severity="error">Не удалось выйти. Повторите попытку.</Alert>}
+    <Button component={Link} href="/playlists">{lt('playlists')}</Button>
+    <Button component={Link} href="/account" aria-label={lt('myAccount')}>{user.displayName}</Button>
+    <Button disabled={pending} onClick={() => void logout()}>{pending ? lt('signingOut') : lt('signOut')}</Button>
+    {error && <Typography variant="caption">{lt('yourSessionCouldNotBeConfirmed')}<Button onClick={refresh}>{lt('checkSession')}</Button></Typography>}
+    {failed && <Alert severity="error">{lt('couldNotSignOutTryAgain')}</Alert>}
   </Stack>
 }

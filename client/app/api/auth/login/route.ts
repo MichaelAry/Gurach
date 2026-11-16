@@ -28,6 +28,6 @@ export async function POST(request: Request) {
   }
   const expires = new Date(Math.min(expiry.valueOf(), Date.now() + 7 * 86400000))
   ;(await cookies()).set(sessionCookieName(), result.token, { ...sessionCookieOptions(), expires })
-  const user = { id: result.user.id, username: result.user.username, displayName: result.user.displayName, role: result.user.role }
+  const user = { id: result.user.id, username: result.user.username, displayName: result.user.displayName, role: result.user.role, preferredLocale: result.user.preferredLocale }
   return NextResponse.json({ user, expiresAt: expires.toISOString() }, { headers: { 'Cache-Control': 'private, no-store', 'x-request-id': upstream.headers.get('x-request-id') ?? '' } })
 }

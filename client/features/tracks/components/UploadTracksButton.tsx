@@ -1,10 +1,13 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 
 import { Button } from '@mui/material'
 import Link from 'next/link'
 import { useViewer } from '@/features/auth/ViewerProvider'
 
 export function UploadTracksButton() {
+  const lt = useText()
+
   const { user, loading } = useViewer()
   if (loading) return null
   return (
@@ -18,7 +21,7 @@ export function UploadTracksButton() {
         '&:hover': { bgcolor: 'primary.dark' },
       }}
     >
-      {user ? 'Загрузить' : 'Войти для загрузки'}
+      {user ? lt('upload') : lt('signInToUpload')}
     </Button>
   )
 }

@@ -1,4 +1,5 @@
 'use client'
+import { useText, useMessage } from '@/i18n/LocaleProvider'
 import { FavoriteButton } from '@/features/favorites/FavoriteButton'
 import { useEffect, useRef, useState } from 'react'
 
@@ -13,7 +14,7 @@ import SkipNextRounded from '@mui/icons-material/SkipNextRounded'
 import SkipPreviousRounded from '@mui/icons-material/SkipPreviousRounded'
 import { Alert, Box, Button, IconButton, Slider, Stack, Typography } from '@mui/material'
 import { useQueueStore } from '@/features/queue/hooks'
-import { clearGuestQueue } from '@/features/queue/guestAdapter'
+import { INVALID_GUEST_QUEUE_WARNING, MEMORY_GUEST_QUEUE_WARNING, clearGuestQueue } from '@/features/queue/guestAdapter'
 import { QueuePanel } from '@/features/queue/components/QueuePanel'
 import { usePlayer } from './PlayerProvider'
 
@@ -30,6 +31,10 @@ function formatTime(seconds: number): string {
  * Бар есть всегда — пока ничего не выбрано, показывает подсказку.
  */
 export function PlayerBar() {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const footerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -52,7 +57,7 @@ export function PlayerBar() {
 
   const hasTrack = Boolean(current?._id)
   const cover = current?.picture
-  const repeatLabel = repeat === 'off' ? 'Повтор выключен' : repeat === 'all' ? 'Повтор всей очереди' : 'Повтор одного трека'
+  const repeatLabel = repeat === 'off' ? lt('repeatOff') : repeat === 'all' ? lt('repeatQueue') : lt('repeatTrack')
 
   return <>
     <Box
@@ -102,11 +107,11 @@ export function PlayerBar() {
           {/* Название + позиция в очереди */}
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography title={current?.name} noWrap sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
-              {current?.name ?? 'Выберите трек'}
+              {current?.name ?? lt('chooseATrack')}
             </Typography>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
               <Typography title={current?.artist ?? undefined} noWrap sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                {current?.artist ?? 'Плеер готов к работе'}
+                {current?.artist ?? lt('readyToPlay')}
               </Typography>
               {/* Позиция в очереди видна только когда очередь длиннее одного трека */}
               {hasTrack && count > 0 && (
@@ -118,7 +123,7 @@ export function PlayerBar() {
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {oneOff ? 'Разовое воспроизведение' : `${position} / ${count}`}
+                  {oneOff ? lt('oneTimePlayback') : `${position} / ${count}`}
                 </Typography>
               )}
             </Stack>
@@ -132,16 +137,16 @@ export function PlayerBar() {
             spacing={0.5}
             sx={{ alignItems: 'center', justifyContent: 'center' }}
           >
-            <IconButton size="small" onClick={toggleShuffle} aria-label="Перемешать порядок воспроизведения" aria-pressed={shuffle} color={shuffle ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
+            <IconButton size="small" onClick={toggleShuffle} aria-label={lt('shufflePlaybackOrder')} aria-pressed={shuffle} color={shuffle ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
               <ShuffleRounded />
             </IconButton>
-            <IconButton size="small" onClick={prev} sx={{ minWidth: 44, minHeight: 44 }} disabled={!hasTrack} aria-label="Предыдущий">
+            <IconButton size="small" onClick={prev} sx={{ minWidth: 44, minHeight: 44 }} disabled={!hasTrack} aria-label={lt('previous')}>
               <SkipPreviousRounded />
             </IconButton>
             <IconButton
               onClick={toggle}
               disabled={!hasTrack || !current?.audio}
-              aria-label={playing ? 'Пауза' : 'Играть'}
+              aria-label={playing ? lt('pause') : lt('play')}
               sx={{
                 minWidth: 44, minHeight: 44,
                 bgcolor: 'primary.main',
@@ -152,10 +157,10 @@ export function PlayerBar() {
             >
               {playing ? <PauseRounded /> : <PlayArrowRounded />}
             </IconButton>
-            <IconButton size="small" onClick={next} sx={{ minWidth: 44, minHeight: 44 }} disabled={!hasTrack} aria-label="Следующий">
+            <IconButton size="small" onClick={next} sx={{ minWidth: 44, minHeight: 44 }} disabled={!hasTrack} aria-label={lt('next')}>
               <SkipNextRounded />
             </IconButton>
-            <IconButton size="small" onClick={cycleRepeat} aria-label={`${repeatLabel}. Переключить режим повтора`} title={repeatLabel} aria-pressed={repeat !== 'off'} color={repeat !== 'off' ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
+            <IconButton size="small" onClick={cycleRepeat} aria-label={lt('changeRepeatMode', { p0: repeatLabel })} title={repeatLabel} aria-pressed={repeat !== 'off'} color={repeat !== 'off' ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
               {repeat === 'one' ? <RepeatOneRounded /> : <RepeatRounded />}
             </IconButton>
           </Stack>
@@ -175,8 +180,8 @@ export function PlayerBar() {
             </Typography>
             <Slider
               size="small"
-              aria-label="Позиция воспроизведения"
-              getAriaValueText={(value) => `${formatTime(value)} из ${formatTime(duration)}`}
+              aria-label={lt('playbackPosition')}
+              getAriaValueText={(value) => lt('of', { p0: formatTime(value), p1: formatTime(duration) })}
               value={Math.min(currentTime, duration || 0)}
               max={duration || 1}
               onChange={(_event, value) => seek(Number(value))}
@@ -191,18 +196,18 @@ export function PlayerBar() {
 
         <Box sx={{ order: { xs: 4, md: 0 }, flex: { xs: '1 1 100%', md: '0 1 280px' }, minWidth: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
           <Stack direction="row" spacing={1} sx={{ flex: '1 1 110px', minWidth: 80, maxWidth: 140, mr: 'auto', alignItems: 'center', px: 1 }}>
-            <IconButton onClick={toggleMute} aria-label="Без звука" aria-pressed={muted} title={muted ? 'Включить звук' : 'Выключить звук'} sx={{ minWidth: 44, minHeight: 44 }}>
+            <IconButton onClick={toggleMute} aria-label={lt('mute')} aria-pressed={muted} title={muted ? lt('unmute') : lt('mute057')} sx={{ minWidth: 44, minHeight: 44 }}>
               {muted || volume === 0 ? <VolumeOffRounded /> : <VolumeUpRounded />}
             </IconButton>
-            <Slider size="small" aria-label="Громкость" getAriaValueText={(value) => `${value}%`} value={Math.round(volume * 100)} max={100}
+            <Slider size="small" aria-label={lt('volume')} getAriaValueText={(value) => `${value}%`} value={Math.round(volume * 100)} max={100}
               onChange={(_event, value) => setVolume(Number(value) / 100)} sx={{ minWidth: 0 }} />
           </Stack>
           {current && <FavoriteButton trackId={current._id} name={current.name} />}
-          <Button size="small" sx={{ minWidth: 0, whiteSpace: 'nowrap' }} aria-label={`Открыть очередь, ${count} из 100`} onClick={() => setQueueOpen(true)}>Очередь {count}/100</Button>
+          <Button size="small" sx={{ minWidth: 0, whiteSpace: 'nowrap' }} aria-label={lt('openQueueOf', { p0: count })} onClick={() => setQueueOpen(true)}>{lt('queue')}{count}/100</Button>
         </Box>
       </Stack>
-      {error && <Alert severity={error.includes('повреждена') || error.includes('только в этой вкладке') ? 'warning' : 'error'}
-        action={audioError ? <Button color="inherit" size="small" disabled={retrying} onClick={retryAudio}>{retrying ? 'Повторяем…' : 'Повторить аудио'}</Button> : error.includes('повреждена') ? <Button color="inherit" size="small" onClick={() => { clearGuestQueue(); void store.refresh() }}>Сбросить гостевую очередь</Button> : undefined}>{error}</Alert>}
+      {error && <Alert severity={error === INVALID_GUEST_QUEUE_WARNING || error === MEMORY_GUEST_QUEUE_WARNING ? 'warning' : 'error'}
+        action={audioError ? <Button color="inherit" size="small" disabled={retrying} onClick={retryAudio}>{retrying ? lt('retrying') : lt('retryAudio')}</Button> : error === INVALID_GUEST_QUEUE_WARNING ? <Button color="inherit" size="small" onClick={() => { clearGuestQueue(); void store.refresh() }}>{lt('resetGuestQueue')}</Button> : undefined}>{resolve(error)}</Alert>}
     </Box>
     <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
   </>

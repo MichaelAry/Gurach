@@ -1,5 +1,6 @@
 // features/tracks/components/TrackRow.tsx
 'use client'
+import { useLocale, useText } from '@/i18n/LocaleProvider'
 
 import { FavoriteButton } from '@/features/favorites/FavoriteButton'
 import { usePlayerTransport } from '@/components/player/PlayerProvider'
@@ -19,6 +20,9 @@ interface TrackRowProps {
 }
 
 export function TrackRow({ track, selectionEnabled = false, selected = false, onSelectionChange }: TrackRowProps) {
+  const lt = useText()
+  const { locale } = useLocale()
+
   const { current } = usePlayerTransport()
   const isCurrent = current?._id === track._id
   const listens = useListenCount(track._id, track.listens)
@@ -49,7 +53,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
       <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex', order: 0, flexShrink: 0 }}>
         <PlayButton track={track} />
       </Box>
-      {selectionEnabled && <Checkbox sx={{ position: 'relative', zIndex: 1, order: 1, flexShrink: 0 }} size="small" checked={selected} disabled={!track.audio} onChange={(event) => onSelectionChange?.(event.target.checked)} slotProps={{ input: { 'aria-label': `Выбрать ${track.name}` } }} />}
+      {selectionEnabled && <Checkbox sx={{ position: 'relative', zIndex: 1, order: 1, flexShrink: 0 }} size="small" checked={selected} disabled={!track.audio} onChange={(event) => onSelectionChange?.(event.target.checked)} slotProps={{ input: { 'aria-label': lt('select335', { p0: track.name }) } }} />}
 
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
@@ -94,7 +98,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {formatListens(listens)}
+        {formatListens(listens, locale)}
       </Typography>
       <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex', order: { xs: 4, sm: 0 }, flexShrink: 0 }}>
         <FavoriteButton trackId={track._id} name={track.name} />

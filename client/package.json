@@ -11,8 +11,9 @@
     "api:check": "node scripts/check-api-contracts.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run",
-    "test:e2e:https": "playwright test --config playwright.https.config.ts"
+    "test": "npm run i18n:check && vitest run",
+    "test:e2e:https": "playwright test --config playwright.https.config.ts",
+    "i18n:check": "node scripts/check-i18n.mjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

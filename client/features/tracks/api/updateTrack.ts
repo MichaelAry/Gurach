@@ -1,3 +1,4 @@
+import { message as localMessage } from '@/i18n/messages'
 import type { components } from '@/lib/api/schema'
 import { formatApiError, readApiError } from '@/lib/api/error'
 import type { TrackDetail } from '../types'
@@ -8,13 +9,13 @@ async function trackResponse(response: Response): Promise<TrackDetail> {
   if (!response.ok) {
     const payload = await readApiError(response)
     const messages: Record<number, string> = {
-      400: 'Проверьте название, исполнителя и текст песни.',
-      401: 'Сессия истекла. Войдите в аккаунт снова.',
-      403: 'У вас нет права редактировать этот трек.',
-      404: 'Трек больше недоступен.',
-      409: 'Активный трек с таким названием и исполнителем уже существует.',
+      400: localMessage('checkTheTitleArtistAndLyrics'),
+      401: localMessage('yourSessionExpiredSignInAgain298'),
+      403: localMessage('youDoNotHavePermissionToEditThisTrack'),
+      404: localMessage('thisTrackIsNoLongerAvailable'),
+      409: localMessage('anActiveTrackWithThisTitleAndArtistAlready'),
     }
-    throw new Error(messages[response.status] ?? formatApiError(payload?.error ?? null, 'Не удалось сохранить изменения. Попробуйте снова.'))
+    throw new Error(messages[response.status] ?? formatApiError(payload?.error ?? null, localMessage('couldNotSaveChangesTryAgain')))
   }
   return response.json() as Promise<TrackDetail>
 }

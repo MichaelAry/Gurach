@@ -1,4 +1,5 @@
 'use client'
+import { useText, useMessage } from '@/i18n/LocaleProvider'
 import { useState } from 'react'
 import { Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, FormControlLabel, Stack, TextField, Typography, useMediaQuery } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
@@ -7,6 +8,10 @@ import { useQueue, useQueueStore } from '../hooks'
 import { QueueRow } from './QueueRow'
 
 export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const store = useQueueStore(), state = useQueue()
   const player = usePlayerTransport()
   const theme = useTheme(), mobile = useMediaQuery(theme.breakpoints.down('sm'))
@@ -54,36 +59,36 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
 
   return <>
     <Drawer open={open} onClose={onClose} anchor={mobile ? 'bottom' : 'right'} ModalProps={{ keepMounted: true }}>
-      <Box component="section" aria-label="Очередь воспроизведения" sx={{ width: mobile ? '100vw' : { sm: 380, md: 440 }, height: mobile ? '82vh' : '100%', display: 'flex', flexDirection: 'column', p: 2, pb: mobile ? 3 : 2 }}>
+      <Box component="section" aria-label={lt('playbackQueue')} sx={{ width: mobile ? '100vw' : { sm: 380, md: 440 }, height: mobile ? '82vh' : '100%', display: 'flex', flexDirection: 'column', p: 2, pb: mobile ? 3 : 2 }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
-            <Typography component="h2" variant="h6">Очередь воспроизведения</Typography>
-            <Typography variant="body2" color="text.secondary" aria-live="polite">{entries.length} / 100 треков</Typography>
+            <Typography component="h2" variant="h6">{lt('playbackQueue')}</Typography>
+            <Typography variant="body2" color="text.secondary" aria-live="polite">{entries.length} {lt('tracks264')}</Typography>
           </Box>
-          <Button onClick={onClose}>Закрыть</Button>
+          <Button onClick={onClose}>{lt('close')}</Button>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ my: 1, flexWrap: 'wrap' }}>
-          <Button size="small" disabled={!entries.length || disabled} onClick={() => setConfirmClear(true)}>Очистить</Button>
-          <Button size="small" disabled={!entries.length || disabled} onClick={() => { setFirstCount('1'); setRemoveFirstOpen(true) }}>Убрать первые…</Button>
+          <Button size="small" disabled={!entries.length || disabled} onClick={() => setConfirmClear(true)}>{lt('clear')}</Button>
+          <Button size="small" disabled={!entries.length || disabled} onClick={() => { setFirstCount('1'); setRemoveFirstOpen(true) }}>{lt('removeFirst')}</Button>
           <Button size="small" disabled={!entries.some((entry) => entry.availability !== 'playable') || disabled}
-            onClick={() => void store.dispatch({ type: 'removeUnavailable' })}>Убрать недоступные</Button>
-          {state.status === 'conflict' && <Button size="small" onClick={() => void store.refresh()}>Обновить очередь</Button>}
-          {state.status === 'error' && store.hasPendingMutation() && <Button size="small" onClick={() => void store.retry()}>Повторить сохранение</Button>}
-          {state.status === 'error' && !store.hasPendingMutation() && <Button size="small" onClick={() => void store.refresh()}>Повторить загрузку</Button>}
+            onClick={() => void store.dispatch({ type: 'removeUnavailable' })}>{lt('removeUnavailable')}</Button>
+          {state.status === 'conflict' && <Button size="small" onClick={() => void store.refresh()}>{lt('refreshQueue')}</Button>}
+          {state.status === 'error' && store.hasPendingMutation() && <Button size="small" onClick={() => void store.retry()}>{lt('retrySaving')}</Button>}
+          {state.status === 'error' && !store.hasPendingMutation() && <Button size="small" onClick={() => void store.refresh()}>{lt('retryLoading')}</Button>}
         </Stack>
         {entries.length > 0 && <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <FormControlLabel label="Выбрать все" sx={{ mr: 0 }} control={<Checkbox size="small" disabled={disabled}
+          <FormControlLabel label={lt('selectAll')} sx={{ mr: 0 }} control={<Checkbox size="small" disabled={disabled}
             checked={checkedEntries.length > 0 && checkedEntries.length === state.canonical.entries.length}
             indeterminate={checkedEntries.length > 0 && checkedEntries.length < state.canonical.entries.length}
             onChange={(_, checked) => setCheckedIds(checked ? new Set(entries.map((entry) => entry.entryId)) : new Set())} />} />
-          <Typography variant="body2" aria-live="polite">Выбрано: {checkedEntries.length}</Typography>
-          <Button size="small" color="error" disabled={!checkedEntries.length || disabled} onClick={() => void removeChecked()}>Убрать выбранные</Button>
+          <Typography variant="body2" aria-live="polite">{lt('selected')}{checkedEntries.length}</Typography>
+          <Button size="small" color="error" disabled={!checkedEntries.length || disabled} onClick={() => void removeChecked()}>{lt('removeSelected')}</Button>
         </Stack>}
-        {state.status === 'loading' && <Typography role="status">Загружаем очередь…</Typography>}
-        {state.status === 'pending' && <Typography role="status">Сохраняем очередь…</Typography>}
-        {state.error && <Alert severity={state.status === 'conflict' ? 'warning' : 'error'} role="alert">{state.error}</Alert>}
-        {!entries.length && state.status !== 'loading' && <Typography sx={{ mt: 2 }} color="text.secondary">Очередь пуста. Добавьте треки из каталога.</Typography>}
-        <Box component="ol" aria-label="Треки в очереди" sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 0, mt: 1, overflowY: 'auto', minHeight: 0 }}>
+        {state.status === 'loading' && <Typography role="status">{lt('loadingQueue')}</Typography>}
+        {state.status === 'pending' && <Typography role="status">{lt('savingQueue')}</Typography>}
+        {state.error && <Alert severity={state.status === 'conflict' ? 'warning' : 'error'} role="alert">{resolve(state.error)}</Alert>}
+        {!entries.length && state.status !== 'loading' && <Typography sx={{ mt: 2 }} color="text.secondary">{lt('theQueueIsEmptyAddTracksFromTheCatalogue')}</Typography>}
+        <Box component="ol" aria-label={lt('queuedTracks')} sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 0, mt: 1, overflowY: 'auto', minHeight: 0 }}>
           {entries.map((entry, index) => <QueueRow key={entry.entryId} entry={entry} index={index} total={entries.length} disabled={disabled}
             checked={checkedIds.has(entry.entryId)} onCheck={() => toggleChecked(entry.entryId)}
             current={player.selectedEntryId === entry.entryId} playing={player.playing && player.selectedEntryId === entry.entryId}
@@ -93,25 +98,24 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
       </Box>
     </Drawer>
     <Dialog open={confirmClear} onClose={() => { if (!busy) setConfirmClear(false) }} aria-labelledby="clear-queue-title">
-      <DialogTitle id="clear-queue-title">Очистить очередь?</DialogTitle>
+      <DialogTitle id="clear-queue-title">{lt('clearTheQueue')}</DialogTitle>
       <DialogContent>
-        Все {state.canonical.entries.length} треков будут удалены из очереди.
-        {state.error && <Alert severity="error" sx={{ mt: 2 }}>{state.error}</Alert>}
+        {lt('clearQueue', { count: state.canonical.entries.length })}{state.error && <Alert severity="error" sx={{ mt: 2 }}>{resolve(state.error)}</Alert>}
       </DialogContent>
-      <DialogActions><Button disabled={busy} onClick={() => setConfirmClear(false)}>Отмена</Button><Button color="error" onClick={() => void clear()} disabled={disabled || !entries.length}>Очистить</Button></DialogActions>
+      <DialogActions><Button disabled={busy} onClick={() => setConfirmClear(false)}>{lt('cancel')}</Button><Button color="error" onClick={() => void clear()} disabled={disabled || !entries.length}>{lt('clear')}</Button></DialogActions>
     </Dialog>
     <Dialog open={removeFirstOpen} onClose={() => { if (!busy) setRemoveFirstOpen(false) }} aria-labelledby="remove-first-title" fullWidth maxWidth="xs">
       <Box component="form" onSubmit={(event) => { event.preventDefault(); if (!disabled) void removeFirst() }}>
-        <DialogTitle id="remove-first-title">Убрать первые треки</DialogTitle>
+        <DialogTitle id="remove-first-title">{lt('removeFirstTracks')}</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>Треки будут удалены с начала очереди, включая текущий, если он входит в это число.</Typography>
-          <TextField autoFocus fullWidth label="Количество треков" type="number" value={firstCount} disabled={disabled}
+          <Typography variant="body2" sx={{ mb: 2 }}>{lt('tracksWillBeRemovedFromTheStartOfThe')}</Typography>
+          <TextField autoFocus fullWidth label={lt('numberOfTracks')} type="number" value={firstCount} disabled={disabled}
             onChange={(event) => setFirstCount(event.target.value)} error={!validCount}
-            helperText={`Введите целое число от 1 до ${state.canonical.entries.length}`}
+            helperText={lt('enterAWholeNumberFromTo', { p0: state.canonical.entries.length })}
             slotProps={{ htmlInput: { min: 1, max: state.canonical.entries.length, step: 1 } }} />
-          {state.error && <Alert severity="error" sx={{ mt: 2 }}>{state.error}</Alert>}
+          {state.error && <Alert severity="error" sx={{ mt: 2 }}>{resolve(state.error)}</Alert>}
         </DialogContent>
-        <DialogActions><Button disabled={busy} onClick={() => setRemoveFirstOpen(false)}>Отмена</Button><Button type="submit" color="error" disabled={disabled || !validCount}>Убрать</Button></DialogActions>
+        <DialogActions><Button disabled={busy} onClick={() => setRemoveFirstOpen(false)}>{lt('cancel')}</Button><Button type="submit" color="error" disabled={disabled || !validCount}>{lt('remove')}</Button></DialogActions>
       </Box>
     </Dialog>
   </>

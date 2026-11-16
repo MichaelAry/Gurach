@@ -1,4 +1,6 @@
 'use client'
+import { useText, useMessage } from '@/i18n/LocaleProvider'
+import { message as localMessage } from '@/i18n/messages'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Alert, Button, Paper, Stack, TextField, Typography } from '@mui/material'
@@ -12,10 +14,14 @@ type List = components['schemas']['PlaylistList']
 async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const response = await fetch(`/api/playlists${path}`, { method, cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-Gurach-Request': '1' }, body: body === undefined ? undefined : JSON.stringify(body) })
-  if (!response.ok) throw new Error(response.status === 409 ? 'Плейлист изменён. Обновите страницу перед сохранением.' : 'Не удалось выполнить действие. Обновите страницу и повторите.')
+  if (!response.ok) throw new Error(response.status === 409 ? localMessage('thePlaylistHasChangedRefreshThePageBeforeSaving') : localMessage('couldNotCompleteTheActionRefreshThePageAnd'))
   return response.json()
 }
 function Editor({ initial, shared = false }: { initial: View; shared?: boolean }) {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const [view, setView] = useState(initial), [name, setName] = useState(initial.name)
   const [ids, setIds] = useState(initial.entries.map(e => e.trackId))
   const [newId, setNewId] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [link, setLink] = useState('')
@@ -37,15 +43,15 @@ function Editor({ initial, shared = false }: { initial: View; shared?: boolean }
     setError('')
     const tracks = ids.map(id => view.entries.find(e => e.trackId === id)?.track)
     const unavailable = tracks.filter(track => !track?.audio).length
-    if (unavailable && !window.confirm(`Недоступных треков: ${unavailable}. Пропустить их и передать в очередь остальные?`)) return
+    if (unavailable && !window.confirm(lt('unavailableTracksSkipThemAndSendTheRemainingTracks', { p0: unavailable }))) return
     const entries = tracks.flatMap(track => track?.audio ? [createOccurrence(track)] : [])
-    if (entries.length > 100 || (!replace && queue.canonical.entries.length + entries.length > 100)) { setError('Лимит очереди — 100. Освободите место: список не был обрезан.'); return }
-    if (!entries.length) { setError('Нет доступных треков.'); return }
-    if (replace && !entries.some(e => e.track?.audio)) { setError('Нет доступных треков для воспроизведения.'); return }
-    if (replace && !window.confirm('Заменить текущую очередь этим плейлистом?')) return
+    if (entries.length > 100 || (!replace && queue.canonical.entries.length + entries.length > 100)) { setError(localMessage('theQueueLimitIsFreeUpSpaceTheList')); return }
+    if (!entries.length) { setError(localMessage('noAvailableTracks')); return }
+    if (replace && !entries.some(e => e.track?.audio)) { setError(localMessage('noTracksAvailableForPlayback')); return }
+    if (replace && !window.confirm(lt('replaceTheCurrentQueueWithThisPlaylist'))) return
     setBusy(true)
     try {
-      if (!await store.dispatch({ type: replace ? 'replace' : 'append', entries })) throw new Error('Очередь не сохранена. Проверьте её состояние в плеере.')
+      if (!await store.dispatch({ type: replace ? 'replace' : 'append', entries })) throw new Error(localMessage('theQueueWasNotSavedCheckItsStateIn'))
       const first = entries.find(e => e.track?.audio)
       if (replace && first) player.selectEntry(first.entryId)
     } catch (e) { setError(String(e)) } finally { setBusy(false) }
@@ -54,22 +60,26 @@ function Editor({ initial, shared = false }: { initial: View; shared?: boolean }
     setIds(old => { const next = [...old]; [next[index], next[index + delta]] = [next[index + delta], next[index]]; return next })
   }
   return <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
-    {shared ? <Typography variant="h5">{name}</Typography> : <TextField label="Название" value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />}
-    <Typography>{view.visibility === 'private' ? 'Приватный' : 'Доступ по ссылке'} · {ids.length}/100</Typography>
+    {shared ? <Typography variant="h5">{name}</Typography> : <TextField label={lt('title')} value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />}
+    <Typography>{view.visibility === 'private' ? lt('private') : lt('anyoneWithTheLink')} · {ids.length}/100</Typography>
     {ids.map((id, index) => <Stack key={`${id}-${index}`} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-      <Typography>{index + 1}. {view.entries.find(e => e.trackId === id)?.track?.name ?? 'Недоступный трек'} ({id})</Typography>
-      {!shared && <><Button disabled={busy || index === 0} aria-label={`Выше: ${index + 1}`} onClick={() => move(index, -1)}>↑</Button><Button disabled={busy || index === ids.length - 1} aria-label={`Ниже: ${index + 1}`} onClick={() => move(index, 1)}>↓</Button><Button disabled={busy} onClick={() => setIds(old => old.filter((_, i) => i !== index))}>Удалить</Button></>}
+      <Typography>{index + 1}. {view.entries.find(e => e.trackId === id)?.track?.name ?? lt('unavailableTrack')} ({id})</Typography>
+      {!shared && <><Button disabled={busy || index === 0} aria-label={lt('moveUp', { p0: index + 1 })} onClick={() => move(index, -1)}>↑</Button><Button disabled={busy || index === ids.length - 1} aria-label={lt('moveDown', { p0: index + 1 })} onClick={() => move(index, 1)}>↓</Button><Button disabled={busy} onClick={() => setIds(old => old.filter((_, i) => i !== index))}>{lt('delete')}</Button></>}
     </Stack>)}
-    {!shared && <><TextField label="ID трека" value={newId} onChange={e => setNewId(e.target.value)} /><Button disabled={busy || ids.length >= 100 || !/^[a-f\d]{24}$/i.test(newId)} onClick={() => { setIds(old => [...old, newId.toLowerCase()]); setNewId('') }}>Добавить трек</Button><Button disabled={busy || queue.status !== 'ready'} onClick={() => setIds(queue.canonical.entries.map(e => e.trackId))}>Взять треки из очереди</Button><Button disabled={busy || !name.trim()} onClick={() => void save()}>Сохранить название и порядок</Button>
-      <Button disabled={busy} onClick={() => void sharing('link')}>Создать / обновить ссылку</Button><Button disabled={busy} onClick={() => void sharing('private')}>Отозвать ссылку</Button>
-      {link && <TextField label="Ссылка для чтения" value={link} slotProps={{ htmlInput: { readOnly: true } }} />}</>}
-    <Typography variant="caption">В очередь передаётся сохранённый список. Пропуск недоступных треков требует подтверждения.</Typography>
-    <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(true)}>Воспроизвести</Button>
-    <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(false)}>Добавить в очередь</Button>
-    {error && <Alert severity="error">{error}</Alert>}
+    {!shared && <><TextField label={lt('trackId')} value={newId} onChange={e => setNewId(e.target.value)} /><Button disabled={busy || ids.length >= 100 || !/^[a-f\d]{24}$/i.test(newId)} onClick={() => { setIds(old => [...old, newId.toLowerCase()]); setNewId('') }}>{lt('addTrack')}</Button><Button disabled={busy || queue.status !== 'ready'} onClick={() => setIds(queue.canonical.entries.map(e => e.trackId))}>{lt('useTracksFromQueue')}</Button><Button disabled={busy || !name.trim()} onClick={() => void save()}>{lt('saveTitleAndOrder')}</Button>
+      <Button disabled={busy} onClick={() => void sharing('link')}>{lt('createRenewLink')}</Button><Button disabled={busy} onClick={() => void sharing('private')}>{lt('revokeLink')}</Button>
+      {link && <TextField label={lt('readOnlyLink')} value={link} slotProps={{ htmlInput: { readOnly: true } }} />}</>}
+    <Typography variant="caption">{lt('theSavedListWillBeSentToTheQueue')}</Typography>
+    <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(true)}>{lt('play238')}</Button>
+    <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(false)}>{lt('addToQueue')}</Button>
+    {error && <Alert severity="error">{resolve(error)}</Alert>}
   </Stack></Paper>
 }
 function Library({ identity }: { identity: string }) {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const { isConfirmed } = useViewer()
   const [items, setItems] = useState<List['items']>([]), [selected, setSelected] = useState<View | null>(null)
   const [name, setName] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
@@ -82,21 +92,25 @@ function Library({ identity }: { identity: string }) {
     setBusy(true); setError('')
     try { const view = await api<View>('', 'POST', { name, trackIds: [] }); if (isConfirmed(identity)) { setItems(old => [{ id: view.id, name: view.name }, ...old]); setSelected(view); setName('') } } catch (e) { setError(String(e)) } finally { setBusy(false) }
   }
-  return <Stack spacing={2} sx={{ p: 3 }}><Typography variant="h4">Мои плейлисты</Typography>
-    <TextField label="Название нового плейлиста" value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} /><Button disabled={busy || !name.trim()} onClick={() => void create()}>Создать приватный плейлист</Button>
+  return <Stack spacing={2} sx={{ p: 3 }}><Typography variant="h4">{lt('myPlaylists')}</Typography>
+    <TextField label={lt('newPlaylistTitle')} value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} /><Button disabled={busy || !name.trim()} onClick={() => void create()}>{lt('createPrivatePlaylist')}</Button>
     {items.map(item => <Button key={item.id} disabled={busy} onClick={() => void open(item.id)}>{selected?.id === item.id ? selected.name : item.name}</Button>)}
-    {selected && <Editor key={`${selected.id}-${selected.revision}`} initial={selected} />}{error && <Alert severity="error">{error}</Alert>}
+    {selected && <Editor key={`${selected.id}-${selected.revision}`} initial={selected} />}{error && <Alert severity="error">{resolve(error)}</Alert>}
   </Stack>
 }
 export function Playlists() {
+  const lt = useText()
+
   const { user, confirmed } = useViewer()
-  if (!confirmed) return <Typography>Проверяем сессию…</Typography>
-  if (!user) return <Button component={Link} href="/login?returnTo=/playlists">Войти</Button>
+  if (!confirmed) return <Typography>{lt('checkingSession')}</Typography>
+  if (!user) return <Button component={Link} href="/login?returnTo=/playlists">{lt('signIn')}</Button>
   return <Library key={user.id} identity={user.id} />
 }
 export function SharedPlaylist({ token }: { token: string }) {
+  const lt = useText()
+
   const [view, setView] = useState<View | null>(null), [failed, setFailed] = useState(false)
   useEffect(() => { let active = true; api<View>(`/shared/${encodeURIComponent(token)}`).then(data => { if (active) setView(data) }).catch(() => { if (active) setFailed(true) }); return () => { active = false } }, [token])
-  if (failed) return <Alert severity="error">Плейлист недоступен. Ссылка могла быть отозвана.</Alert>
-  return view ? <Editor initial={view} shared /> : <Typography>Загрузка…</Typography>
+  if (failed) return <Alert severity="error">{lt('playlistUnavailableTheLinkMayHaveBeenRevoked')}</Alert>
+  return view ? <Editor initial={view} shared /> : <Typography>{lt('loading162')}</Typography>
 }

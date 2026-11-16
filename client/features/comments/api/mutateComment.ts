@@ -1,3 +1,4 @@
+import { message as localMessage } from '@/i18n/messages'
 import type { components } from '@/lib/api/schema'
 import type { CommentResponse } from '../types'
 import { formatApiError, readApiError } from '@/lib/api/error'
@@ -11,7 +12,7 @@ export async function commentRequest(path: string, method = 'GET', body?: Create
   })
   if (!response.ok) {
     const payload = await readApiError(response)
-    throw new Error(response.status === 401 ? 'Сессия истекла. Войдите снова; черновик сохранён.' : formatApiError(payload?.error ?? null, 'Не удалось выполнить запрос'))
+    throw new Error(response.status === 401 ? localMessage('yourSessionExpiredSignInAgainYourDraftHas') : formatApiError(payload?.error ?? null, localMessage('couldNotCompleteTheRequest')))
   }
   return response.json()
 }

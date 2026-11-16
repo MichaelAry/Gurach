@@ -11,9 +11,9 @@ import { PasswordService } from './password.service.js';
 import { User, type UserDocument, normalizeUsername } from './schemas/user.schema.js';
 import { Session } from './schemas/session.schema.js';
 
-export interface Actor { id: string; username: string; displayName: string; role: 'user' | 'admin'; }
+export interface Actor { id: string; username: string; displayName: string; role: 'user' | 'admin'; preferredLocale?: 'en' | 'ru'; }
 function publicUser(user: UserDocument): Actor {
-  return { id: String(user._id), username: user.username, displayName: user.displayName, role: user.role };
+  return { id: String(user._id), username: user.username, displayName: user.displayName, role: user.role, ...(user.preferredLocale ? { preferredLocale: user.preferredLocale } : {}) };
 }
 function tokenHash(token: string): string { return createHash('sha256').update(token).digest('hex'); }
 function validToken(token: unknown): token is string { return typeof token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(token); }

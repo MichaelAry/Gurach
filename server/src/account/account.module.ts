@@ -1,3 +1,4 @@
+import { User, UserSchema } from '../auth/schemas/user.schema.js';
 import { AccountFavorite, AccountFavoriteSchema } from './favorite.schema.js';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -10,6 +11,7 @@ import { AccountController } from './account.controller.js';
 
 @Module({
   imports: [TrackModule, MongooseModule.forFeature([
+    { name: User.name, schema: UserSchema },
     { name: AccountFavorite.name, schema: AccountFavoriteSchema },
     { name: AccountListen.name, schema: AccountListenSchema },
     { name: Track.name, schema: TrackSchema },

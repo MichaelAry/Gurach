@@ -1,21 +1,11 @@
-// features/tracks/utils/formatListens.ts
-
-/** Русские формы числительного: 1 прослушивание / 3 прослушивания / 7 прослушиваний */
+import { formatNumber, translate, type Locale } from '@/i18n/messages'
 export function pluralRu(n: number, forms: [string, string, string]): string {
-  const mod100 = Math.abs(n) % 100;
-  const mod10 = mod100 % 10;
-  if (mod100 > 10 && mod100 < 20) return forms[2];
-  if (mod10 > 1 && mod10 < 5) return forms[1];
-  if (mod10 === 1) return forms[0];
-  return forms[2];
+  const category = new Intl.PluralRules('ru').select(n)
+  return forms[category === 'one' ? 0 : category === 'few' ? 1 : 2]
 }
-
-/** «3 742 прослушивания» — число в ru-локали + правильная форма слова. */
-export function formatListens(n: number): string {
-  const formatted = new Intl.NumberFormat('ru-RU').format(n);
-  return `${formatted} ${pluralRu(n, [
-    'прослушивание',
-    'прослушивания',
-    'прослушиваний',
-  ])}`;
+const pluralRules = { en: new Intl.PluralRules('en'), ru: new Intl.PluralRules('ru') }
+export function formatListens(n: number, locale: Locale = 'en'): string {
+  const category = pluralRules[locale].select(n)
+  const key = category === 'one' ? 'listen_one' : category === 'few' ? 'listen_few' : category === 'many' ? 'listen_many' : 'listen_other'
+  return translate(locale, 'ui', key, { count: formatNumber(locale, n) })
 }

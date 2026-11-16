@@ -8,7 +8,7 @@ import { ListenResult, TrackListPage } from '../contracts/track.contract.js';
 import { decodeScopedCursor } from '../common/cursor.js';
 import { env } from '../common/env.js';
 import { parseCursorPageQuery } from '../track/dto/list-tracks-query.dto.js';
-import { AccountHistoryPage, AccountStatistics, RecordAccountListenDto } from './account.contract.js';
+import { AccountHistoryPage, AccountStatistics, RecordAccountListenDto, AccountPreferences, UpdateAccountPreferences } from './account.contract.js';
 import { AccountService } from './account.service.js';
 
 @SetMetadata('gurach.private', true)
@@ -16,6 +16,16 @@ import { AccountService } from './account.service.js';
 @ApiTags('account')
 export class AccountController {
   constructor(private readonly accounts: AccountService) {}
+
+  @Get('preferences') @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ type: AccountPreferences }) @ApiStandardErrors({ authenticated: true })
+  preferences(@CurrentActor() actor: Actor) { return this.accounts.preferences(actor.id); }
+
+  @Put('preferences') @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ type: AccountPreferences }) @ApiStandardErrors({ authenticated: true })
+  updatePreferences(@CurrentActor() actor: Actor, @Body() dto: UpdateAccountPreferences) {
+    return this.accounts.updatePreferences(actor.id, dto.preferredLocale, dto.initialize);
+  }
 
   @Get('statistics') @Header('Cache-Control', 'private, no-store')
   @ApiOkResponse({ type: AccountStatistics }) @ApiStandardErrors({ authenticated: true })

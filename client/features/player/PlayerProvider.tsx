@@ -1,4 +1,6 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
+import { message as localMessage } from '@/i18n/messages'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material'
 import type { QueueEntry } from '@/features/queue/types'
@@ -106,6 +108,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   </AudioPlayer></QueueProvider>
 }
 function AudioPlayer({ children, enabled, identity, storageWarning }: { children: ReactNode; enabled: boolean; identity: string; storageWarning: string | null }) {
+  const lt = useText()
+
   const store = useQueueStore(), state = useQueue()
   const viewer = useViewer()
   const { isConfirmed } = viewer
@@ -166,7 +170,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     try { await audio.play() } catch (error) {
       if (!mounted.current || session.current !== active || source.current !== key || (error instanceof DOMException && error.name === 'AbortError')) return
       audio.pause(); setPlaying(false); setRetrying(false); retryInFlight.current = false
-      setAudioError('Не удалось запустить аудио. Проверьте соединение и нажмите «Повторить аудио».')
+      setAudioError(localMessage('couldNotStartAudioCheckYourConnectionAndSelect'))
       if (identity === 'guest') releaseGuestAudioLease()
     }
   }, [identity])
@@ -176,7 +180,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     const epoch = ++actionEpoch.current
     const valid = () => mounted.current && actionEpoch.current === epoch && source.current === key
     if (identity === 'guest' && !await acquireGuestAudioLease(valid)) {
-      if (valid()) setTransportError('Плеер уже работает в другой вкладке. Остановите его там и повторите запуск.')
+      if (valid()) setTransportError(localMessage('thePlayerIsActiveInAnotherTabStopIt'))
       return
     }
     if (!valid()) return
@@ -231,7 +235,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     const valid = () => mounted.current && actionEpoch.current === epoch
     void (async () => {
       if (identity === 'guest' && !await acquireGuestAudioLease(valid)) {
-        if (valid()) setTransportError('Плеер уже работает в другой вкладке. Остановите его там и повторите запуск.')
+        if (valid()) setTransportError(localMessage('thePlayerIsActiveInAnotherTabStopIt'))
         return
       }
       if (!valid()) return
@@ -257,13 +261,13 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     if (existing) { selectEntry(existing.entryId); return }
     const occurrence = createOccurrence(track)
     if (snapshot.canonical.entries.length >= snapshot.canonical.capacity) { setFullQueueEntry(occurrence); return }
-    if (identity !== 'guest' && !isConfirmed(identity)) { setTransportError('Сессия временно не подтверждена. Проверьте сессию перед изменением очереди.'); return }
+    if (identity !== 'guest' && !isConfirmed(identity)) { setTransportError(localMessage('yourSessionCouldNotBeConfirmedCheckYourSession')); return }
     const epoch = ++actionEpoch.current
     void store.dispatch({ type: 'append', entries: [occurrence] }).then((ok) => {
       if (!mounted.current || epoch !== actionEpoch.current) return
       if (ok) selectEntry(occurrence.entryId)
       else if (store.getSnapshot().error === 'QUEUE_FULL' || (!store.hasPendingMutation() && store.getSnapshot().canonical.entries.length >= store.getSnapshot().canonical.capacity)) setFullQueueEntry(occurrence)
-      else setTransportError('Не удалось добавить трек. Откройте очередь и повторите сохранение или загрузку. ' + (store.getSnapshot().error ?? ''))
+      else setTransportError(localMessage('couldNotAddTheTrackOpenTheQueueAnd') + (store.getSnapshot().error ?? ''))
     })
   }, [enabled, identity, isConfirmed, store, selectEntry, oneOffEntry?.trackId, toggle])
   const playOnce = useCallback(() => {
@@ -272,7 +276,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     const valid = () => mounted.current && actionEpoch.current === epoch
     void (async () => {
       if (identity === 'guest' && !await acquireGuestAudioLease(valid)) {
-        if (valid()) setTransportError('Плеер уже работает в другой вкладке. Остановите его там и повторите запуск.')
+        if (valid()) setTransportError(localMessage('thePlayerIsActiveInAnotherTabStopIt'))
         setFullQueueEntry(null)
         return
       }
@@ -402,7 +406,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
   }, [identity, isConfirmed])
   const value = useMemo<Transport>(() => ({ current, queue: state.canonical.entries.flatMap((entry) => entry.track ? [entry.track] : []), playing,
     selectedEntryId: playbackEntryId, position: oneOffEntry ? 0 : state.canonical.entries.findIndex((entry) => entry.entryId === state.selectedEntryId) + 1,
-    count: state.canonical.entries.length, pending: state.status === 'pending' || state.status === 'loading', error: audioError ?? transportError ?? (viewer.error ? 'Сессия временно не подтверждена. Текущий звук сохранён; новые приватные операции недоступны.' : null) ?? storageWarning ?? state.error,
+    count: state.canonical.entries.length, pending: state.status === 'pending' || state.status === 'loading', error: audioError ?? transportError ?? (viewer.error ? localMessage('yourSessionCouldNotBeConfirmedCurrentAudioIs') : null) ?? storageWarning ?? state.error,
     audioError, retryAudio, retrying, oneOff: Boolean(oneOffEntry),
     volume, muted, repeat, shuffle, setVolume, toggleMute, cycleRepeat, toggleShuffle,
     play, selectEntry, restore, toggle, next, prev, seek }), [current, state, playing, playbackEntryId, oneOffEntry, audioError, retryAudio, retrying, transportError, viewer.error, storageWarning, volume, muted, repeat, shuffle, setVolume, toggleMute, cycleRepeat, toggleShuffle, play, selectEntry, restore, toggle, next, prev, seek])
@@ -439,7 +443,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
       if (!source.current) return
       suspendListen(); audioRef.current?.pause(); setPlaying(false); retryInFlight.current = false; setRetrying(false)
       const code = audioRef.current?.error?.code
-      setAudioError(code === 3 || code === 4 ? 'Не удалось декодировать аудио или формат недоступен. Нажмите «Повторить аудио» или выберите другой трек.' : 'Не удалось загрузить аудио. Проверьте соединение и нажмите «Повторить аудио».')
+      setAudioError(code === 3 || code === 4 ? localMessage('couldNotDecodeTheAudioOrTheFormatIs') : localMessage('couldNotLoadAudioCheckYourConnectionAndSelect'))
       if (identity === 'guest') releaseGuestAudioLease()
     }}
     onEnded={() => { suspendListen(); setPlaying(false); session.current++; listenProgress.current = new ListenProgress(); playbackId.current = null; if (repeat === 'one' || (oneOffEntry && repeat === 'all')) restart(); else if (!oneOffEntry) next(); else if (identity === 'guest') releaseGuestAudioLease() }}
@@ -447,9 +451,9 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     onTimeUpdate={() => { collectListen(); if (!audioRef.current?.paused) warmAudio(); setProgress((old) => ({ ...old, currentTime: audioRef.current?.currentTime ?? 0 })) }}
     onLoadedMetadata={() => { const audio = audioRef.current!; if (savedTime.current !== null && Number.isFinite(audio.duration)) { audio.currentTime = Math.min(savedTime.current, audio.duration); savedTime.current = null }; warmAudio(true); setProgress({ currentTime: audio.currentTime, duration: Number.isFinite(audio.duration) ? audio.duration : 0 }) }} />
     <Dialog open={Boolean(fullQueueEntry)} onClose={() => setFullQueueEntry(null)} fullWidth maxWidth="sm" aria-labelledby="player-full-queue-title">
-      <DialogTitle id="player-full-queue-title">Очередь заполнена</DialogTitle>
-      <DialogContent><Typography>В очереди уже {state.canonical.entries.length} треков. Можно послушать «{fullQueueEntry?.display.name}» один раз без добавления. Чтобы освободить место, закройте это окно и откройте «Очередь» в плеере: выберите вхождения для удаления. Ничего не будет удалено автоматически.</Typography></DialogContent>
-      <DialogActions><Button onClick={() => setFullQueueEntry(null)}>Отмена</Button><Button onClick={playOnce}>Слушать один раз</Button></DialogActions>
+      <DialogTitle id="player-full-queue-title">{lt('queueFull')}</DialogTitle>
+      <DialogContent><Typography>{lt('fullQueue', { count: state.canonical.entries.length, name: fullQueueEntry?.display.name })}</Typography></DialogContent>
+      <DialogActions><Button onClick={() => setFullQueueEntry(null)}>{lt('cancel')}</Button><Button onClick={playOnce}>{lt('playOnce')}</Button></DialogActions>
     </Dialog>
   </ProgressContext.Provider></TransportContext.Provider>
 }

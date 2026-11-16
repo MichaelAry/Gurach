@@ -3,6 +3,10 @@
 
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { theme } from './index'
+import { createTheme } from '@mui/material/styles'
+import { enUS, ruRU } from '@mui/material/locale'
+import { useLocale } from '@/i18n/LocaleProvider'
+const themes = { en: createTheme(theme, enUS), ru: createTheme(theme, ruRU) }
 
 /**
  * Клиентский провайдер MUI-темы.
@@ -18,8 +22,9 @@ import { theme } from './index'
  *
  */
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
+  const { locale } = useLocale()
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={themes[locale]}>
       <CssBaseline />
       {children}
     </ThemeProvider>

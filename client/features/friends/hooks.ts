@@ -1,11 +1,12 @@
 'use client'
+import { message as localMessage } from '@/i18n/messages'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import { acceptFriendRequest, blockUser, cancelOrRejectRequest, getBlockedUsers, getFriendRequests, getFriends, getFriendsSummary, removeFriend, searchUsers, sendFriendRequest, SocialApiError, unblockUser, type FriendListItem, type FriendStatus, type ListKind, type UserProfile } from './api'
 
 type Page<T> = { items: T[]; nextCursor: string | null }
 type PageState<T> = { key: string; requestKey: string; page: Page<T> | null; error: string | null; expired: boolean }
-const message = (error: unknown) => error instanceof Error ? error.message : 'Сетевая ошибка.'
+const message = (error: unknown) => error instanceof Error ? error.message : localMessage('networkError')
 
 function useSocialPage<T>(identity: string, loader: (cursor: string | null, signal: AbortSignal) => Promise<Page<T>>, enabled = true) {
   const { user } = useViewer()
@@ -106,7 +107,7 @@ export function useFriendAction(onChanged: (profile: UserProfile, action: Friend
       else if (action === 'remove' && state.revision !== null) await removeFriend(profile.id, state.revision, controller.signal)
       else if (action === 'block') await blockUser(profile.id, state.revision ?? 0, controller.signal)
       else if (action === 'unblock' && state.revision !== null) await unblockUser(profile.id, state.revision, controller.signal)
-      else throw new Error('Состояние изменилось. Обновите страницу.')
+      else throw new Error(localMessage('theStateHasChangedRefreshThePage'))
       if (!controller.signal.aborted) onChanged(profile, action, false)
     } catch (error: unknown) {
       if (!controller.signal.aborted) {

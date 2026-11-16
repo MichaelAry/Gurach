@@ -1,3 +1,4 @@
+import { resolveMessage } from '@/i18n/messages'
 import { describe, expect, it } from 'vitest'
 import { formatApiError, readApiError } from './error'
 
@@ -14,7 +15,7 @@ describe('API error envelope', () => {
 
     const error = await readApiError(response)
     expect(error?.error.fieldErrors).toEqual({ username: ['should not be empty'] })
-    expect(formatApiError(error?.error ?? null, 'fallback')).toContain('request-123')
+    expect(resolveMessage('en', formatApiError(error?.error ?? null, 'fallback'))).toContain('request-123')
   })
 
   it('does not treat arbitrary response bodies as API errors', async () => {

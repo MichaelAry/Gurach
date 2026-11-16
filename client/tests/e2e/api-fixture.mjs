@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 const port = Number(process.env.FIXTURE_API_PORT ?? 5300);
 const total = 121;
+const accountLocales = new Map();
 const tracks = Array.from({ length: total }, (_, index) => {
   const number = index + 1;
   return {
@@ -44,7 +45,8 @@ const server = createServer((request, response) => {
   const secondUser = { ...fixtureUser, id: '000000000000000000000002', username: 'fixture_other', displayName: 'Другой пользователь' };
   const token = request.headers.authorization?.replace(/^Bearer /, '');
   // Fixed sessions support direct-cookie upload tests; browser logins get isolated state.
-  const sessionUser = token === 'a'.repeat(43) ? fixtureUser : token === 'b'.repeat(43) ? secondUser : sessions.get(token) ?? null;
+  const rawSessionUser = token === 'a'.repeat(43) ? fixtureUser : token === 'b'.repeat(43) ? secondUser : sessions.get(token) ?? null;
+  const sessionUser = rawSessionUser ? { ...rawSessionUser, preferredLocale: accountLocales.get(rawSessionUser.id) } : null;
   const accountKey = sessionUser ? `${sessionUser.id}:${token}` : null;
   if (request.method === 'GET' && ['/home/releases', '/home/popular', '/home/discovery', '/home/activity', '/friends', '/friends/summary', '/friends/requests', '/friends/blocks'].includes(url.pathname)) {
     const personal = !['/home/releases', '/home/popular'].includes(url.pathname);
@@ -93,6 +95,17 @@ const server = createServer((request, response) => {
     if (!sessionUser) { response.writeHead(401); response.end(); return; }
     response.setHeader('content-type', 'application/json');
     response.setHeader('Cache-Control', 'private, no-store');
+    if (url.pathname === '/account/preferences') {
+      if (request.method === 'GET') { response.end(JSON.stringify({ preferredLocale: accountLocales.get(sessionUser.id) ?? null })); return; }
+      let body = '';
+      request.on('data', chunk => { body += chunk; });
+      request.on('end', () => {
+        const value = JSON.parse(body);
+        if (!['en', 'ru'].includes(value.preferredLocale)) { response.writeHead(400); response.end('{}'); return; }
+        if (!value.initialize || !accountLocales.has(sessionUser.id)) accountLocales.set(sessionUser.id, value.preferredLocale);
+        response.end(JSON.stringify({ preferredLocale: accountLocales.get(sessionUser.id) }));
+      }); return;
+    }
     const uploads = sessionUser.id === fixtureUser.id ? tracks.slice(0, 21) : [];
     if (!accountHistory.has(accountKey)) accountHistory.set(accountKey, sessionUser.id === fixtureUser.id ? [
       { id: 'history-1', trackId: tracks[0]._id, listenedAt: '2026-01-02T12:00:00.000Z', track: tracks[0] },

@@ -1,3 +1,4 @@
+import { getText } from '@/i18n/server'
 // app/(main)/tracks/[id]/page.tsx
 import { FavoriteButton } from '@/features/favorites/FavoriteButton'
 import {
@@ -19,25 +20,28 @@ interface TrackPageProps {
 }
 
 export async function generateMetadata({ params }: TrackPageProps) {
+  const lt = await getText()
   const { id } = await params
   try {
     const track = await getTrack(id)
-    if (!track) return { title: 'Track not found' }
+    if (!track) return { title: lt('trackNotFound') }
 
     return {
       title: `${track.name} — ${track.artist ?? ''}`.trim(),
       openGraph: {
         ...(track.picture ? { images: [track.picture] } : {}),
-        description: `${track.name} by ${track.artist ?? ''}`.trim(),
+        description: track.artist ? lt('artistDescription', { name: track.name, artist: track.artist }) : track.name,
       },
     }
   } catch {
     // Метадата не должна ронять рендер страницы
-    return { title: 'Track' }
+    return { title: lt('tracks') }
   }
 }
 
 export default async function TrackPage({ params }: TrackPageProps) {
+  const lt = await getText()
+
   const { id } = await params
   const track = await getTrack(id)
   if (!track) notFound()
@@ -116,11 +120,10 @@ export default async function TrackPage({ params }: TrackPageProps) {
               fontWeight: 700, mb: 1.5, px: 1.5, py: 1,
               bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', borderRadius: 1,
             }}>
-              Лирика
-            </Typography>
+              {lt('lyrics')}</Typography>
             <Box tabIndex={0} role="region" aria-labelledby="lyrics-heading" sx={{ overflowY: { xs: 'visible', md: 'auto' }, minHeight: 0 }}>
               <Typography color="text.primary" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                {track.lyrics || 'Лирика недоступна'}
+                {track.lyrics || lt('lyricsUnavailable')}
               </Typography>
             </Box>
           </Box>

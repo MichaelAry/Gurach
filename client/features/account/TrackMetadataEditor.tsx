@@ -1,4 +1,6 @@
 'use client'
+import { useText, useMessage } from '@/i18n/LocaleProvider'
+import { message as localMessage } from '@/i18n/messages'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material'
@@ -11,6 +13,10 @@ export function TrackMetadataEditor({ id, onClose, onSaved }: {
   onClose: () => void
   onSaved: (track: TrackDetail) => void
 }) {
+  const resolve = useMessage()
+
+  const lt = useText()
+
   const router = useRouter()
   const [fields, setFields] = useState<TrackMetadataUpdate | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +29,7 @@ export function TrackMetadataEditor({ id, onClose, onSaved }: {
     getEditableTrack(id, controller.signal).then((track) => {
       if (!controller.signal.aborted) setFields({ name: track.name, artist: track.artist ?? '', text: track.lyrics ?? '' })
     }).catch((cause) => {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Не удалось загрузить трек.')
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : localMessage('couldNotLoadTheTrack'))
     })
     return () => controller.abort()
   }, [id, attempt])
@@ -44,7 +50,7 @@ export function TrackMetadataEditor({ id, onClose, onSaved }: {
         onClose()
       }
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Не удалось сохранить изменения. Попробуйте снова.')
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : localMessage('couldNotSaveChangesTryAgain'))
     } finally {
       if (request.current === controller) {
         request.current = null
@@ -56,30 +62,32 @@ export function TrackMetadataEditor({ id, onClose, onSaved }: {
   return (
     <Dialog open onClose={() => { if (!saving) onClose() }} fullWidth maxWidth="sm" aria-labelledby="track-editor-title">
       <form onSubmit={save} aria-busy={saving || (!fields && !error)}>
-        <DialogTitle id="track-editor-title">Редактирование трека</DialogTitle>
+        <DialogTitle id="track-editor-title">{lt('editTrack100')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            {!fields && !error && <Typography role="status">Загружаем данные трека…</Typography>}
-            {error && <Alert severity="error" action={!fields ? <Button onClick={() => { setError(null); setAttempt((value) => value + 1) }}>Повторить</Button> : undefined}>{error}</Alert>}
+            {!fields && !error && <Typography role="status">{lt('loadingTrackDetails')}</Typography>}
+            {error && <Alert severity="error" action={!fields ? <Button onClick={() => { setError(null); setAttempt((value) => value + 1) }}>{lt('tryAgain')}</Button> : undefined}>{resolve(error)}</Alert>}
             {fields && <>
-              <TextField label="Название трека" required value={fields.name} disabled={saving}
+              <TextField label={lt('trackTitle')} required value={fields.name} disabled={saving}
                 slotProps={{ htmlInput: { maxLength: 200 } }}
                 onChange={(event) => {
-                  event.target.setCustomValidity(event.target.value.trim() ? '' : 'Введите название трека.')
+                  const error = event.target.value.trim() ? '' : localMessage('enterATrackTitle')
+                  event.target.dataset.gurachValidationMessage = error
+                  event.target.setCustomValidity(resolve(error))
                   setFields({ ...fields, name: event.target.value })
                 }} />
-              <TextField label="Исполнитель" value={fields.artist} disabled={saving}
+              <TextField label={lt('artist')} value={fields.artist} disabled={saving}
                 slotProps={{ htmlInput: { maxLength: 200 } }}
                 onChange={(event) => setFields({ ...fields, artist: event.target.value })} />
-              <TextField label="Текст песни" value={fields.text} disabled={saving} multiline minRows={4} maxRows={12}
+              <TextField label={lt('lyrics105')} value={fields.text} disabled={saving} multiline minRows={4} maxRows={12}
                 slotProps={{ htmlInput: { maxLength: 100_000 } }}
                 onChange={(event) => setFields({ ...fields, text: event.target.value })} />
             </>}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose} disabled={saving}>Отмена</Button>
-          <Button type="submit" variant="contained" disabled={!fields || saving}>{saving ? 'Сохраняем…' : 'Сохранить'}</Button>
+          <Button onClick={onClose} disabled={saving}>{lt('cancel')}</Button>
+          <Button type="submit" variant="contained" disabled={!fields || saving}>{saving ? lt('saving') : lt('save')}</Button>
         </DialogActions>
       </form>
     </Dialog>

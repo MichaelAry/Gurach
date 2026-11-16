@@ -1,4 +1,5 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 import { Alert, Button, Skeleton, Stack } from '@mui/material'
 export function BlockState({
   loading,
@@ -9,6 +10,8 @@ export function BlockState({
   error: boolean
   retry: () => void
 }) {
+  const lt = useText()
+
   return loading ? (
     <Stack spacing={1}>
       {[1, 2, 3].map((i) => (
@@ -18,9 +21,8 @@ export function BlockState({
   ) : error ? (
     <Alert
       severity="warning"
-      action={<Button onClick={retry}>Повторить</Button>}
+      action={<Button onClick={retry}>{lt('tryAgain')}</Button>}
     >
-      Не удалось загрузить блок.
-    </Alert>
+      {lt('couldNotLoadThisSection')}</Alert>
   ) : null
 }

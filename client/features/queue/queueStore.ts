@@ -1,3 +1,4 @@
+import { message as localMessage } from '@/i18n/messages'
 import { queueReducer } from './queueReducer'
 import type { QueueAdapter, QueueCommand, QueueSnapshot, QueueEntry } from './types'
 export class QueueTransportError extends Error {
@@ -66,7 +67,7 @@ export class QueueStore {
     try {
       const saved = await this.adapter.save(pending.revision, pending.mutationId, pending.entries.map(({ entryId, trackId, source }) => ({ entryId, trackId, source })), this.controller.signal)
       if (generation !== this.generation) return false
-      if (saved.revision < this.state.canonical.revision) throw new Error('Stale queue response')
+      if (saved.revision < this.state.canonical.revision) throw new Error(localMessage('invalidQueueResponse'))
       this.pending = undefined
       this.publish({ canonical: saved, selectedEntryId: saved.entries.some((entry) => entry.entryId === pending.selectedEntryId && canSelect(entry)) ? pending.selectedEntryId : null, preview: null, status: 'ready', error: null })
       return true
@@ -80,13 +81,13 @@ export class QueueStore {
           if (canonical.revision >= this.state.canonical.revision) this.publish({ canonical, selectedEntryId: canonical.entries.some((entry) => entry.entryId === this.state.selectedEntryId && canSelect(entry)) ? this.state.selectedEntryId : null })
         } catch { /* Keep the last confirmed snapshot; caller can explicitly refresh. */ }
         if (generation !== this.generation) return false
-        this.publish({ preview: null, status: 'conflict', error: 'Очередь изменена в другом окне. Обновите её перед повтором.' })
+        this.publish({ preview: null, status: 'conflict', error: localMessage('theQueueChangedInAnotherWindowRefreshItBefore') })
       } else {
         if (error instanceof QueueTransportError && [400, 401, 403, 413].includes(error.status)) {
           this.pending = undefined
           if (error.status === 401) this.publish({ canonical: empty(), selectedEntryId: null })
         }
-        this.publish({ preview: null, status: 'error', error: error instanceof Error ? error.message : 'Не удалось сохранить очередь' })
+        this.publish({ preview: null, status: 'error', error: error instanceof Error ? error.message : localMessage('couldNotSaveTheQueue') })
       }
       return false
     }

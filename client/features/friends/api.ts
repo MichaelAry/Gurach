@@ -1,3 +1,4 @@
+import { message as localMessage } from '@/i18n/messages'
 import type { components } from '@/lib/api/schema'
 import { formatApiError, readApiError } from '@/lib/api/error'
 export type FriendRelationship = components['schemas']['FriendRelationship']
@@ -19,10 +20,10 @@ async function request<T>(path: string, signal?: AbortSignal, method = 'GET', bo
   })
   if (!response.ok) {
     const error = await readApiError(response)
-    const fallback = response.status === 401 ? 'Сессия истекла. Войдите снова.' : response.status === 404 ? 'Пользователь или заявка недоступны.' : 'Не удалось выполнить запрос.'
+    const fallback = response.status === 401 ? localMessage('yourSessionExpiredSignInAgain') : response.status === 404 ? localMessage('theUserOrRequestIsUnavailable') : localMessage('couldNotCompleteTheRequest165')
     const message = response.status === 401 ? fallback : formatApiError(error?.error ?? null, fallback)
     const retryAfter = response.headers.get('retry-after')
-    throw new SocialApiError(response.status, response.status === 429 && retryAfter ? `${message} Повторите через ${retryAfter} сек.` : message, retryAfter)
+    throw new SocialApiError(response.status, response.status === 429 && retryAfter ? localMessage('tryAgainInSeconds', { p0: message, p1: retryAfter }) : message, retryAfter)
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>
 }

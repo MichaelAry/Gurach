@@ -1,4 +1,6 @@
 'use client'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { useLocale, useText } from '@/i18n/LocaleProvider'
 
 import Link from 'next/link'
 import { Alert, Avatar, Box, Button, Paper, Stack, Typography } from '@mui/material'
@@ -10,6 +12,9 @@ import { AccountTracks } from './AccountTracks'
 import { AccountFriends } from './AccountFriends'
 
 export function AccountOverview() {
+  const lt = useText()
+  const { syncError, syncPending } = useLocale()
+
   const { user, loading, error } = useViewer()
   const listenRevision = useListenRevision()
   const [refresh, setRefresh] = useState(0)
@@ -22,16 +27,16 @@ export function AccountOverview() {
 
   return (
     <Stack spacing={3} sx={{ p: { xs: 2, sm: 3 } }}>
-      <Typography component="h1" variant="h5">Мой аккаунт</Typography>
+      <Typography component="h1" variant="h5">{lt('myAccount')}</Typography>
 
       {loading ? (
-        <Typography role="status" color="text.secondary">Проверяем сессию…</Typography>
+        <Typography role="status" color="text.secondary">{lt('checkingSession')}</Typography>
       ) : error ? (
-        <Alert severity="error">Не удалось загрузить аккаунт. Обновите страницу.</Alert>
+        <Alert severity="error">{lt('couldNotLoadYourAccountRefreshThePage')}</Alert>
       ) : !user ? (
         <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
-          <Typography color="text.secondary">Войдите, чтобы открыть свой аккаунт.</Typography>
-          <Button component={Link} href="/login?returnTo=/account" variant="outlined">Войти</Button>
+          <Typography color="text.secondary">{lt('signInToOpenYourAccount')}</Typography>
+          <Button component={Link} href="/login?returnTo=/account" variant="outlined">{lt('signIn')}</Button>
         </Stack>
       ) : (
         <Stack key={user.id} spacing={3}>
@@ -45,22 +50,29 @@ export function AccountOverview() {
             </Stack>
           </Paper>
 
+          <Paper component="section" variant="outlined" sx={{ p: 2 }}>
+            <Stack spacing={1}>
+              <Typography component="h2" variant="h6">{lt('languageSettings')}</Typography>
+              <LanguageSwitcher />
+              <Typography variant="body2">{lt(syncPending ? 'languageSavingAccount' : syncError ? 'languageSavedLocally' : 'languageSavedAccount')}</Typography>
+            </Stack>
+          </Paper>
           <AccountStatistics revision={revision} friendsRevision={refresh} />
           <AccountFriends revision={refresh} />
-          <Button component={Link} href="/favorites" variant="outlined">Избранные треки</Button>
+          <Button component={Link} href="/favorites" variant="outlined">{lt('favoriteTracks')}</Button>
 
           <Paper component="section" aria-labelledby="account-uploads" variant="outlined" sx={{ p: 2 }}>
             <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
-              <Typography id="account-uploads" component="h2" variant="h6">Мои загрузки</Typography>
-              <Button component={Link} href="/upload" variant="outlined">Загрузить трек</Button>
+              <Typography id="account-uploads" component="h2" variant="h6">{lt('myUploads')}</Typography>
+              <Button component={Link} href="/upload" variant="outlined">{lt('uploadTrack')}</Button>
             </Stack>
             <Box sx={{ mt: 2 }}><AccountTracks kind="uploads" revision={revision} /></Box>
           </Paper>
 
           <Paper component="section" aria-labelledby="account-history" variant="outlined" sx={{ p: 2 }}>
             <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
-              <Typography id="account-history" component="h2" variant="h6">Недавно слушал</Typography>
-              <Button component={Link} href="/tracks" variant="outlined">Открыть треки</Button>
+              <Typography id="account-history" component="h2" variant="h6">{lt('recentlyPlayed')}</Typography>
+              <Button component={Link} href="/tracks" variant="outlined">{lt('browseTracks')}</Button>
             </Stack>
             <Box sx={{ mt: 2 }}><AccountTracks kind="history" revision={revision} /></Box>
           </Paper>

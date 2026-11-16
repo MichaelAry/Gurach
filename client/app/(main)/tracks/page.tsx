@@ -1,3 +1,4 @@
+import { getText } from '@/i18n/server'
 // app/(main)/tracks/page.tsx
 import { UploadTracksButton } from '@/features/tracks/components/UploadTracksButton'
 import { getTracksPage } from '@/features/tracks/api/getTracksPage'
@@ -13,27 +14,29 @@ async function CatalogueData() {
 }
 
 export async function generateMetadata() {
+  const lt = await getText()
   return {
-    title: 'Треки',
-    description: 'Каталог и поиск треков по названию или исполнителю',
+    title: lt('tracks'),
+    description: lt('browseAndSearchTracksByTitleOrArtist'),
   }
 }
 
-export default function TracksPage() {
+export default async function TracksPage() {
+  const lt = await getText()
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Ширину задаёт центральная колонка layout — страница на всю её ширину */}
       <Card sx={{ width: '100%', p: 2 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h1" sx={{ fontSize: '1.5rem' }}>
-            Список треков
-          </Typography>
+            {lt('trackList')}</Typography>
           <UploadTracksButton />
         </Stack>
       </Card>
 
       <Box sx={{ width: '100%', mt: 2 }}>
-        <Suspense fallback={<Typography color="text.secondary">Загружаем треки…</Typography>}>
+        <Suspense fallback={<Typography color="text.secondary">{lt('loadingTracks')}</Typography>}>
           <CatalogueData />
         </Suspense>
       </Box>

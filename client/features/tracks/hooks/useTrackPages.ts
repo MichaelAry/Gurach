@@ -1,4 +1,5 @@
 'use client'
+import { message as localMessage } from '@/i18n/messages'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TrackListItem, TrackListPage, TrackSearchPage } from '../types'
@@ -12,6 +13,7 @@ type PageState = {
 }
 
 export function useTrackPages(initialPage: TrackListPage, search = '') {
+
   const query = search.normalize('NFC').trim()
   const initialState = (): PageState => ({
     query,
@@ -39,11 +41,11 @@ export function useTrackPages(initialPage: TrackListPage, search = '') {
       const response = await fetch(`${endpoint}?${params}`, { signal: controller.signal })
       if (!response.ok) {
         const payload = await readApiError(response)
-        throw new Error(formatApiError(payload?.error ?? null, 'Не удалось загрузить треки'))
+        throw new Error(formatApiError(payload?.error ?? null, localMessage('couldNotLoadTracks361')))
       }
       const page = (await response.json()) as TrackListPage | TrackSearchPage
       if (!Array.isArray(page.items) || !(page.nextCursor === null || typeof page.nextCursor === 'string')) {
-        throw new Error('Invalid page response')
+        throw new Error(localMessage('invalidPage'))
       }
       if (controller.signal.aborted) return
       setState((current) => {
@@ -64,7 +66,7 @@ export function useTrackPages(initialPage: TrackListPage, search = '') {
       if (!controller.signal.aborted) {
         setState((current) => current.query === query ? {
           ...current,
-          error: cause instanceof Error ? cause.message : 'Не удалось загрузить треки',
+          error: cause instanceof Error ? cause.message : localMessage('couldNotLoadTracks361'),
         } : current)
       }
     } finally {

@@ -1,4 +1,5 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 import { Box, Card, Checkbox, Chip, IconButton, Stack, Typography } from '@mui/material'
 import ArrowDownward from '@mui/icons-material/ArrowDownward'
 import ArrowUpward from '@mui/icons-material/ArrowUpward'
@@ -12,26 +13,28 @@ export function QueueRow({ entry, index, total, current, playing, disabled, chec
   checked: boolean; onCheck: () => void
   onSelect: () => void; onRemove: () => void; onMove: (direction: -1 | 1) => void; onDrop: (fromIndex: number, targetIndex: number) => void
 }) {
+  const lt = useText()
+
   const label = `${index + 1}. ${entry.display.name}${entry.display.artist ? ` — ${entry.display.artist}` : ''}`
   return <Card component="li" draggable={!disabled} onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))}
     onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) onDrop(from, index) }}
     aria-label={label} aria-current={current ? 'true' : undefined} sx={{ listStyle: 'none', p: 1, border: '1px solid', borderColor: current ? 'primary.main' : 'divider', bgcolor: current ? 'action.selected' : 'background.paper' }}>
     <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-      <Checkbox size="small" checked={checked} disabled={disabled} onChange={onCheck} slotProps={{ input: { 'aria-label': `Выбрать: ${label}` } }} sx={{ p: 0.5 }} />
-      <Typography sx={{ width: 22, flexShrink: 0, textAlign: 'right' }} aria-label={`Позиция ${index + 1}`}>{index + 1}</Typography>
-      <IconButton size="small" aria-label={`${current && playing ? 'Пауза' : 'Играть'}: ${label}`} disabled={disabled || entry.availability !== 'playable' || !entry.track?.audio} onClick={onSelect}>
+      <Checkbox size="small" checked={checked} disabled={disabled} onChange={onCheck} slotProps={{ input: { 'aria-label': lt('select', { p0: label }) } }} sx={{ p: 0.5 }} />
+      <Typography sx={{ width: 22, flexShrink: 0, textAlign: 'right' }} aria-label={lt('position', { p0: index + 1 })}>{index + 1}</Typography>
+      <IconButton size="small" aria-label={`${current && playing ? lt('pause') : lt('play')}: ${label}`} disabled={disabled || entry.availability !== 'playable' || !entry.track?.audio} onClick={onSelect}>
         {current && playing ? <Pause fontSize="small" /> : <PlayArrow fontSize="small" />}
       </IconButton>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography noWrap sx={{ fontWeight: current ? 700 : 400 }}>{entry.display.name}</Typography>
-        {entry.source !== 'automatic' && <Chip size="small" label="Добавлен вручную" sx={{ height: 20, maxWidth: '100%', '& .MuiChip-label': { px: 0.75 } }} />}
+        {entry.source !== 'automatic' && <Chip size="small" label={lt('addedManually')} sx={{ height: 20, maxWidth: '100%', '& .MuiChip-label': { px: 0.75 } }} />}
         <Typography noWrap variant="caption" color="text.secondary">
-          {entry.display.artist ?? '—'}{entry.availability === 'unavailable' ? ` · Недоступен (${entry.reason ?? 'причина неизвестна'})` : ''}
+          {entry.display.artist ?? '—'}{entry.availability === 'unavailable' ? lt('unavailable290', { p0: entry.reason === 'deleted' ? lt('reason_deleted') : entry.reason === 'missing-audio' ? lt('reason_audio_missing') : lt('reason_unavailable') }) : ''}
         </Typography>
       </Box>
-      <IconButton size="small" aria-label={`Выше: ${label}`} disabled={disabled || index === 0} onClick={() => onMove(-1)}><ArrowUpward fontSize="small" /></IconButton>
-      <IconButton size="small" aria-label={`Ниже: ${label}`} disabled={disabled || index === total - 1} onClick={() => onMove(1)}><ArrowDownward fontSize="small" /></IconButton>
-      <IconButton size="small" aria-label={`Убрать: ${label}`} disabled={disabled} onClick={onRemove}><Close fontSize="small" /></IconButton>
+      <IconButton size="small" aria-label={lt('moveUp', { p0: label })} disabled={disabled || index === 0} onClick={() => onMove(-1)}><ArrowUpward fontSize="small" /></IconButton>
+      <IconButton size="small" aria-label={lt('moveDown', { p0: label })} disabled={disabled || index === total - 1} onClick={() => onMove(1)}><ArrowDownward fontSize="small" /></IconButton>
+      <IconButton size="small" aria-label={lt('remove292', { p0: label })} disabled={disabled} onClick={onRemove}><Close fontSize="small" /></IconButton>
     </Stack>
   </Card>
 }

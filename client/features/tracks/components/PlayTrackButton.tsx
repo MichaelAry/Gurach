@@ -1,4 +1,5 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 
 import PauseRounded from '@mui/icons-material/PauseRounded'
 import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded'
@@ -12,6 +13,8 @@ import type { TrackDetail } from '../types'
  * вызвать контекст плеера напрямую, поэтому кнопка — клиентский компонент.
  */
 export function PlayTrackButton({ track }: { track: TrackDetail }) {
+  const lt = useText()
+
   const { current, playing, play, pending } = usePlayerTransport()
   const isCurrent = current?._id === track._id
   const isPlaying = isCurrent && playing
@@ -28,7 +31,7 @@ export function PlayTrackButton({ track }: { track: TrackDetail }) {
         '&:hover': { bgcolor: 'primary.dark' },
       }}
     >
-      {isPlaying ? 'Пауза' : track.audio ? 'Слушать' : 'Аудио недоступно'}
+      {isPlaying ? lt('pause') : track.audio ? lt('listen') : lt('audioUnavailable')}
     </Button>
   )
 }

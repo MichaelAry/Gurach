@@ -17,6 +17,9 @@ export class User {
   @Prop({ required: true, trim: true, minlength: 1, maxlength: 64 })
   displayName: string;
 
+  @Prop({ type: String, enum: ['en', 'ru'] })
+  preferredLocale?: 'en' | 'ru';
+
   @Prop({ required: true, enum: ['user', 'admin'], default: 'user' })
   role: 'user' | 'admin';
 

@@ -1,4 +1,5 @@
 'use client'
+import { useText } from '@/i18n/LocaleProvider'
 
 import PauseRounded from '@mui/icons-material/PauseRounded'
 import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded'
@@ -16,6 +17,8 @@ interface PlayButtonProps {
  * без перехода на страницу трека.
  */
 export function PlayButton({ track }: PlayButtonProps) {
+  const lt = useText()
+
   const { current, playing, play, pending } = usePlayerTransport()
   const isCurrent = current?._id === track._id
   const isPlaying = isCurrent && playing
@@ -24,7 +27,7 @@ export function PlayButton({ track }: PlayButtonProps) {
     <IconButton
       size="small"
       disabled={!track.audio || pending}
-      aria-label={`${isPlaying ? 'Пауза' : 'Играть'} ${track.name}`}
+      aria-label={`${isPlaying ? lt('pause') : lt('play')} ${track.name}`}
       onClick={() => play(track)}
       sx={{
         color: isPlaying ? 'primary.main' : 'text.secondary',
