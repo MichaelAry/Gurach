@@ -29,7 +29,7 @@ export const Navbar = () => {
   const t = useTranslations('navigation')
   return <Paper
     component="nav"
-    aria-label="Основная навигация"
+    aria-label={t('main')}
     variant="outlined"
     sx={{
       display: 'flex',
