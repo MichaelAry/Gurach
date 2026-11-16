@@ -184,7 +184,13 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Знакомые исполнители и свежие открытия
               </Typography>
-              <MusicRows tracks={recommendations} />
+              {recommendations.length > 0 ? (
+                <MusicRows tracks={recommendations} />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Пока нет подходящих рекомендаций. <Link href="/tracks">Открыть каталог</Link>
+                </Typography>
+              )}
             </>
           )}
         </Section>
@@ -205,7 +211,12 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
                 {week.map((d) => `${d.day} ${d.count}`).join(' · ')}
               </Typography>
             )}
-            {history.data && (
+            {history.data && history.data.items.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                История прослушиваний пока пуста. <Link href="/tracks">Выбрать трек</Link>
+              </Typography>
+            )}
+            {history.data && history.data.items.length > 0 && (
               <MusicRows
                 tracks={[
                   ...new Map(
