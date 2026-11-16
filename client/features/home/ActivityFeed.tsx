@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from '@/i18n/LocaleProvider'
 import Link from 'next/link'
+import { discussionLink } from '@/lib/discussion-link'
 import { Button, Stack, Typography } from '@mui/material'
 import type { components } from '@/lib/api/schema'
 import { Section, MusicRows } from './MusicSection'
@@ -85,7 +86,7 @@ export function ActivityFeed() {
               <time dateTime={item.at}>{new Date(item.at).toLocaleString(locale)}</time>
             </Typography>
             {item.action !== 'upload' && (
-              <Link href={`/tracks/${item.track._id}#comment-${item.id}`}>{t('openComment')}</Link>
+              <Link href={discussionLink(item.track._id, item.id)}>{t('openComment')}</Link>
             )}
             <MusicRows tracks={[item.track]} />
           </Stack>

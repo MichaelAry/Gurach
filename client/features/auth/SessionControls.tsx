@@ -2,10 +2,11 @@
 import { useState } from 'react'
 import { Alert, Button, Stack, Typography } from '@mui/material'
 import Link from 'next/link'
+import { NotificationIndicator } from '@/features/notifications/NotificationIndicator'
 import { useViewer } from './ViewerProvider'
 
 export function SessionControls() {
-  const { user, loading, error, refresh } = useViewer()
+  const { user, loading, error, refresh, confirmed } = useViewer()
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
   if (loading) return <Typography variant="caption">Проверяем сессию…</Typography>
@@ -19,6 +20,7 @@ export function SessionControls() {
     } catch { setFailed(true); setPending(false) }
   }
   return <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 1, flexWrap: 'wrap' }}>
+    {confirmed && <NotificationIndicator />}
     <Button component={Link} href="/account" aria-label="Мой аккаунт">{user.displayName}</Button>
     <Button disabled={pending} onClick={() => void logout()}>{pending ? 'Выходим…' : 'Выйти'}</Button>
     {error && <Typography variant="caption">Сессия временно не подтверждена. <Button onClick={refresh}>Проверить сессию</Button></Typography>}

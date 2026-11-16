@@ -1,3 +1,4 @@
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
@@ -25,6 +26,7 @@ export class FriendsService {
     @InjectModel(FriendRequestCounter.name) private readonly counters: Model<FriendRequestCounter>,
     @InjectModel(User.name) private readonly users: Model<User>,
     @InjectConnection() private readonly connection: Connection,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private pair(actorId: string, targetId: string) {
@@ -110,6 +112,10 @@ export class FriendsService {
           } else {
             [updated] = await this.relations.create([{ ...pair, ...fields, revision: 1 }], { session });
           }
+          await this.notifications.record({
+            eventKey: `friend.requested:${fields.requestId}`, kind: 'friend.requested',
+            actorId: actor, recipientId: target, requestId: fields.requestId,
+          }, session, now);
           return { created: true, relationship: relationship(actorId, targetId, updated) };
         });
       } catch (error) {
@@ -126,19 +132,29 @@ export class FriendsService {
 
   async accept(actorId: string, value: string): Promise<FriendRelationship> {
     const requestId = this.uuid(value);
-    const row = await this.relations.findOne({ requestId, status: 'pending' }).lean().exec();
-    if (!row) throw new ConflictException('Request is no longer active');
-    if (String(row.recipientId) !== actorId) throw new ForbiddenException();
-    const targetId = String(row.requesterId);
-    const pair = this.pair(actorId, targetId);
-    await this.active(targetId);
-    const updated = await this.relations.findOneAndUpdate(
-      { ...pair, requestId, recipientId: new Types.ObjectId(actorId), status: 'pending', blockedByLow: false, blockedByHigh: false },
-      { $set: { status: 'accepted', acceptedAt: new Date() }, $unset: { requestId: '', requesterId: '', recipientId: '', requestedAt: '', nextRequestAllowedAt: '' }, $inc: { revision: 1 } },
-      { returnDocument: 'after' },
-    ).exec();
-    if (!updated) throw new ConflictException('Request is no longer active');
-    return relationship(actorId, targetId, updated);
+    const session = await this.connection.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const row = await this.relations.findOne({ requestId, status: 'pending' }).session(session).lean().exec();
+        if (!row) throw new ConflictException('Request is no longer active');
+        if (String(row.recipientId) !== actorId) throw new ForbiddenException();
+        const targetId = String(row.requesterId);
+        const pair = this.pair(actorId, targetId);
+        if (!await this.users.exists({ _id: row.requesterId, disabled: false }).session(session)) throw new NotFoundException('User unavailable');
+        const now = new Date();
+        const updated = await this.relations.findOneAndUpdate(
+          { ...pair, requestId, recipientId: new Types.ObjectId(actorId), status: 'pending', blockedByLow: false, blockedByHigh: false },
+          { $set: { status: 'accepted', acceptedAt: now }, $unset: { requestId: '', requesterId: '', recipientId: '', requestedAt: '', nextRequestAllowedAt: '' }, $inc: { revision: 1 } },
+          { session, returnDocument: 'after' },
+        ).exec();
+        if (!updated) throw new ConflictException('Request is no longer active');
+        await this.notifications.record({
+          eventKey: `friend.accepted:${requestId}`, kind: 'friend.accepted',
+          actorId: new Types.ObjectId(actorId), recipientId: new Types.ObjectId(targetId),
+        }, session, now);
+        return relationship(actorId, targetId, updated);
+      });
+    } finally { await session.endSession(); }
   }
 
   async cancelOrReject(actorId: string, value: string): Promise<void> {

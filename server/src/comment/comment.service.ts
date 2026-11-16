@@ -1,3 +1,4 @@
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { PermissionService } from '../auth/permission.service.js';
 import type { Actor } from '../auth/session.service.js';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -25,17 +26,24 @@ export class CommentService {
     @InjectModel(Comment.name) private readonly comments: Model<CommentDocument>,
     private readonly tracks: TrackAccessService,
     @InjectConnection() private readonly connection: Connection,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async add(trackId: string, dto: CreateCommentDto, actor?: Actor) {
     const identity = new PermissionService().requireActor(actor);
     if (!Types.ObjectId.isValid(trackId)) throw new BadRequestException('"trackId" must be a valid ObjectId');
+    const commentId = new Types.ObjectId();
     try {
       const comment = await this.withBoundedTransaction(async (session) => {
         const id = await this.tracks.reserveCommentWrite(trackId, session);
         const [created] = await this.comments.create([{
-          username: identity.displayName, authorId: new Types.ObjectId(identity.id), text: dto.text, track_id: id, rating: dto.rating,
+          _id: commentId, username: identity.displayName, authorId: new Types.ObjectId(identity.id), text: dto.text, track_id: id, rating: dto.rating,
         }], { session });
+        const recipientId = await this.tracks.commentRecipient(id, session);
+        if (recipientId) await this.notifications.record({
+          eventKey: `track.commented:${String(commentId)}`, kind: 'track.commented',
+          actorId: new Types.ObjectId(identity.id), recipientId, trackId: id, commentId,
+        }, session);
         return created;
       });
       return toCommentResponse(comment as CommentRecord);

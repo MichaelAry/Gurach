@@ -18,6 +18,11 @@ export class TrackAccessService {
     return id;
   }
 
+  async commentRecipient(trackId: Types.ObjectId, session: ClientSession): Promise<Types.ObjectId | undefined> {
+    const track = await this.tracks.findOne({ _id: trackId, lifecycle: 'active' }).select('ownerId').session(session).lean().exec();
+    return track?.ownerId;
+  }
+
   async reserveCommentWrite(trackId: string, session: ClientSession): Promise<Types.ObjectId> {
     if (!Types.ObjectId.isValid(trackId)) throw new BadRequestException('"trackId" must be a valid ObjectId');
     const id = new Types.ObjectId(trackId);

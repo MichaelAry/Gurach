@@ -54,5 +54,24 @@
     "guestDescription": "Sign in to save music and find friends.",
     "signIn": "Sign in",
     "releasesEmpty": "The first releases will appear here soon."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "countUnavailable": "count unavailable",
+    "requested": "sent you a friend request",
+    "accepted": "accepted your friend request",
+    "commented": "commented on your track",
+    "openDiscussion": "Open discussion",
+    "openFriends": "Open friends",
+    "markRead": "Mark as read",
+    "refresh": "Refresh",
+    "loading": "Loading notifications…",
+    "loadFailed": "Could not load notifications.",
+    "writeFailed": "Could not mark notification as read. It may no longer be available.",
+    "retry": "Try again",
+    "empty": "No notifications yet.",
+    "more": "Load more",
+    "checkingSession": "Checking session…",
+    "login": "Sign in"
   }
 }

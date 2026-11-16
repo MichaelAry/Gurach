@@ -1,3 +1,4 @@
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { HomeService } from '../home/home.service.js';
 import { FriendsService } from '../friends/friends.service.js';
 import { UsersService } from '../users/users.service.js';
@@ -19,6 +20,7 @@ import { CommentService } from '../comment/comment.service.js';
 @Module({
   controllers: [...API_CONTROLLERS],
   providers: [
+    { provide: NotificationsService, useValue: {} },
     { provide: HomeService, useValue: {} },
     { provide: FriendsService, useValue: {} },
     { provide: UsersService, useValue: {} },
