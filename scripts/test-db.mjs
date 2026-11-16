@@ -9,7 +9,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const serverDir = path.join(root, 'server');
 const token = randomUUID().replaceAll('-', '');
 const containerName = `gurach-test-${token.slice(0, 16)}`;
-const image = 'mongo@sha256:5d7043a4ffe02b9ed1b6e0bab057546981af5ca0a79107e9c461e49bc44c0a7b';
+// MongoDB 8.3.17 includes SERVER-131779 (Ubuntu kernel/tcmalloc startup check).
+const image = 'mongo@sha256:0f64db83d5926400d1cbcbaf35fbf2b0dfa6a4eaa71e04a26481a38cd803b27b';
 const databaseName = `gurach_test_${token}`;
 const label = `gurach.test-run=${token}`;
 const rootUser = 'gurach_test_root';
@@ -46,6 +47,7 @@ function diagnostics(result) {
       const log = JSON.parse(line);
       if (['E', 'F', 'W'].includes(log.s) && Number.isInteger(log.id)) {
         messages.push(`mongod severity=${log.s} id=${log.id}`);
+        if (log.id === 12257600) messages.push('MongoDB kernel/tcmalloc incompatibility (SERVER-131779)');
       }
     } catch { /* Ignore non-JSON lines rather than exposing raw logs. */ }
   }
@@ -84,8 +86,12 @@ async function waitFor(nextStage, args) {
     checkRunning();
     last = invoke(args);
     if (last.status === 0) return;
+    // mongosh can fail to connect before --eval executes, just after PID 1
+    // becomes mongod and before the socket opens. It uses exit 1 in that case.
+    const connecting = nextStage === 'mongosh-auth' && last.status === 1 &&
+      /^MongoNetworkError: connect ECONNREFUSED\b/m.test(`${last.stdout}\n${last.stderr}`);
     // Only explicitly transient probe results are retried.
-    if (last.error || ![22, 23].includes(last.status)) {
+    if (last.error || (![22, 23].includes(last.status) && !connecting)) {
       throw new Error(`[${stage}] ${diagnostics(last)}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
