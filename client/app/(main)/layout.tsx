@@ -8,6 +8,7 @@ import { Box } from '@mui/material'
 import { Suspense } from 'react'
 import type { Viewport } from 'next'
 import { ViewerProvider } from '@/features/auth/ViewerProvider'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { SessionControls } from '@/features/auth/SessionControls'
 
 export const viewport: Viewport = { viewportFit: 'cover' }
@@ -48,6 +49,7 @@ export default function MainLayout({
           </Suspense>
 
           <Navbar />
+          <LanguageSwitcher />
         </Box>
 
         {/* PlayerBar measures its full height, including errors and the safe area. */}
