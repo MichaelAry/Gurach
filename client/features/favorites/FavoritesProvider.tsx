@@ -15,11 +15,12 @@ export function useFavorites() {
 }
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
-  const { user, loading } = useViewer()
-  return <FavoritesSession key={user?.id ?? 'guest'} authenticated={Boolean(user)} sessionLoading={loading}>{children}</FavoritesSession>
+  const { user, loading, confirmed } = useViewer()
+  return <FavoritesSession key={user?.id ?? 'guest'} authenticated={Boolean(user) && confirmed} sessionLoading={loading || !confirmed}>{children}</FavoritesSession>
 }
 
 function FavoritesSession({ children, authenticated, sessionLoading }: { children: ReactNode; authenticated: boolean; sessionLoading: boolean }) {
+  const { user, isConfirmed } = useViewer()
   const [ids, setIds] = useState<Set<string>>(new Set())
   const [pending, setPending] = useState<Set<string>>(new Set())
   const [ready, setReady] = useState(false)
@@ -31,7 +32,7 @@ function FavoritesSession({ children, authenticated, sessionLoading }: { childre
   const controller = useRef<AbortController | null>(null)
 
   const refresh = useCallback(() => {
-    if (!authenticated || busy.current.size) return
+    if (!authenticated || !isConfirmed(user?.id ?? null) || busy.current.size) return
     controller.current?.abort()
     const request = new AbortController()
     controller.current = request
@@ -46,7 +47,7 @@ function FavoritesSession({ children, authenticated, sessionLoading }: { childre
     }).catch(() => {
       if (active.current && !request.signal.aborted && version === generation.current) setError('Не удалось загрузить избранное. Повторите попытку.')
     })
-  }, [authenticated])
+  }, [authenticated, isConfirmed, user?.id])
 
   useEffect(() => {
     active.current = true
@@ -56,7 +57,7 @@ function FavoritesSession({ children, authenticated, sessionLoading }: { childre
   }, [refresh])
 
   async function toggle(id: string) {
-    if (!authenticated || !ready || busy.current.has(id)) return
+    if (!authenticated || !isConfirmed(user?.id ?? null) || !ready || busy.current.has(id)) return
     busy.current.add(id)
     setPending(new Set(busy.current))
     setError(null)

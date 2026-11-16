@@ -21,9 +21,10 @@ const ListenCountsContext = createContext<ListenCountsContextValue | null>(null)
 export function ListenCountsProvider({ children }: { children: ReactNode }) {
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [revision, setRevision] = useState(0)
-  const { user } = useViewer()
+  const { user, isConfirmed } = useViewer()
   const recordListen = useCallback(
     async (trackId: string, playbackId: string): Promise<boolean> => {
+      if (!isConfirmed(user?.id ?? null)) return false
       try {
         const response = await fetch(
           user ? '/api/account/listens' : `/api/tracks/${encodeURIComponent(trackId)}/listen`,
@@ -34,7 +35,7 @@ export function ListenCountsProvider({ children }: { children: ReactNode }) {
             signal: AbortSignal.timeout(15_000),
           },
         )
-        if (!response.ok) return false
+        if (!response.ok || !isConfirmed(user?.id ?? null)) return false
         const body: unknown = await response.json()
         if (
           typeof body !== 'object' ||
@@ -57,7 +58,7 @@ export function ListenCountsProvider({ children }: { children: ReactNode }) {
         return false
       }
     },
-    [user],
+    [user, isConfirmed],
   )
 
   return (

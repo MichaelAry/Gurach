@@ -86,7 +86,7 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
         <Box component="ol" aria-label="Треки в очереди" sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 0, mt: 1, overflowY: 'auto', minHeight: 0 }}>
           {entries.map((entry, index) => <QueueRow key={entry.entryId} entry={entry} index={index} total={entries.length} disabled={disabled}
             checked={checkedIds.has(entry.entryId)} onCheck={() => toggleChecked(entry.entryId)}
-            current={state.selectedEntryId === entry.entryId} playing={player.playing && state.selectedEntryId === entry.entryId}
+            current={player.selectedEntryId === entry.entryId} playing={player.playing && player.selectedEntryId === entry.entryId}
             onSelect={() => player.selectEntry(entry.entryId)} onRemove={() => void store.dispatch({ type: 'remove', entryId: entry.entryId })}
             onMove={(direction) => move(index, index + direction)} onDrop={move} />)}
         </Box>

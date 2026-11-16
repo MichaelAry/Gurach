@@ -5,6 +5,7 @@ import { Alert, Button, LinearProgress, Stack, TextField } from '@mui/material'
 import Link from 'next/link'
 import { DuplicateTrackError, uploadTrack } from '../api/uploadTrack'
 import { useRouter } from 'next/navigation'
+import { useViewer } from '@/features/auth/ViewerProvider'
 
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac']
 const COVER_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']
@@ -24,6 +25,7 @@ function validateFile(event: ChangeEvent<HTMLInputElement>, extensions: string[]
 }
 
 export function UploadTrackForm() {
+  const { user, confirmed, isConfirmed } = useViewer()
   const router = useRouter()
   const [audioError, setAudioError] = useState('')
   const [coverError, setCoverError] = useState('')
@@ -37,7 +39,7 @@ export function UploadTrackForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (requestRef.current || uploaded || !event.currentTarget.reportValidity()) return
+    if (!user || !isConfirmed(user.id) || requestRef.current || uploaded || !event.currentTarget.reportValidity()) return
     const body = new FormData(event.currentTarget)
     body.set('name', String(body.get('name') ?? '').trim())
     body.set('artist', String(body.get('artist') ?? '').trim())
@@ -68,7 +70,7 @@ export function UploadTrackForm() {
 
   return (
     <Stack component="form" spacing={2.5} onSubmit={submit} aria-busy={pending}>
-      <Stack component="fieldset" disabled={pending || uploaded} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
+      <Stack component="fieldset" disabled={!confirmed || pending || uploaded} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
         <TextField
           label="Аудиофайл"
           name="audio"
@@ -122,7 +124,7 @@ export function UploadTrackForm() {
       {pending && <LinearProgress aria-label="Загрузка трека" />}
       {error && <Alert severity="error">{error}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>Открыть существующий трек</Link></>}</Alert>}
       {uploaded && <Alert severity="success">Трек успешно загружен. Открываем страницу трека…</Alert>}
-      <Button type="submit" variant="contained" disabled={pending || uploaded}>{uploaded ? 'Трек загружен' : pending ? 'Загружаем…' : 'Загрузить трек'}</Button>
+      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? 'Трек загружен' : pending ? 'Загружаем…' : 'Загрузить трек'}</Button>
     </Stack>
   )
 }

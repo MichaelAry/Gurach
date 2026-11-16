@@ -7,11 +7,13 @@ async function read(response: Response): Promise<QueueSnapshot> {
   if (!Number.isSafeInteger(value.revision) || value.revision < 0 || value.capacity !== 100 || !Array.isArray(value.entries) || value.entries.length > 100 || new Set(value.entries.map((entry) => entry.entryId)).size !== value.entries.length) throw new Error('Некорректный ответ очереди')
   return value
 }
-export function accountQueueAdapter(): QueueAdapter {
+export function accountQueueAdapter(isSessionConfirmed: () => boolean): QueueAdapter {
   let channel: BroadcastChannel | null = null
+  const assertSession = () => { if (!isSessionConfirmed()) throw new QueueTransportError(503, 'Сессия временно не подтверждена. Проверьте сессию и повторите операцию.') }
   return {
-    load: async (signal) => read(await fetch('/api/queue', { cache: 'no-store', signal })),
+    load: async (signal) => { assertSession(); return read(await fetch('/api/queue', { cache: 'no-store', signal })) },
     save: async (expectedRevision, mutationId, entries, signal) => {
+      assertSession()
       const saved = await read(await fetch('/api/queue', {
         method: 'PUT', cache: 'no-store', signal, headers: { 'content-type': 'application/json', 'X-Gurach-Request': '1' },
         body: JSON.stringify({ expectedRevision, mutationId, entries }),
@@ -20,7 +22,7 @@ export function accountQueueAdapter(): QueueAdapter {
       return saved
     },
     subscribe: (listener) => {
-      const refresh = () => listener()
+      const refresh = () => { if (isSessionConfirmed()) listener() }
       channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('gurach:account-queue')
       if (channel) channel.onmessage = refresh
       window.addEventListener('focus', refresh)

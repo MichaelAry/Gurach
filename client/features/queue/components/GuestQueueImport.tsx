@@ -4,8 +4,10 @@ import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTi
 import { useQueue, useQueueStore } from '../hooks'
 import type { QueueEntry } from '../types'
 import { guestImportResolved, loadGuestQueueForImport, markGuestImportResolved } from '../guestAdapter'
+import { useViewer } from '@/features/auth/ViewerProvider'
 
 export function GuestQueueImport({ userId }: { userId: string }) {
+  const { confirmed, isConfirmed } = useViewer()
   const store = useQueueStore(), queue = useQueue()
   const [entries, setEntries] = useState<QueueEntry[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -18,7 +20,7 @@ export function GuestQueueImport({ userId }: { userId: string }) {
 
   useEffect(() => {
     let active = true
-    if (queue.status !== 'ready' || guestImportResolved(userId)) return
+    if (!confirmed || queue.status !== 'ready' || guestImportResolved(userId)) return
     void loadGuestQueueForImport().then((snapshot) => {
       if (!active) return
       const manualEntries = snapshot?.entries.filter((entry) => entry.source !== 'automatic') ?? []
@@ -28,14 +30,14 @@ export function GuestQueueImport({ userId }: { userId: string }) {
       setOpen(true)
     }).catch(() => { if (active) setError('Не удалось прочитать гостевую очередь. Повторите позже.') })
     return () => { active = false }
-  }, [queue.status, userId])
+  }, [queue.status, userId, confirmed])
 
   function finish() {
     if (!markGuestImportResolved(userId)) { setError('Решение не удалось сохранить в этом браузере. Очередь аккаунта уже сохранена; закройте окно вручную.') }
     setResolved(true); setOpen(false)
   }
   async function choose(mode: 'replace' | 'append') {
-    if (busy || !selection.length) return
+    if (!isConfirmed(userId) || busy || !selection.length) return
     if (mode === 'append' && selection.length > remaining) { setError(`Выбрано ${selection.length}, свободно только ${remaining}. Снимите часть отметок или замените очередь.`); return }
     if (selection.some((entry) => entry.availability !== 'playable' || !entry.track?.audio)) { setError('Снимите отметки с недоступных треков перед импортом.'); return }
     setBusy(true); setError(null)
@@ -67,8 +69,8 @@ export function GuestQueueImport({ userId }: { userId: string }) {
     </DialogContent>
     <DialogActions sx={{ flexWrap: 'wrap' }}>
       <Button disabled={busy} onClick={finish}>Оставить очередь аккаунта</Button>
-      <Button disabled={busy || !selection.length || selection.some((entry) => entry.availability !== 'playable' || !entry.track?.audio)} onClick={() => void choose('replace')}>Заменить выбранными</Button>
-      <Button disabled={busy || !selection.length || selection.length > remaining || selection.some((entry) => entry.availability !== 'playable' || !entry.track?.audio)} onClick={() => void choose('append')}>Объединить выбранные</Button>
+      <Button disabled={busy || !confirmed || !selection.length || selection.some((entry) => entry.availability !== 'playable' || !entry.track?.audio)} onClick={() => void choose('replace')}>Заменить выбранными</Button>
+      <Button disabled={busy || !confirmed || !selection.length || selection.length > remaining || selection.some((entry) => entry.availability !== 'playable' || !entry.track?.audio)} onClick={() => void choose('append')}>Объединить выбранные</Button>
     </DialogActions>
   </Dialog>
 }

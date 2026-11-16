@@ -83,7 +83,7 @@ export function affectedLists(status: FriendStatus, action: FriendAction): ListK
   return [...new Set([...before, ...(action === 'send' ? ['outgoing' as const] : action === 'accept' ? ['friends' as const] : action === 'block' ? ['blocks' as const] : [])])]
 }
 export function useFriendAction(onChanged: (profile: UserProfile, action: FriendAction, conflict: boolean) => void) {
-  const { user } = useViewer()
+  const { user, isConfirmed } = useViewer()
   const actorId = user?.id
   const active = useRef(new Map<string, AbortController>())
   const [pending, setPending] = useState<string[]>([])
@@ -94,7 +94,7 @@ export function useFriendAction(onChanged: (profile: UserProfile, action: Friend
     return () => { for (const controller of requests.values()) controller.abort(); requests.clear() }
   }, [actorId])
   async function run(profile: UserProfile, action: FriendAction) {
-    if (!actorId || active.current.has(profile.id)) return
+    if (!actorId || !isConfirmed(actorId) || active.current.has(profile.id)) return
     const controller = new AbortController()
     active.current.set(profile.id, controller)
     setPending([...active.current.keys()]); setError(null)

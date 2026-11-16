@@ -42,7 +42,7 @@ export function PlayerBar() {
 
   const [queueOpen, setQueueOpen] = useState(false)
   const store = useQueueStore()
-  const { current, position, count, error, playing, currentTime, duration, toggle, next, prev, seek } =
+  const { current, position, count, error, audioError, retryAudio, retrying, oneOff, playing, currentTime, duration, toggle, next, prev, seek } =
     usePlayer()
 
   const hasTrack = Boolean(current?._id)
@@ -112,7 +112,7 @@ export function PlayerBar() {
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {position} / {count}
+                  {oneOff ? 'Разовое воспроизведение' : `${position} / ${count}`}
                 </Typography>
               )}
             </Stack>
@@ -182,7 +182,7 @@ export function PlayerBar() {
         </Box>
       </Stack>
       {error && <Alert severity={error.includes('повреждена') || error.includes('только в этой вкладке') ? 'warning' : 'error'}
-        action={error.includes('повреждена') ? <Button color="inherit" size="small" onClick={() => { clearGuestQueue(); void store.refresh() }}>Сбросить гостевую очередь</Button> : undefined}>{error}</Alert>}
+        action={audioError ? <Button color="inherit" size="small" disabled={retrying} onClick={retryAudio}>{retrying ? 'Повторяем…' : 'Повторить аудио'}</Button> : error.includes('повреждена') ? <Button color="inherit" size="small" onClick={() => { clearGuestQueue(); void store.refresh() }}>Сбросить гостевую очередь</Button> : undefined}>{error}</Alert>}
     </Box>
     <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
   </>

@@ -320,7 +320,7 @@ function HomeContent() {
           <ContinueListening />
           <Releases block={releases} />
           <Popular />
-          {viewer.user && <ActivityFeed key={viewer.user.id} />}
+          {viewer.user && !viewer.error && <ActivityFeed key={viewer.user.id} />}
         </Stack>
         <Stack spacing={2} sx={{ minWidth: 0 }}>
           <Section title={t('quickAccess')}>
@@ -337,7 +337,7 @@ function HomeContent() {
               </Button>
             </Stack>
           </Section>
-          {viewer.user ? (
+          {viewer.user && !viewer.error ? (
             <Personal key={viewer.user.id} releases={releases} />
           ) : (
             !viewer.loading && (

@@ -30,7 +30,7 @@ function CommentCard({ comment, canDelete, deleting, onDelete }: {
 }
 
 export function CommentsSection({ trackId }: { trackId: string }) {
-  const { user, loading: viewerLoading, error: viewerError } = useViewer()
+  const { user, loading: viewerLoading, error: viewerError, confirmed, isConfirmed } = useViewer()
   const { items, nextCursor, loading, loadingMore, error, loadMore, retry,
     addComment, deleteComment, mutating, mutationError, targetError, retryTarget } = useCommentPages(trackId)
   const [text, setText] = useState('')
@@ -55,19 +55,19 @@ export function CommentsSection({ trackId }: { trackId: string }) {
       ) : user ? (
         <Box component="form" sx={{ mb: 2 }} onSubmit={(event) => {
           event.preventDefault()
-          if (!text.trim() || mutating) return
+          if (!isConfirmed(user?.id ?? null) || !text.trim() || mutating) return
           void addComment({ text, ...(rating ? { rating: Number(rating) } : {}) }).then((success) => {
             if (success) { setText(''); setRating('') }
           })
         }}>
           <Stack spacing={1}>
             <TextField label="Комментарий" multiline minRows={2} required value={text}
-              disabled={mutating} slotProps={{ htmlInput: { maxLength: 5000 } }} onChange={(event) => setText(event.target.value)} />
-            <TextField select label="Оценка (необязательно)" value={rating} disabled={mutating} onChange={(event) => setRating(event.target.value)}>
+              disabled={!confirmed || mutating} slotProps={{ htmlInput: { maxLength: 5000 } }} onChange={(event) => setText(event.target.value)} />
+            <TextField select label="Оценка (необязательно)" value={rating} disabled={!confirmed || mutating} onChange={(event) => setRating(event.target.value)}>
               <MenuItem value="">Без оценки</MenuItem>
               {Array.from({ length: 10 }, (_, index) => <MenuItem key={index + 1} value={String(index + 1)}>{index + 1}/10</MenuItem>)}
             </TextField>
-            <Button type="submit" variant="outlined" disabled={mutating || loading || !text.trim()}>
+            <Button type="submit" variant="outlined" disabled={!confirmed || mutating || loading || !text.trim()}>
               {mutating ? 'Сохраняем…' : 'Отправить комментарий'}
             </Button>
           </Stack>
@@ -103,8 +103,8 @@ export function CommentsSection({ trackId }: { trackId: string }) {
       {items.length > 0 && (
         <Stack spacing={1.5}>
           {items.map((comment) => <CommentCard key={comment._id} comment={comment}
-            canDelete={Boolean(user && (user.role === 'admin' || user.id === comment.authorId))}
-            deleting={mutating} onDelete={() => { void deleteComment(comment._id) }} />)}
+            canDelete={Boolean(confirmed && user && (user.role === 'admin' || user.id === comment.authorId))}
+            deleting={mutating} onDelete={() => { if (isConfirmed(user?.id ?? null)) void deleteComment(comment._id) }} />)}
         </Stack>
       )}
 
