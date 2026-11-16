@@ -2,6 +2,7 @@
 
 import { Button, Stack, TextField, Typography } from '@mui/material'
 import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import type { TrackListPage } from '../types'
 import { useTrackPages } from '../hooks/useTrackPages'
 import { TrackList } from './TrackList'
@@ -9,15 +10,34 @@ import { TrackList } from './TrackList'
 export function TracksCatalogue({ initialPage }: { initialPage: TrackListPage }) {
   const params = useSearchParams()
   const search = params.get('query') ?? ''
+  const [input, setInput] = useState(search)
   const { tracks, nextCursor, loading, error, loadMore } = useTrackPages(initialPage, search)
   const searching = Boolean(search.trim())
+
+  // Keep the field in sync with browser back/forward navigation.
+  useEffect(() => setInput(search), [search])
 
   function updateSearch(value: string) {
     const url = new URL(window.location.href)
     if (value) url.searchParams.set('query', value)
     else url.searchParams.delete('query')
     url.searchParams.delete('cursor')
-    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`
+    if (nextUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(null, '', nextUrl)
+    }
+  }
+
+  // Do not update the URL (and trigger catalogue state changes) on every keystroke.
+  useEffect(() => {
+    if (input === search) return
+    const timer = setTimeout(() => updateSearch(input), 300)
+    return () => clearTimeout(timer)
+  }, [input, search])
+
+  function clearSearch() {
+    setInput('')
+    updateSearch('')
   }
 
   return (
@@ -25,12 +45,12 @@ export function TracksCatalogue({ initialPage }: { initialPage: TrackListPage })
       <TextField
         label="Поиск по названию или исполнителю"
         type="search"
-        value={search}
-        onChange={(event) => updateSearch(event.target.value)}
+        value={input}
+        onChange={(event) => setInput(event.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
         fullWidth
       />
-      {search && <Button onClick={() => updateSearch('')}>Очистить поиск</Button>}
+      {input && <Button onClick={clearSearch}>Очистить поиск</Button>}
       <Typography variant="body2" color="text.secondary">
         При запуске трека в очередь попадут следующие загруженные треки, максимум 100.
       </Typography>
