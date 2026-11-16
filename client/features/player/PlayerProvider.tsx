@@ -14,10 +14,60 @@ import { acquireGuestAudioLease, releaseGuestAudioLease } from './guestAudioLeas
 import { GuestQueueImport } from '@/features/queue/components/GuestQueueImport'
 import { ListenProgress } from './listenProgress'
 import { cacheAudioAhead, prepareAudioCache } from './audioCache'
+type RepeatMode = 'off' | 'all' | 'one'
+type PlayerSettings = { volume: number; muted: boolean; repeat: RepeatMode; shuffle: boolean }
+const DEFAULT_SETTINGS: PlayerSettings = { volume: 1, muted: false, repeat: 'off', shuffle: false }
+function settingsKey(identity: string) { return `gurach:player-settings:${identity}` }
+function readSettings(identity: string): PlayerSettings {
+  try {
+    const value = JSON.parse(localStorage.getItem(settingsKey(identity)) ?? 'null')
+    if (value && Number.isFinite(value.volume) && value.volume >= 0 && value.volume <= 1 &&
+      typeof value.muted === 'boolean' && ['off', 'all', 'one'].includes(value.repeat) && typeof value.shuffle === 'boolean') {
+      return { volume: value.volume, muted: value.muted, repeat: value.repeat, shuffle: value.shuffle }
+    }
+  } catch { /* Settings are optional when storage is unavailable. */ }
+  return DEFAULT_SETTINGS
+}
+function shuffled(ids: string[]) {
+  const result = [...ids]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+function usePlayerSettings(identity: string, enabled: boolean) {
+  const [settingsState, setSettingsState] = useState<{ identity: string; value: PlayerSettings } | null>(null)
+  const settings = useMemo(() => settingsState?.identity === identity ? settingsState.value : DEFAULT_SETTINGS, [settingsState, identity])
+  useEffect(() => {
+    if (!enabled || identity === 'loading') return
+    const timer = window.setTimeout(() => setSettingsState((old) => old?.identity === identity ? old : { identity, value: readSettings(identity) }), 0)
+    return () => window.clearTimeout(timer)
+  }, [enabled, identity])
+  useEffect(() => {
+    if (!enabled || identity === 'loading' || settingsState?.identity !== identity) return
+    try { localStorage.setItem(settingsKey(identity), JSON.stringify(settingsState.value)) } catch { /* Optional settings. */ }
+  }, [enabled, identity, settingsState])
+  const updateSettings = useCallback((update: (value: PlayerSettings) => PlayerSettings) => {
+    if (!enabled || identity === 'loading') return
+    setSettingsState((old) => ({ identity, value: update(old?.identity === identity ? old.value : readSettings(identity)) }))
+  }, [enabled, identity])
+  const setVolume = useCallback((value: number) => {
+    if (Number.isFinite(value)) updateSettings((old) => ({ ...old, volume: Math.min(1, Math.max(0, value)) }))
+  }, [updateSettings])
+  const toggleMute = useCallback(() => updateSettings((old) => ({ ...old, muted: !old.muted })), [updateSettings])
+  const cycleRepeat = useCallback(() => updateSettings((old) => ({ ...old, repeat: old.repeat === 'off' ? 'all' : old.repeat === 'all' ? 'one' : 'off' })), [updateSettings])
+  const toggleShuffle = useCallback(() => {
+    updateSettings((old) => ({ ...old, shuffle: !old.shuffle }))
+  }, [updateSettings])
+  return { ...settings, setVolume, toggleMute, cycleRepeat, toggleShuffle }
+}
 interface Transport {
   current: PlayableTrack | null; queue: PlayableTrack[]; playing: boolean
   selectedEntryId: string | null; position: number; count: number; pending: boolean; error: string | null
   audioError: string | null; retrying: boolean; retryAudio: () => void; oneOff: boolean
+  volume: number; muted: boolean; repeat: RepeatMode; shuffle: boolean
+  setVolume: (volume: number) => void; toggleMute: () => void; cycleRepeat: () => void; toggleShuffle: () => void
   play: (track: PlayableTrack) => void
   selectEntry: (id: string) => void; restore: (id: string, time: number) => void
   toggle: () => void; next: () => void; prev: () => void; seek: (time: number) => void
@@ -75,6 +125,28 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
   const [playing, setPlaying] = useState(false)
   const [transportError, setTransportError] = useState<string | null>(null)
   const [progress, setProgress] = useState({ currentTime: 0, duration: 0 })
+  const { volume, muted, repeat, shuffle, setVolume, toggleMute, cycleRepeat, toggleShuffle } = usePlayerSettings(identity, enabled)
+  const shuffleOrder = useRef<{ identity: string; ids: string[] } | null>(null)
+  useEffect(() => {
+    const audio = audioRef.current
+    if (audio) { audio.volume = volume; audio.muted = muted }
+  }, [volume, muted])
+  // Keep a separate occurrence order; queue mutations and tab synchronization remain canonical.
+  const traversal = useCallback(() => {
+    const snapshot = store.getSnapshot(), ids = snapshot.canonical.entries.map((entry) => entry.entryId)
+    if (!shuffle) { shuffleOrder.current = null; return ids }
+    const previous = shuffleOrder.current?.identity === identity ? shuffleOrder.current.ids : null
+    const retained = previous?.filter((id) => ids.includes(id)) ?? []
+    const added = shuffled(ids.filter((id) => !retained.includes(id)))
+    const order = [...retained, ...added]
+    if (!previous && snapshot.selectedEntryId && order.includes(snapshot.selectedEntryId)) {
+      order.splice(order.indexOf(snapshot.selectedEntryId), 1)
+      order.unshift(snapshot.selectedEntryId)
+    }
+    shuffleOrder.current = { identity, ids: order }
+    return order
+  }, [identity, shuffle, store])
+  useEffect(() => { traversal() }, [traversal, state.canonical.entries])
   const recordListen = useRecordListen()
   const selected = state.canonical.entries.find((entry) => entry.entryId === state.selectedEntryId)
   const current = oneOffEntry?.track ?? (selected?.availability === 'playable' ? selected.track : null)
@@ -168,11 +240,15 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
       else { intent.current = null; if (identity === 'guest' && audio?.paused) releaseGuestAudioLease() }
     })()
   }, [enabled, identity, store, resumeCurrent])
+  const pause = useCallback(() => {
+    actionEpoch.current++; retryInFlight.current = false; setRetrying(false)
+    audioRef.current?.pause()
+    if (identity === 'guest') releaseGuestAudioLease()
+  }, [identity])
   const toggle = useCallback(() => {
-    const audio = audioRef.current
-    if (audio && !audio.paused) { actionEpoch.current++; retryInFlight.current = false; setRetrying(false); audio.pause(); if (identity === 'guest') releaseGuestAudioLease() }
+    if (audioRef.current && !audioRef.current.paused) pause()
     else void resumeCurrent()
-  }, [identity, resumeCurrent])
+  }, [pause, resumeCurrent])
   const play = useCallback((track: PlayableTrack) => {
     if (!enabled || !track.audio) return
     if (oneOffEntry?.trackId === track._id) { toggle(); return }
@@ -205,16 +281,31 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
       setOneOffEntry(entry); setFullQueueEntry(null)
     })()
   }, [enabled, fullQueueEntry, identity])
+  const restart = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio || !source.current) return
+    audio.currentTime = 0
+    void resumeCurrent()
+  }, [resumeCurrent])
   const step = useCallback((delta: number) => {
     if (oneOffEntry) { audioRef.current?.pause(); if (identity === 'guest') releaseGuestAudioLease(); return }
-    const snapshot = store.getSnapshot(), entries = snapshot.canonical.entries
-    const index = entries.findIndex((entry) => entry.entryId === snapshot.selectedEntryId)
+    const snapshot = store.getSnapshot(), order = traversal()
+    if (snapshot.status === 'pending') return
+    const index = order.indexOf(snapshot.selectedEntryId ?? '')
     if (index < 0) return
-    for (let i = index + delta; i >= 0 && i < entries.length; i += delta) {
-      if (entries[i].availability === 'playable' && entries[i].track?.audio) { selectEntry(entries[i].entryId); return }
+    const entries = new Map(snapshot.canonical.entries.map((entry) => [entry.entryId, entry]))
+    for (let offset = 1; offset <= order.length; offset++) {
+      const candidate = index + offset * delta
+      if (repeat !== 'all' && (candidate < 0 || candidate >= order.length)) break
+      const entry = entries.get(order[(candidate + order.length) % order.length])
+      if (entry?.availability === 'playable' && entry.track?.audio) {
+        if (entry.entryId === source.current) restart()
+        else selectEntry(entry.entryId)
+        return
+      }
     }
     audioRef.current?.pause(); if (identity === 'guest') releaseGuestAudioLease()
-  }, [identity, store, selectEntry, oneOffEntry])
+  }, [identity, store, selectEntry, oneOffEntry, traversal, repeat, restart])
   const next = useCallback(() => step(1), [step])
   const prev = useCallback(() => { if ((audioRef.current?.currentTime ?? 0) > 3) audioRef.current!.currentTime = 0; else step(-1) }, [step])
   const seek = useCallback((time: number) => { const audio = audioRef.current; if (audio && Number.isFinite(time) && Number.isFinite(audio.duration)) audio.currentTime = Math.min(Math.max(0, time), audio.duration) }, [])
@@ -222,6 +313,57 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     setOneOffEntry(null); audioRef.current?.pause(); intent.current = false; savedTime.current = Number.isFinite(time) ? Math.max(0, time) : 0
     if (!store.select(id)) { intent.current = null; savedTime.current = null }
   }, [store])
+  useEffect(() => {
+    if (!enabled || !current?.audio || !playbackEntryId || !('mediaSession' in navigator) || !navigator.mediaSession) return
+    const media = navigator.mediaSession
+    if (!media || typeof media.setActionHandler !== 'function') return
+    const audio = audioRef.current
+    if (typeof MediaMetadata !== 'undefined') {
+      try {
+        media.metadata = new MediaMetadata({ title: current.name, artist: current.artist ?? '',
+          artwork: current.picture ? [{ src: new URL(current.picture, window.location.href).href }] : [] })
+      } catch { media.metadata = null }
+    }
+    media.playbackState = audio?.paused ? 'paused' : 'playing'
+    try {
+      if (audio && Number.isFinite(audio.duration) && audio.duration > 0) media.setPositionState?.({
+        duration: audio.duration, position: Math.min(Math.max(0, audio.currentTime), audio.duration), playbackRate: audio.playbackRate,
+      })
+    } catch { /* Optional position reporting. */ }
+    const handlers: Partial<Record<MediaSessionAction, MediaSessionActionHandler>> = {
+      play: () => { void resumeCurrent() },
+      pause,
+      previoustrack: prev,
+      nexttrack: next,
+      seekto: (details) => { if (details.seekTime !== undefined) seek(details.seekTime) },
+      seekbackward: (details) => seek((audio?.currentTime ?? 0) - (details.seekOffset ?? 10)),
+      seekforward: (details) => seek((audio?.currentTime ?? 0) + (details.seekOffset ?? 10)),
+      stop: () => { pause(); seek(0) },
+    }
+    for (const [action, handler] of Object.entries(handlers)) {
+      try { media.setActionHandler(action as MediaSessionAction, handler) } catch { /* Individual actions may be unsupported. */ }
+    }
+    return () => {
+      for (const action of Object.keys(handlers)) {
+        try { media.setActionHandler(action as MediaSessionAction, null) } catch { /* Unsupported action. */ }
+      }
+      media.metadata = null
+      media.playbackState = 'none'
+      try { media.setPositionState?.() } catch { /* Optional position reporting. */ }
+    }
+  }, [enabled, identity, playbackEntryId, current?.audio, current?.name, current?.artist, current?.picture, resumeCurrent, pause, next, prev, seek])
+  useEffect(() => {
+    if (!enabled || !current?.audio || !('mediaSession' in navigator) || !navigator.mediaSession || typeof navigator.mediaSession.setActionHandler !== 'function') return
+    const media = navigator.mediaSession
+    media.playbackState = playing ? 'playing' : 'paused'
+    try {
+      if (progress.duration > 0) media.setPositionState?.({
+        duration: progress.duration, position: Math.min(Math.max(0, progress.currentTime), progress.duration),
+        playbackRate: audioRef.current?.playbackRate || 1,
+      })
+      else media.setPositionState?.()
+    } catch { /* Position state is optional and may reject an unknown duration. */ }
+  }, [enabled, identity, playbackEntryId, current?.audio, playing, progress])
   useEffect(() => {
     if (!enabled || state.status !== 'ready' || identity === 'loading' || restoredIdentity.current === identity) return
     if (identity === 'guest' && !guestQueuePersistenceAvailable()) return
@@ -262,7 +404,8 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     selectedEntryId: playbackEntryId, position: oneOffEntry ? 0 : state.canonical.entries.findIndex((entry) => entry.entryId === state.selectedEntryId) + 1,
     count: state.canonical.entries.length, pending: state.status === 'pending' || state.status === 'loading', error: audioError ?? transportError ?? (viewer.error ? 'Сессия временно не подтверждена. Текущий звук сохранён; новые приватные операции недоступны.' : null) ?? storageWarning ?? state.error,
     audioError, retryAudio, retrying, oneOff: Boolean(oneOffEntry),
-    play, selectEntry, restore, toggle, next, prev, seek }), [current, state, playing, playbackEntryId, oneOffEntry, audioError, retryAudio, retrying, transportError, viewer.error, storageWarning, play, selectEntry, restore, toggle, next, prev, seek])
+    volume, muted, repeat, shuffle, setVolume, toggleMute, cycleRepeat, toggleShuffle,
+    play, selectEntry, restore, toggle, next, prev, seek }), [current, state, playing, playbackEntryId, oneOffEntry, audioError, retryAudio, retrying, transportError, viewer.error, storageWarning, volume, muted, repeat, shuffle, setVolume, toggleMute, cycleRepeat, toggleShuffle, play, selectEntry, restore, toggle, next, prev, seek])
   function collectListen() {
     const audio = audioRef.current
     if (!audio || !current || !enabled || !advancing.current || audio.seeking || source.current !== playbackEntryId) return
@@ -299,7 +442,7 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
       setAudioError(code === 3 || code === 4 ? 'Не удалось декодировать аудио или формат недоступен. Нажмите «Повторить аудио» или выберите другой трек.' : 'Не удалось загрузить аудио. Проверьте соединение и нажмите «Повторить аудио».')
       if (identity === 'guest') releaseGuestAudioLease()
     }}
-    onEnded={() => { suspendListen(); setPlaying(false); session.current++; listenProgress.current = new ListenProgress(); playbackId.current = null; if (!oneOffEntry) next(); else if (identity === 'guest') releaseGuestAudioLease() }}
+    onEnded={() => { suspendListen(); setPlaying(false); session.current++; listenProgress.current = new ListenProgress(); playbackId.current = null; if (repeat === 'one' || (oneOffEntry && repeat === 'all')) restart(); else if (!oneOffEntry) next(); else if (identity === 'guest') releaseGuestAudioLease() }}
     onEmptied={() => setProgress({ currentTime: 0, duration: 0 })}
     onTimeUpdate={() => { collectListen(); if (!audioRef.current?.paused) warmAudio(); setProgress((old) => ({ ...old, currentTime: audioRef.current?.currentTime ?? 0 })) }}
     onLoadedMetadata={() => { const audio = audioRef.current!; if (savedTime.current !== null && Number.isFinite(audio.duration)) { audio.currentTime = Math.min(savedTime.current, audio.duration); savedTime.current = null }; warmAudio(true); setProgress({ currentTime: audio.currentTime, duration: Number.isFinite(audio.duration) ? audio.duration : 0 }) }} />

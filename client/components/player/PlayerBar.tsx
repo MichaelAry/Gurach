@@ -2,6 +2,11 @@
 import { FavoriteButton } from '@/features/favorites/FavoriteButton'
 import { useEffect, useRef, useState } from 'react'
 
+import VolumeUpRounded from '@mui/icons-material/VolumeUpRounded'
+import VolumeOffRounded from '@mui/icons-material/VolumeOffRounded'
+import RepeatRounded from '@mui/icons-material/RepeatRounded'
+import RepeatOneRounded from '@mui/icons-material/RepeatOneRounded'
+import ShuffleRounded from '@mui/icons-material/ShuffleRounded'
 import PauseRounded from '@mui/icons-material/PauseRounded'
 import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded'
 import SkipNextRounded from '@mui/icons-material/SkipNextRounded'
@@ -42,11 +47,12 @@ export function PlayerBar() {
 
   const [queueOpen, setQueueOpen] = useState(false)
   const store = useQueueStore()
-  const { current, position, count, error, audioError, retryAudio, retrying, oneOff, playing, currentTime, duration, toggle, next, prev, seek } =
+  const { current, position, count, error, audioError, retryAudio, retrying, oneOff, playing, currentTime, duration, toggle, next, prev, seek, volume, muted, repeat, shuffle, setVolume, toggleMute, cycleRepeat, toggleShuffle } =
     usePlayer()
 
   const hasTrack = Boolean(current?._id)
   const cover = current?.picture
+  const repeatLabel = repeat === 'off' ? 'Повтор выключен' : repeat === 'all' ? 'Повтор всей очереди' : 'Повтор одного трека'
 
   return <>
     <Box
@@ -69,9 +75,9 @@ export function PlayerBar() {
     >
       <Stack
         direction="row"
-        sx={{ flexWrap: { xs: 'wrap', sm: 'nowrap' }, width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: { xs: 1, sm: 2 } }}
+        sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: { xs: 1, md: 2 } }}
       >
-        <Stack direction="row" spacing={1.5} sx={{ flex: { xs: '1 1 calc(100% - 150px)', sm: '1 1 0' }, minWidth: 0, alignItems: 'center' }}>
+        <Stack direction="row" spacing={1.5} sx={{ flex: { xs: '1 1 100%', md: '1 1 0' }, minWidth: 0, alignItems: 'center' }}>
           {/* Обложка / заглушка */}
           <Box
             sx={{
@@ -119,14 +125,17 @@ export function PlayerBar() {
           </Box>
         </Stack>
 
-        <Stack spacing={0.5} sx={{ order: { xs: 3, sm: 0 }, width: { xs: '100%', sm: '46%' }, maxWidth: { sm: 560 }, flexShrink: 0, alignItems: 'center' }}>
+        <Stack spacing={0.5} sx={{ order: { xs: 3, md: 0 }, width: { xs: '100%', md: '46%' }, maxWidth: { md: 560 }, flexShrink: 0, alignItems: 'center' }}>
           {/* Управление */}
           <Stack
             direction="row"
             spacing={0.5}
             sx={{ alignItems: 'center', justifyContent: 'center' }}
           >
-            <IconButton size="small" onClick={prev} disabled={!hasTrack} aria-label="Предыдущий">
+            <IconButton size="small" onClick={toggleShuffle} aria-label="Перемешать порядок воспроизведения" aria-pressed={shuffle} color={shuffle ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
+              <ShuffleRounded />
+            </IconButton>
+            <IconButton size="small" onClick={prev} sx={{ minWidth: 44, minHeight: 44 }} disabled={!hasTrack} aria-label="Предыдущий">
               <SkipPreviousRounded />
             </IconButton>
             <IconButton
@@ -134,6 +143,7 @@ export function PlayerBar() {
               disabled={!hasTrack || !current?.audio}
               aria-label={playing ? 'Пауза' : 'Играть'}
               sx={{
+                minWidth: 44, minHeight: 44,
                 bgcolor: 'primary.main',
                 color: 'primary.contrastText',
                 '&:hover': { bgcolor: 'primary.dark' },
@@ -142,8 +152,11 @@ export function PlayerBar() {
             >
               {playing ? <PauseRounded /> : <PlayArrowRounded />}
             </IconButton>
-            <IconButton size="small" onClick={next} disabled={!hasTrack} aria-label="Следующий">
+            <IconButton size="small" onClick={next} sx={{ minWidth: 44, minHeight: 44 }} disabled={!hasTrack} aria-label="Следующий">
               <SkipNextRounded />
+            </IconButton>
+            <IconButton size="small" onClick={cycleRepeat} aria-label={`${repeatLabel}. Переключить режим повтора`} title={repeatLabel} aria-pressed={repeat !== 'off'} color={repeat !== 'off' ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
+              {repeat === 'one' ? <RepeatOneRounded /> : <RepeatRounded />}
             </IconButton>
           </Stack>
 
@@ -176,9 +189,16 @@ export function PlayerBar() {
           </Stack>
         </Stack>
 
-        <Box sx={{ flex: { xs: '0 1 auto', sm: '1 1 0' }, minWidth: 0, flexWrap: 'wrap', display: 'flex', justifyContent: 'flex-end' }}>
+        <Box sx={{ order: { xs: 4, md: 0 }, flex: { xs: '1 1 100%', md: '0 1 280px' }, minWidth: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+          <Stack direction="row" spacing={1} sx={{ flex: '1 1 110px', minWidth: 80, maxWidth: 140, mr: 'auto', alignItems: 'center', px: 1 }}>
+            <IconButton onClick={toggleMute} aria-label="Без звука" aria-pressed={muted} title={muted ? 'Включить звук' : 'Выключить звук'} sx={{ minWidth: 44, minHeight: 44 }}>
+              {muted || volume === 0 ? <VolumeOffRounded /> : <VolumeUpRounded />}
+            </IconButton>
+            <Slider size="small" aria-label="Громкость" getAriaValueText={(value) => `${value}%`} value={Math.round(volume * 100)} max={100}
+              onChange={(_event, value) => setVolume(Number(value) / 100)} sx={{ minWidth: 0 }} />
+          </Stack>
           {current && <FavoriteButton trackId={current._id} name={current.name} />}
-          <Button size="small" sx={{ minWidth: 0, overflowWrap: 'anywhere' }} aria-label={`Открыть очередь, ${count} из 100`} onClick={() => setQueueOpen(true)}>Очередь {count}/100</Button>
+          <Button size="small" sx={{ minWidth: 0, whiteSpace: 'nowrap' }} aria-label={`Открыть очередь, ${count} из 100`} onClick={() => setQueueOpen(true)}>Очередь {count}/100</Button>
         </Box>
       </Stack>
       {error && <Alert severity={error.includes('повреждена') || error.includes('только в этой вкладке') ? 'warning' : 'error'}
