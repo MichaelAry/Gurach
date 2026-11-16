@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations, useLocale } from '@/i18n/LocaleProvider'
 import type { components } from '@/lib/api/schema'
 import type { AccountStatistics } from '@/features/account/api'
 import { useViewer } from '@/features/auth/ViewerProvider'
@@ -14,10 +15,11 @@ import { BlockState } from './BlockState'
 import { MusicRows, Section } from './MusicSection'
 import { useHomeBlock } from './useHomeBlock'
 function ContinueListening() {
+  const t = useTranslations('home')
   const player = usePlayer()
   if (!player.current) return null
   return (
-    <Section title="Продолжить прослушивание">
+    <Section title={t('continue')}>
       <MusicRows tracks={[player.current]} />
       <LinearProgress
         aria-label="Прогресс воспроизведения"
@@ -28,7 +30,7 @@ function ContinueListening() {
         sx={{ mt: 1.5 }}
       />
       <Button disabled={player.pending} onClick={player.toggle} sx={{ mt: 1 }}>
-        {player.playing ? 'Пауза' : 'Продолжить'}
+        {player.playing ? t('pause') : t('resume')}
       </Button>
     </Section>
   )
@@ -36,6 +38,7 @@ function ContinueListening() {
 type HomeReleasesPage = components['schemas']['HomeReleasesPage']
 type ReleasesBlock = ReturnType<typeof useHomeBlock<HomeReleasesPage>>
 function Releases({ block }: { block: ReleasesBlock }) {
+  const t = useTranslations('home')
   const [cursor, setCursor] = useState<string | null>(null)
   const [page, setPage] = useState<HomeReleasesPage>({ items: [], nextCursor: null })
   const [loading, setLoading] = useState(false)
@@ -76,11 +79,11 @@ function Releases({ block }: { block: ReleasesBlock }) {
   ]
   const next = cursor ? page.nextCursor : block.data?.nextCursor
   return (
-    <Section title="Новые треки" href="/tracks">
+    <Section title={t('releases')} href="/tracks">
       <BlockState {...block} />
       <MusicRows tracks={tracks} />
       {block.data?.items.length === 0 && (
-        <Typography color="text.secondary">Первые релизы скоро появятся здесь.</Typography>
+        <Typography color="text.secondary">{t('releasesEmpty')}</Typography>
       )}
       <BlockState
         loading={loading}
@@ -99,18 +102,19 @@ function Releases({ block }: { block: ReleasesBlock }) {
             setCursor(next)
           }}
         >
-          Показать ещё
+          {t('more')}
         </Button>
       )}
     </Section>
   )
 }
 function Popular() {
+  const t = useTranslations('home')
   const block = useHomeBlock<components['schemas']['HomePopularResponse']>('/api/home/popular')
   return (
-    <Section title="Популярное за 7 дней">
+    <Section title={t('popular')}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Рейтинг по прослушиваниям вошедших пользователей за последние 7 дней.
+        {t('popularDescription')}
       </Typography>
       <BlockState {...block} />
       {block.data &&
@@ -118,13 +122,15 @@ function Popular() {
           <MusicRows tracks={block.data.items} />
         ) : (
           <Typography color="text.secondary" variant="body2">
-            Пока недостаточно прослушиваний. Откройте новые треки.
+            {t('popularEmpty')}
           </Typography>
         ))}
     </Section>
   )
 }
 function Personal({ releases }: { releases: ReleasesBlock }) {
+  const t = useTranslations('home')
+  const { locale } = useLocale()
   const tracks = releases.data?.items
   const history = useHomeBlock<components['schemas']['AccountHistoryPage']>('/api/account/history?count=30')
   const favorites = useHomeBlock<TrackListPage>('/api/account/favorites?count=30')
@@ -159,7 +165,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
     const date = new Date()
     date.setDate(date.getDate() - 6 + i)
     return {
-      day: date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric' }),
+      day: date.toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
       count:
         history.data?.items.filter(
           (item) => new Date(item.listenedAt).toDateString() === date.toDateString(),
@@ -169,7 +175,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
   return (
     <>
       {showPersonal && (
-        <Section title="Для вас">
+        <Section title={t('forYou')}>
           <BlockState
             loading={personalLoading || (hasPersonalHistory && releases.loading)}
             error={personalError || (hasPersonalHistory && releases.error)}
@@ -182,41 +188,41 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
           {personalReady && hasPersonalHistory && (
             <>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Знакомые исполнители и свежие открытия
+                {t('recommendationDescription')}
               </Typography>
               {recommendations.length > 0 ? (
                 <MusicRows tracks={recommendations} />
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Пока нет подходящих рекомендаций. <Link href="/tracks">Открыть каталог</Link>
+                  {t('recommendationsEmpty')} <Link href="/tracks">{t('catalog')}</Link>
                 </Typography>
               )}
             </>
           )}
         </Section>
       )}
-      <Section title="Ваша музыка" href="/account">
+      <Section title={t('yourMusic')} href="/account">
         <BlockState {...stats} />
         {stats.data && stats.data.totalListens > 0 ? (
           <Stack spacing={1}>
             <Typography>
-              {stats.data.totalListens} прослушиваний · {stats.data.uniqueTracks} композиций
+              {stats.data.totalListens} {t('listens')} · {stats.data.uniqueTracks} {t('tracks')}
             </Typography>
             {artists.length > 0 && (
-              <Typography variant="body2">Недавние исполнители: {artists.join(', ')}</Typography>
+              <Typography variant="body2">{t('recentArtists')}: {artists.join(', ')}</Typography>
             )}
             {history.data && (
               <Typography variant="body2" color="text.secondary">
                 {week.some((day) => day.count > 0)
-                  ? <>Прослушивания за последние 7 дней (по выборке из 30 последних):{' '}
+                  ? <>{t('weekSample')}:{' '}
                       {week.map((day) => `${day.day}: ${day.count}`).join(' · ')}
                     </>
-                  : 'Среди 30 последних прослушиваний нет событий за последние 7 дней.'}
+                  : t('weekEmpty')}
               </Typography>
             )}
             {history.data && history.data.items.length === 0 && (
               <Typography variant="body2" color="text.secondary">
-                История прослушиваний пока пуста. <Link href="/tracks">Выбрать трек</Link>
+                {t('historyEmpty')} <Link href="/tracks">{t('catalog')}</Link>
               </Typography>
             )}
             {history.data && history.data.items.length > 0 && (
@@ -239,7 +245,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
           )
         )}
       </Section>
-      <Section title="Друзья" href="/friends">
+      <Section title={t('friends')} href="/friends">
         <BlockState {...friends} />
         {friends.data?.items.map((friend) => (
           <Button
@@ -253,7 +259,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
         ))}
         {friends.data?.items.length === 0 && (
           <Typography variant="body2" color="text.secondary">
-            Откройте музыку вместе. <Link href="/friends">Найти друзей</Link>
+            {t('friendsEmpty')} <Link href="/friends">{t('findFriends')}</Link>
           </Typography>
         )}
       </Section>
@@ -274,6 +280,7 @@ export default function HomePage() {
   return <HomeContent />
 }
 function HomeContent() {
+  const t = useTranslations('home')
   const viewer = useViewer(),
     releases = useHomeBlock<HomeReleasesPage>('/api/home/releases')
   const [queueOpen, setQueueOpen] = useState(false)
@@ -288,15 +295,15 @@ function HomeContent() {
       }}
     >
       <Typography variant="overline" color="text.secondary">
-        GURACH / МУЗЫКА РЯДОМ
+        GURACH / MUSIC
       </Typography>
       <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
-        Музыка на сегодня
+        {t('hero')}
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
         {viewer.user
-          ? `${viewer.user.displayName}, откройте что-нибудь новое.`
-          : 'Новые звуки, любимые исполнители и люди с похожим вкусом.'}
+          ? `${viewer.user.displayName}, ${t('greeting')}`
+          : t('tagline')}
       </Typography>
       <Box
         sx={{
@@ -316,17 +323,17 @@ function HomeContent() {
           {viewer.user && <ActivityFeed key={viewer.user.id} />}
         </Stack>
         <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <Section title="Быстрый доступ">
+          <Section title={t('quickAccess')}>
             <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }}>
               <Button component={Link} href="/tracks">
-                Каталог
+                {t('catalog')}
               </Button>
               <Button component={Link} href="/favorites">
-                Избранное
+                {t('favorites')}
               </Button>
-              <Button onClick={() => setQueueOpen(true)}>Очередь</Button>
+              <Button onClick={() => setQueueOpen(true)}>{t('queue')}</Button>
               <Button component={Link} href="/upload">
-                Загрузить трек
+                {t('upload')}
               </Button>
             </Stack>
           </Section>
@@ -334,12 +341,12 @@ function HomeContent() {
             <Personal key={viewer.user.id} releases={releases} />
           ) : (
             !viewer.loading && (
-              <Section title="Ваша музыкальная история">
+              <Section title={t('guestTitle')}>
                 <Typography variant="body2" color="text.secondary">
-                  Войдите, чтобы сохранять музыку и находить друзей.
+                  {t('guestDescription')}
                 </Typography>
                 <Button component={Link} href="/login" sx={{ mt: 1 }}>
-                  Войти
+                  {t('signIn')}
                 </Button>
               </Section>
             )

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from '@/i18n/LocaleProvider'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { IconButton } from '@mui/material'
 import { usePathname, useRouter } from 'next/navigation'
@@ -9,6 +10,7 @@ type Props = {
 }
 
 export function BackButton({ fallback = '/tracks' }: Props) {
+  const t = useTranslations('navigation')
   const router = useRouter()
   const pathname = usePathname()
 

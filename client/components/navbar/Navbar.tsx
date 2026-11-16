@@ -5,16 +5,18 @@ import { usePathname } from 'next/navigation'
 import { Suspense } from 'react'
 import { NavbarItem } from './NavbarItem'
 import { trackStructure } from './trackStructure'
+import { useTranslations } from '@/i18n/LocaleProvider'
 
 function NavigationLinks() {
   const pathname = usePathname()
+  const t = useTranslations('navigation')
 
   return trackStructure
     .filter((item) => item.isAnchor)
     .map((item) => (
       <NavbarItem
         key={item.id}
-        item={item}
+        item={{ ...item, label: item.href === '/' ? t('main') : item.href === '/tracks' ? t('tracks') : item.href === '/favorites' ? t('favorites') : item.href === '/friends' ? t('friends') : item.label }}
         active={
           pathname === item.href ||
           (item.href !== '/' && !!item.href && pathname.startsWith(`${item.href}/`))
@@ -23,10 +25,11 @@ function NavigationLinks() {
     ))
 }
 
-export const Navbar = () => (
-  <Paper
+export const Navbar = () => {
+  const t = useTranslations('navigation')
+  return <Paper
     component="nav"
-    aria-label="Основная навигация"
+    aria-label={t('main')}
     variant="outlined"
     sx={{
       display: 'flex',
@@ -40,6 +43,6 @@ export const Navbar = () => (
       <NavigationLinks />
     </Suspense>
   </Paper>
-)
+}
 
 export default Navbar
