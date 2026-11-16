@@ -18,19 +18,99 @@ const appUser = 'gurach_test_app';
 const appPassword = randomBytes(36).toString('base64url');
 let tempRoot;
 let created = false;
+let startAttempted = false;
+
+let stage = 'container-start';
+
+// Only emit known messages/codes. Raw Docker/Mongo output can contain credentials,
+// connection strings, or key material (including in nested log attributes).
+function diagnostics(result) {
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  const known = [
+    'AuthenticationFailed', 'Unauthorized', 'NotYetInitialized',
+    'NoReplicationEnabled', 'AlreadyInitialized', 'InvalidReplicaSetConfig',
+    'ECONNREFUSED', 'ENOTFOUND', 'Permission denied', 'Operation not permitted',
+    'No such file or directory', 'invalid char in key file',
+    'security key in YAML file is invalid', 'Unable to acquire security key',
+    'Cannot connect to the Docker daemon', 'OOM',
+  ];
+  const messages = known.filter((message) => output.includes(message));
+  if (['ENOENT', 'EACCES', 'ETIMEDOUT', 'ENOBUFS'].includes(result.error?.code)) {
+    messages.push(result.error.code);
+  }
+  // These are emitted by our probe/entrypoint, never arbitrary server text.
+  messages.push(...(output.match(/gurach-mongo stage=[a-z-]+ exit=\d+/g) ?? []));
+  messages.push(...(output.match(/mongo-code=\d+/g) ?? []));
+  for (const line of output.split('\n')) {
+    try {
+      const log = JSON.parse(line);
+      if (['E', 'F', 'W'].includes(log.s) && Number.isInteger(log.id)) {
+        messages.push(`mongod severity=${log.s} id=${log.id}`);
+      }
+    } catch { /* Ignore non-JSON lines rather than exposing raw logs. */ }
+  }
+  return `exit=${result.status ?? 'unavailable'}${result.signal ? ` signal=${result.signal}` : ''}; ${messages.join(', ') || 'no allowlisted message'}`;
+}
+
+function invoke(args) {
+  return spawnSync('docker', args, {
+    cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 10_000,
+  });
+}
 
 function docker(args, { capture = false } = {}) {
+  // Pull/start can exceed the short probe timeout, especially on a cold CI host.
   const result = spawnSync('docker', args, {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
   });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`docker ${args[0]} failed with status ${result.status ?? 'unknown'}`);
+  if (result.error || result.status !== 0) {
+    throw new Error(`[${stage}] docker ${args[0]}: ${diagnostics(result)}`);
   }
   return capture ? result.stdout.trim() : '';
 }
+
+function checkRunning() {
+  const state = docker(['inspect', '--format', '{{json .State}}', containerName], { capture: true });
+  const { Running, ExitCode, OOMKilled } = JSON.parse(state);
+  if (!Running) throw new Error(`[${stage}] container stopped: exit=${ExitCode}; OOMKilled=${OOMKilled}`);
+}
+
+async function waitFor(nextStage, args) {
+  stage = nextStage;
+  console.log(`[mongo] ${stage}`);
+  let last;
+  while (Date.now() < bootstrapDeadline) {
+    checkRunning();
+    last = invoke(args);
+    if (last.status === 0) return;
+    // Only explicitly transient probe results are retried.
+    if (last.error || ![22, 23].includes(last.status)) {
+      throw new Error(`[${stage}] ${diagnostics(last)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`[${stage}] bootstrap deadline (90 seconds): ${diagnostics(last ?? {})}`);
+}
+
+const auth = `
+  const a=db.getSiblingDB('admin');
+  const auth=a.auth(process.env.MONGO_INITDB_ROOT_USERNAME,process.env.MONGO_INITDB_ROOT_PASSWORD);
+  if(auth!==1&&auth?.ok!==1)quit(21);
+`;
+function mongoProbe(script) {
+  return ['exec', containerName, 'mongosh', '--quiet', '--host', '127.0.0.1', '--port', '27017', '--eval', `
+    try { ${auth} ${script} }
+    catch(e) {
+      if(Number.isInteger(e.code))print('mongo-code='+e.code);
+      const names=['AuthenticationFailed','Unauthorized','NotYetInitialized','NoReplicationEnabled','AlreadyInitialized','InvalidReplicaSetConfig'];
+      if(names.includes(e.codeName))print(e.codeName);
+      if(e.name==='MongoNetworkError'){ print('ECONNREFUSED'); quit(23); }
+      quit(24);
+    }
+  `];
+}
+let bootstrapDeadline;
 
 try {
   const collision = spawnSync('docker', ['inspect', containerName], { stdio: 'ignore' });
@@ -53,6 +133,8 @@ try {
   await chmod(envFile, 0o600);
   await chmod(keyFile, 0o600);
 
+  console.log('[mongo] container-start');
+  startAttempted = true;
   docker([
     'run', '-d', '--name', containerName, '--label', label,
     '--env-file', envFile,
@@ -70,27 +152,34 @@ try {
   if (!match) throw new Error('Disposable Mongo did not bind to a loopback host port');
   const port = match[1];
 
-  const deadline = Date.now() + 90_000;
-  let ready = false;
-  const bootstrap = `
-    const a=db.getSiblingDB('admin');
-    const auth=a.auth(process.env.MONGO_INITDB_ROOT_USERNAME,process.env.MONGO_INITDB_ROOT_PASSWORD);
-    if(auth!==1&&auth?.ok!==1)quit(21);
-    try { const s=rs.status(); if(s.set==='rs0'&&s.myState===1)quit(0); }
-    catch(e) { if(e.code===94||e.codeName==='NotYetInitialized') rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}); else throw e; }
-    quit(22);
-  `;
-  while (Date.now() < deadline) {
-    const probe = spawnSync('docker', [
-      'exec', containerName, 'mongosh', '--quiet', '--eval', bootstrap,
-    ], { stdio: 'ignore' });
-    if (probe.status === 0) {
-      ready = true;
-      break;
+  bootstrapDeadline = Date.now() + 90_000;
+  checkRunning();
+  await waitFor('keyfile', ['exec', containerName, 'bash', '-c', `
+    test -s /tmp/mongo-keyfile || exit 22
+    test "$(stat -c '%U:%G:%a' /tmp/mongo-keyfile)" = mongodb:mongodb:400 || exit 25
+    gosu mongodb test -r /tmp/mongo-keyfile || exit 26
+  `]);
+  // The official entrypoint runs a temporary standalone mongod for initdb.
+  // PID 1 becomes mongod only AFTER init scripts and its shutdown finish.
+  await waitFor('init-complete', ['exec', containerName, 'bash', '-c', `
+    test "$(cat /proc/1/comm)" = mongod || exit 22
+  `]);
+  await waitFor('mongosh-auth', mongoProbe('quit(0);'));
+  await waitFor('rs-initiate', mongoProbe(`
+    try { const s=rs.status(); if(s.set!=='rs0')quit(27); }
+    catch(e) {
+      if(e.code!==94)throw e;
+      const result=rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]});
+      if(result.ok!==1)quit(28);
     }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  if (!ready) throw new Error('Authenticated replica set did not become primary within 90 seconds');
+    quit(0);
+  `));
+  await waitFor('primary', mongoProbe(`
+    const s=rs.status();
+    if(s.set!=='rs0')quit(27);
+    quit(s.myState===1 ? 0 : 22);
+  `));
+  console.log('[mongo] authenticated rs0 primary ready');
 
   const uri = new URL(`mongodb://${encodeURIComponent(appUser)}:${encodeURIComponent(appPassword)}@127.0.0.1:${port}/${databaseName}`);
   uri.searchParams.set('authSource', databaseName);
@@ -120,7 +209,20 @@ try {
   });
   if (integration.error) throw integration.error;
   if (integration.status !== 0) process.exitCode = integration.status ?? 1;
+} catch (error) {
+  // A failed docker run may still have created a stopped container.
+  if (startAttempted && !created) {
+    const ownership = invoke(['inspect', '--format', '{{ index .Config.Labels "gurach.test-run" }}', containerName]);
+    created = ownership.status === 0 && ownership.stdout.trim() === token;
+  }
+  console.error(error.message);
+  if (created) {
+    const logs = invoke(['logs', '--tail', '100', containerName]);
+    console.error(`[${stage}] filtered container logs: ${diagnostics(logs)}`);
+  }
+  process.exitCode = 1;
 } finally {
+  stage = 'cleanup';
   if (created) {
     const actualLabel = docker([
       'inspect', '--format', '{{ index .Config.Labels "gurach.test-run" }}', containerName,
