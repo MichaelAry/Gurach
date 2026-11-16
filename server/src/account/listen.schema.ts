@@ -27,3 +27,8 @@ AccountListenSchema.index(
   { listenedAt: -1, trackId: 1 },
   { name: 'listen_week_tracks' },
 );
+
+AccountListenSchema.index(
+  { userId: 1, listenedAt: -1, _id: -1 },
+  { name: 'home_listen_signal' },
+);

@@ -56,6 +56,10 @@ export class Track {
   @Prop({ type: Types.ObjectId })
   ownerId?: Types.ObjectId;
 
+  /** Publication time; legacy rows fall back to their ObjectId timestamp. */
+  @Prop({ type: Date })
+  publishedAt?: Date;
+
   @Prop()
   duration?: number;
 

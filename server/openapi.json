@@ -436,6 +436,7 @@
             "type": "string"
           },
           "at": {
+            "description": "Publication/comment creation time; legacy rows fall back to the ObjectId timestamp.",
             "format": "date-time",
             "type": "string"
           },
@@ -491,6 +492,31 @@
         "required": [
           "username",
           "displayName"
+        ],
+        "type": "object"
+      },
+      "HomeDiscoveryResponse": {
+        "properties": {
+          "basis": {
+            "description": "Artists from the last 30 listens and 30 favorites, or an explicit catalogue fallback.",
+            "enum": [
+              "artists",
+              "no-signal",
+              "no-matches"
+            ],
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackListItem"
+            },
+            "maxItems": 6,
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "basis"
         ],
         "type": "object"
       },
@@ -3190,6 +3216,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HomeActivityPage"
+                }
+              }
+            },
+            "description": "",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "enum": [
+                    "private, no-store"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "home"
+        ]
+      }
+    },
+    "/home/discovery": {
+      "get": {
+        "operationId": "HomeController_discovery",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeDiscoveryResponse"
                 }
               }
             },

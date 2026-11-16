@@ -22,10 +22,18 @@ export class HomeActivityItem {
   @ApiProperty({ enum: ['upload', 'comment', 'rating'] })
   action: 'upload' | 'comment' | 'rating';
   @ApiProperty({ type: TrackListItem }) track: TrackListItem;
-  @ApiProperty({ format: 'date-time' }) at: string;
+  @ApiProperty({ format: 'date-time', description: 'Publication/comment creation time; legacy rows fall back to the ObjectId timestamp.' }) at: string;
 }
 
 export class HomeActivityPage extends CursorPage<HomeActivityItem> {
   @ApiProperty({ type: [HomeActivityItem], maxItems: 20 })
   declare items: HomeActivityItem[];
+}
+
+export class HomeDiscoveryResponse {
+  @ApiProperty({ type: [TrackListItem], maxItems: 6 })
+  items: TrackListItem[];
+
+  @ApiProperty({ enum: ['artists', 'no-signal', 'no-matches'], description: 'Artists from the last 30 listens and 30 favorites, or an explicit catalogue fallback.' })
+  basis: 'artists' | 'no-signal' | 'no-matches';
 }

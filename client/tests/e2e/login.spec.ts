@@ -1,4 +1,8 @@
 import { expect, test } from '@playwright/test'
+
+test.beforeEach(async ({ context }) => {
+  await context.addCookies([{ name: 'NEXT_LOCALE', value: 'ru', domain: '127.0.0.1', path: '/' }])
+})
 test('logs in with returnTo, opens catalogue, displays identity and clears session on logout', async ({ page, context }) => {
   await page.goto('/login?returnTo=/tracks')
   await page.getByLabel('Имя пользователя').fill('fixture_user')
@@ -50,12 +54,13 @@ test('does not reuse the previous identity across logout and login', async ({ pa
     const releases = main.locator('section').filter({ has: page.getByRole('heading', { name: 'Новые треки', exact: true }) })
     await expect(releases.getByRole('link', { name: 'Track 1', exact: true })).toBeVisible()
     await expect(main.getByRole('alert')).toHaveCount(0)
-    const personal = main.locator('section').filter({ has: page.getByRole('heading', { name: 'Для вас', exact: true }) })
+    const continuation = main.locator('section').filter({ has: page.getByRole('heading', { name: 'Продолжить прослушивание', exact: true }) })
     if (username === 'fixture_user') {
-      await expect(personal.getByRole('link', { name: 'Track 1', exact: true })).toBeVisible()
+      await expect(continuation.getByRole('link', { name: 'Track 81', exact: true })).toBeVisible()
+      await expect(releases.getByRole('link', { name: 'Track 81', exact: true })).toHaveCount(0)
     } else {
-      await expect(main.getByText('Слушайте музыку — здесь появятся ваши открытия.', { exact: true })).toBeVisible()
-      await expect(personal).toHaveCount(0)
+      await expect(continuation.getByText(/Пока недостаточно данных о ваших исполнителях/)).toBeVisible()
+      await expect(continuation.getByRole('link', { name: 'Track 81', exact: true })).toHaveCount(0)
     }
     await expect(page.getByText(previous, { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Выйти', exact: true }).click()

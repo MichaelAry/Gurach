@@ -1,3 +1,4 @@
+import { AccountFavorite, AccountFavoriteSchema } from '../account/favorite.schema.js';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Track, TrackSchema } from '../track/schemas/track.schema.js';
@@ -21,6 +22,7 @@ import { HomeService } from './home.service.js';
       { name: Track.name, schema: TrackSchema },
       { name: Comment.name, schema: CommentSchema },
       { name: AccountListen.name, schema: AccountListenSchema },
+      { name: AccountFavorite.name, schema: AccountFavoriteSchema },
       { name: SocialRelation.name, schema: SocialRelationSchema },
       { name: User.name, schema: UserSchema },
     ]),

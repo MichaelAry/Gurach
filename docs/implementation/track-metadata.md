@@ -16,10 +16,10 @@ It immediately expires `tracks` and `track:<lowercase-id>`. Deletion additionall
 expires `track-comments:<id>`. Updates use a unique `<UUID-v4>:updated` event ID,
 so every committed edit can retry delivery independently after a lost response.
 
-The home endpoints currently use `no-store` and have no public cache tags.
-When task 17 introduces public home caches, add their tags to this helper;
-upload, metadata edits, deletion events and retries must use the same helper.
-Keep personal home/account data outside shared caches. The account editor
+Public home releases and popular data share the `tracks` cache tag with the
+catalogue. The same helper therefore expires home data on publication, edits,
+and deletion, including durable-event retries. Personal home/account data stay
+outside shared caches. The account editor
 updates the saved row locally and refreshes the Next router after success.
 
 ## Validation

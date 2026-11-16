@@ -173,6 +173,7 @@ export class TrackService {
             audio: audioFile.name,
             picture: pictureFile.name,
             lifecycle: 'active',
+            publishedAt: new Date(),
           });
           await track.save({ session });
 

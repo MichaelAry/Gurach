@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocale, useTranslations } from '@/i18n/LocaleProvider'
 import Link from 'next/link'
 import { Button, Stack, Typography } from '@mui/material'
 import type { components } from '@/lib/api/schema'
@@ -8,6 +9,8 @@ import { BlockState } from './BlockState'
 type ActivityPage = components['schemas']['HomeActivityPage']
 type Event = ActivityPage['items'][number]
 export function ActivityFeed() {
+  const t = useTranslations('home')
+  const { locale } = useLocale()
   const [cursor, setCursor] = useState<string | null>(null)
   const [items, setItems] = useState<Event[]>([]),
     [next, setNext] = useState<string | null>(null)
@@ -28,10 +31,12 @@ export function ActivityFeed() {
           setItems((old) =>
             cursor
               ? [
-                  ...old,
-                  ...rows.filter(
-                    (row) => !old.some((item) => item.id === row.id),
-                  ),
+                  ...new Map(
+                    [...old, ...rows].map((item) => [
+                      `${item.action === 'upload' ? 'upload' : 'comment'}:${item.id}`,
+                      item,
+                    ]),
+                  ).values(),
                 ]
               : rows,
           )
@@ -47,55 +52,44 @@ export function ActivityFeed() {
       })
     return () => controller.abort()
   }, [cursor, attempt])
+  const groups = useMemo(() => {
+    const grouped = new Map<string, { item: Event; count: number }>()
+    for (const item of items) {
+      const key = JSON.stringify([
+        item.user.username,
+        item.action,
+        item.track._id,
+        item.at.slice(0, 10),
+      ])
+      const group = grouped.get(key)
+      if (group) group.count++
+      else grouped.set(key, { item, count: 1 })
+    }
+    return [...grouped.values()]
+  }, [items])
   return (
-    <Section title="Активность друзей">
+    <Section title={t('fromFriends')}>
       <Stack spacing={1}>
-        {items
-          .filter(
-            (item, index) =>
-              !items
-                .slice(0, index)
-                .some(
-                  (previous) =>
-                    previous.user.username === item.user.username &&
-                    previous.action === item.action &&
-                    previous.track._id === item.track._id &&
-                    previous.at.slice(0, 10) === item.at.slice(0, 10),
-                ),
-          )
-          .map((item) => (
-            <Stack key={item.id}>
-              {item.user.username && (
-                <Typography variant="body2" color="text.secondary">
-                  <Link href={`/users/${item.user.username}`}>
-                    {item.user.displayName}
-                  </Link>{' '}
-                  {item.action === 'upload'
-                    ? 'опубликовал трек'
-                    : item.action === 'rating'
-                      ? 'оставил оценку и комментарий'
-                      : 'прокомментировал'}
-                  {items.filter(
-                    (other) =>
-                      other.user.username === item.user.username &&
-                      other.action === item.action &&
-                      other.track._id === item.track._id &&
-                      other.at.slice(0, 10) === item.at.slice(0, 10),
-                  ).length > 1
-                    ? ' (несколько действий)'
-                    : ''}{' '}
-                  ·{' '}
-                  <time dateTime={item.at}>
-                    {new Date(item.at).toLocaleString('ru')}
-                  </time>
-                </Typography>
-              )}
-              {item.action !== 'upload' && (
-                <Link href={`/tracks/${item.track._id}#comment-${item.id}`}>Открыть комментарий</Link>
-              )}
-              <MusicRows tracks={[item.track]} />
-            </Stack>
-          ))}
+        {groups.map(({ item, count }) => (
+          <Stack key={`${item.action}:${item.id}`}>
+            <Typography variant="body2" color="text.secondary">
+              <Link href={`/users/${item.user.username}`}>{item.user.displayName}</Link>{' '}
+              {t(
+                item.action === 'upload'
+                  ? 'activityUpload'
+                  : item.action === 'rating'
+                    ? 'activityRating'
+                    : 'activityComment',
+              )}{' '}
+              {count > 1 ? t('activityRepeated') : ''} ·{' '}
+              <time dateTime={item.at}>{new Date(item.at).toLocaleString(locale)}</time>
+            </Typography>
+            {item.action !== 'upload' && (
+              <Link href={`/tracks/${item.track._id}#comment-${item.id}`}>{t('openComment')}</Link>
+            )}
+            <MusicRows tracks={[item.track]} />
+          </Stack>
+        ))}
       </Stack>
       <BlockState
         loading={loading}
@@ -108,8 +102,8 @@ export function ActivityFeed() {
       />
       {!loading && !error && items.length === 0 && (
         <Typography variant="body2" color="text.secondary">
-          Пока нет новых событий. <Link href="/friends">Найти друзей</Link> или{' '}
-          <Link href="/tracks">открыть каталог</Link>.
+          {t('activityEmpty')} <Link href="/friends">{t('findFriends')}</Link> ·{' '}
+          <Link href="/tracks">{t('activityCatalog')}</Link>.
         </Typography>
       )}
       {next && !error && (
@@ -121,7 +115,7 @@ export function ActivityFeed() {
             setCursor(next)
           }}
         >
-          Показать ещё
+          {t('more')}
         </Button>
       )}
     </Section>

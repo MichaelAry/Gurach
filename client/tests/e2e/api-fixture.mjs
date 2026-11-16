@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 const port = Number(process.env.FIXTURE_API_PORT ?? 5300);
 const total = 121;
@@ -8,7 +8,8 @@ const tracks = Array.from({ length: total }, (_, index) => {
   return {
     _id: number.toString(16).padStart(24, '0'),
     name: `Track ${number}`,
-    artist: `Artist ${number}`,
+    // A discovery candidate outside the first releases page.
+    artist: number === 81 ? 'Artist 1' : `Artist ${number}`,
     audio: `http://127.0.0.1:${port}/static/audio/track-${number}.mp3`,
     picture: null,
     duration: 180,
@@ -44,18 +45,42 @@ const server = createServer((request, response) => {
   // Fixed sessions support direct-cookie upload tests; browser logins get isolated state.
   const sessionUser = token === 'a'.repeat(43) ? fixtureUser : token === 'b'.repeat(43) ? secondUser : sessions.get(token) ?? null;
   const accountKey = sessionUser ? `${sessionUser.id}:${token}` : null;
-  if (request.method === 'GET' && ['/home/releases', '/home/popular', '/home/activity', '/friends', '/friends/summary', '/friends/requests', '/friends/blocks'].includes(url.pathname)) {
+  if (request.method === 'GET' && ['/home/releases', '/home/popular', '/home/discovery', '/home/activity', '/friends', '/friends/summary', '/friends/requests', '/friends/blocks'].includes(url.pathname)) {
     const personal = !['/home/releases', '/home/popular'].includes(url.pathname);
     if (personal && !sessionUser) { response.writeHead(401); response.end(); return; }
     response.setHeader('content-type', 'application/json');
     response.setHeader('Cache-Control', personal ? 'private, no-store' : 'no-store');
     if (url.pathname === '/home/releases') {
-      const offset = Number(url.searchParams.get('cursor') ?? 0);
-      const count = Number(url.searchParams.get('count') ?? 20);
-      response.end(JSON.stringify({ items: tracks.slice(offset, offset + count), nextCursor: offset + count < tracks.length ? String(offset + count) : null })); return;
+      const scope = createHash('sha256').update('home:releases').digest('hex');
+      let offset = 0;
+      try {
+        if ([...url.searchParams.keys()].some((key) => key !== 'cursor') || url.searchParams.getAll('cursor').length > 1) throw new Error();
+        if (url.searchParams.has('cursor')) {
+          const cursor = url.searchParams.get('cursor');
+          const bytes = Buffer.from(cursor, 'base64url');
+          const value = JSON.parse(bytes.toString('utf8'));
+          if (cursor.length > 512 || bytes.toString('base64url') !== cursor || Object.keys(value).length !== 3 || value.v !== 2 || value.scope !== scope || !/^[a-f0-9]{24}$/.test(value.after)) throw new Error();
+          offset = tracks.findIndex((track) => track._id === value.after) + 1;
+          if (!offset) throw new Error();
+        }
+      } catch {
+        response.writeHead(400);
+        response.end(JSON.stringify({ error: { code: 'VALIDATION_ERROR', message: 'Invalid releases cursor', requestId: 'fixture-home' } })); return;
+      }
+      const items = tracks.slice(offset, offset + 20);
+      const nextCursor = offset + 20 < tracks.length ? Buffer.from(JSON.stringify({ v: 2, after: items.at(-1)._id, scope })).toString('base64url') : null;
+      response.end(JSON.stringify({ items, nextCursor })); return;
     }
     if (url.pathname === '/home/popular') {
       response.end(JSON.stringify({ items: tracks.slice(0, 5) })); return;
+    }
+    if (url.pathname === '/home/discovery') {
+      const history = accountHistory.get(accountKey) ?? (sessionUser.id === fixtureUser.id ? [{ trackId: tracks[0]._id }] : []);
+      const favorites = (accountFavorites.get(accountKey) ?? []).slice(0, 30);
+      const signalIds = new Set([...history.slice(0, 30).map((item) => item.trackId), ...favorites]);
+      const artists = new Set(tracks.filter((track) => signalIds.has(track._id)).map((track) => track.artist).filter(Boolean));
+      const candidates = tracks.filter((track) => !signalIds.has(track._id) && artists.has(track.artist)).slice(0, 6);
+      response.end(JSON.stringify({ items: candidates, basis: candidates.length ? 'artists' : artists.size ? 'no-matches' : 'no-signal' })); return;
     }
     if (url.pathname === '/friends/summary') {
       response.end(JSON.stringify({ friendsCount: 0, incomingRequestsCount: 0, outgoingRequestsCount: 0, blockedUsersCount: 0 })); return;

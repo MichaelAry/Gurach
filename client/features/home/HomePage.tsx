@@ -1,42 +1,92 @@
 'use client'
-import { useTranslations, useLocale } from '@/i18n/LocaleProvider'
+import { useTranslations } from '@/i18n/LocaleProvider'
 import type { components } from '@/lib/api/schema'
-import type { AccountStatistics } from '@/features/account/api'
 import { useViewer } from '@/features/auth/ViewerProvider'
-import type { FriendListPage } from '@/features/friends/api'
+import { useFavorites } from '@/features/favorites/FavoritesProvider'
+import { useListenRevision } from '@/features/tracks/components/ListenCountsProvider'
 import { usePlayer } from '@/features/player/PlayerProvider'
 import { QueuePanel } from '@/features/queue/components/QueuePanel'
-import type { TrackListPage } from '@/features/tracks/types'
 import { Box, Button, LinearProgress, Stack, Typography } from '@mui/material'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityFeed } from './ActivityFeed'
 import { BlockState } from './BlockState'
 import { MusicRows, Section } from './MusicSection'
 import { useHomeBlock } from './useHomeBlock'
+
+type HomeReleasesPage = components['schemas']['HomeReleasesPage']
+type ReleasesBlock = ReturnType<typeof useHomeBlock<HomeReleasesPage>>
+
+function Discovery() {
+  const t = useTranslations('home')
+  const listenRevision = useListenRevision()
+  const { revision } = useFavorites()
+  const block = useHomeBlock<components['schemas']['HomeDiscoveryResponse']>(
+    '/api/home/discovery',
+    `${listenRevision}:${revision}`,
+  )
+  return (
+    <>
+      <Typography component="h3" variant="subtitle1" sx={{ mt: 2 }}>
+        {t('forYou')}
+      </Typography>
+      <BlockState {...block} />
+      {block.data && (
+        <>
+          <Typography variant="body2" color="text.secondary">
+            {t(
+              block.data.basis === 'artists'
+                ? 'discoveryArtists'
+                : block.data.basis === 'no-signal'
+                  ? 'discoveryNoSignal'
+                  : 'discoveryNoMatches',
+            )}
+          </Typography>
+          <MusicRows tracks={block.data.items} />
+          {!block.data.items.length && <Link href="/tracks">{t('catalog')}</Link>}
+        </>
+      )}
+    </>
+  )
+}
+
 function ContinueListening() {
   const t = useTranslations('home')
   const player = usePlayer()
-  if (!player.current) return null
+  const viewer = useViewer()
   return (
     <Section title={t('continue')}>
-      <MusicRows tracks={[player.current]} />
-      <LinearProgress
-        aria-label="Прогресс воспроизведения"
-        variant="determinate"
-        value={
-          player.duration > 0 ? Math.min(100, (player.currentTime / player.duration) * 100) : 0
-        }
-        sx={{ mt: 1.5 }}
-      />
-      <Button disabled={player.pending} onClick={player.toggle} sx={{ mt: 1 }}>
-        {player.playing ? t('pause') : t('resume')}
-      </Button>
+      {player.current ? (
+        <>
+          <MusicRows tracks={[player.current]} />
+          <LinearProgress
+            aria-label={t('playbackProgress')}
+            variant="determinate"
+            value={
+              player.duration > 0 ? Math.min(100, (player.currentTime / player.duration) * 100) : 0
+            }
+            sx={{ mt: 1.5 }}
+          />
+          <Button disabled={player.pending} onClick={player.toggle} sx={{ mt: 1 }}>
+            {player.playing ? t('pause') : t('resume')}
+          </Button>
+        </>
+      ) : (
+        <Typography color="text.secondary">
+          {t('continueEmpty')} <Link href="/tracks">{t('catalog')}</Link>
+        </Typography>
+      )}
+      {viewer.user && !viewer.error ? (
+        <Discovery />
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          {t('guestDescription')} <Link href="/login">{t('signIn')}</Link>
+        </Typography>
+      )}
     </Section>
   )
 }
-type HomeReleasesPage = components['schemas']['HomeReleasesPage']
-type ReleasesBlock = ReturnType<typeof useHomeBlock<HomeReleasesPage>>
+
 function Releases({ block }: { block: ReleasesBlock }) {
   const t = useTranslations('home')
   const [cursor, setCursor] = useState<string | null>(null)
@@ -108,191 +158,26 @@ function Releases({ block }: { block: ReleasesBlock }) {
     </Section>
   )
 }
-function Popular() {
-  const t = useTranslations('home')
-  const block = useHomeBlock<components['schemas']['HomePopularResponse']>('/api/home/popular')
-  return (
-    <Section title={t('popular')}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {t('popularDescription')}
-      </Typography>
-      <BlockState {...block} />
-      {block.data &&
-        (block.data.items.length ? (
-          <MusicRows tracks={block.data.items} />
-        ) : (
-          <Typography color="text.secondary" variant="body2">
-            {t('popularEmpty')}
-          </Typography>
-        ))}
-    </Section>
-  )
-}
-function Personal({ releases }: { releases: ReleasesBlock }) {
-  const t = useTranslations('home')
-  const { locale } = useLocale()
-  const tracks = releases.data?.items
-  const history = useHomeBlock<components['schemas']['AccountHistoryPage']>('/api/account/history?count=30')
-  const favorites = useHomeBlock<TrackListPage>('/api/account/favorites?count=30')
-  const stats = useHomeBlock<AccountStatistics>('/api/account/statistics')
-  const friends = useHomeBlock<FriendListPage>('/api/friends?count=5')
-  const recommendations = useMemo(() => {
-    const artists = new Set([
-      ...(history.data?.items.flatMap((i) => (i.track?.artist ? [i.track.artist] : [])) ?? []),
-      ...(favorites.data?.items.flatMap((i) => (i.artist ? [i.artist] : [])) ?? []),
-    ])
-    const heard = new Set(history.data?.items.map((i) => i.trackId))
-    return [...(tracks ?? [])]
-      .sort(
-        (a, b) =>
-          Number(artists.has(b.artist ?? '')) * 3 +
-          Number(!heard.has(b._id)) -
-          (Number(artists.has(a.artist ?? '')) * 3 + Number(!heard.has(a._id))),
-      )
-      .slice(0, 5)
-  }, [tracks, history.data, favorites.data])
-  const hasPersonalHistory = !!history.data?.items.length || !!favorites.data?.items.length
-  const personalLoading = history.loading || favorites.loading
-  const personalError = history.error || favorites.error
-  const showPersonal =
-    personalLoading || personalError ||
-    (hasPersonalHistory && (releases.loading || releases.error || recommendations.length > 0))
-  const personalReady = !personalLoading && !personalError && !releases.loading && !releases.error
-  const artists = [
-    ...new Set(history.data?.items.flatMap((i) => (i.track?.artist ? [i.track.artist] : [])) ?? []),
-  ].slice(0, 3)
-  const week = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date()
-    date.setDate(date.getDate() - 6 + i)
-    return {
-      day: date.toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
-      count:
-        history.data?.items.filter(
-          (item) => new Date(item.listenedAt).toDateString() === date.toDateString(),
-        ).length ?? 0,
-    }
-  })
-  return (
-    <>
-      {showPersonal && (
-        <Section title={t('forYou')}>
-          <BlockState
-            loading={personalLoading || (hasPersonalHistory && releases.loading)}
-            error={personalError || (hasPersonalHistory && releases.error)}
-            retry={() => {
-              if (history.error) history.retry()
-              if (favorites.error) favorites.retry()
-              if (releases.error) releases.retry()
-            }}
-          />
-          {personalReady && hasPersonalHistory && (
-            <>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {t('recommendationDescription')}
-              </Typography>
-              {recommendations.length > 0 ? (
-                <MusicRows tracks={recommendations} />
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  {t('recommendationsEmpty')} <Link href="/tracks">{t('catalog')}</Link>
-                </Typography>
-              )}
-            </>
-          )}
-        </Section>
-      )}
-      <Section title={t('yourMusic')} href="/account">
-        <BlockState {...stats} />
-        {stats.data && stats.data.totalListens > 0 ? (
-          <Stack spacing={1}>
-            <Typography>
-              {stats.data.totalListens} {t('listens')} · {stats.data.uniqueTracks} {t('tracks')}
-            </Typography>
-            {artists.length > 0 && (
-              <Typography variant="body2">{t('recentArtists')}: {artists.join(', ')}</Typography>
-            )}
-            {history.data && (
-              <Typography variant="body2" color="text.secondary">
-                {week.some((day) => day.count > 0)
-                  ? <>{t('weekSample')}:{' '}
-                      {week.map((day) => `${day.day}: ${day.count}`).join(' · ')}
-                    </>
-                  : t('weekEmpty')}
-              </Typography>
-            )}
-            {history.data && history.data.items.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                {t('historyEmpty')} <Link href="/tracks">{t('catalog')}</Link>
-              </Typography>
-            )}
-            {history.data && history.data.items.length > 0 && (
-              <MusicRows
-                tracks={[
-                  ...new Map(
-                    history.data.items.flatMap((i) =>
-                      i.track ? [[i.track._id, i.track] as const] : [],
-                    ),
-                  ).values(),
-                ].slice(0, 3)}
-              />
-            )}
-          </Stack>
-        ) : (
-          stats.data && (
-            <Typography variant="body2" color="text.secondary">
-              Слушайте музыку — здесь появятся ваши открытия.
-            </Typography>
-          )
-        )}
-      </Section>
-      <Section title={t('friends')} href="/friends">
-        <BlockState {...friends} />
-        {friends.data?.items.map((friend) => (
-          <Button
-            key={friend.id}
-            component={Link}
-            href={`/users/${friend.username}`}
-            sx={{ display: 'block', textAlign: 'left' }}
-          >
-            {friend.displayName}
-          </Button>
-        ))}
-        {friends.data?.items.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            {t('friendsEmpty')} <Link href="/friends">{t('findFriends')}</Link>
-          </Typography>
-        )}
-      </Section>
-    </>
-  )
-}
 export default function HomePage() {
   const viewer = useViewer()
-  // Session providers remount their children when the viewer becomes known.
-  // Wait for that transition before starting the home requests.
-  if (viewer.loading) {
+  if (viewer.loading)
     return (
       <Box sx={{ width: '100%', p: 3 }}>
         <LinearProgress aria-label="Загрузка главной страницы" />
       </Box>
     )
-  }
   return <HomeContent />
 }
+
 function HomeContent() {
   const t = useTranslations('home')
-  const viewer = useViewer(),
-    releases = useHomeBlock<HomeReleasesPage>('/api/home/releases')
+  const viewer = useViewer()
+  const releases = useHomeBlock<HomeReleasesPage>('/api/home/releases')
   const [queueOpen, setQueueOpen] = useState(false)
   return (
     <Box
       data-home-page
-      sx={{
-        maxWidth: 1200,
-        mx: 'auto',
-        px: { xs: 2, md: 3 },
-        py: { xs: 2, md: 4 },
-      }}
+      sx={{ maxWidth: 1000, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 4 } }}
     >
       <Typography variant="overline" color="text.secondary">
         GURACH / MUSIC
@@ -300,59 +185,26 @@ function HomeContent() {
       <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
         {t('hero')}
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        {viewer.user
-          ? `${viewer.user.displayName}, ${t('greeting')}`
-          : t('tagline')}
+      <Typography color="text.secondary" sx={{ mb: 2 }}>
+        {viewer.user ? `${viewer.user.displayName}, ${t('greeting')}` : t('tagline')}
       </Typography>
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'minmax(0, 1fr)',
-            md: 'minmax(0, 2fr) minmax(280px, 1fr)',
-          },
-          gap: 2,
-          alignItems: 'start',
-        }}
-      >
-        <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <ContinueListening />
-          <Releases block={releases} />
-          <Popular />
-          {viewer.user && !viewer.error && <ActivityFeed key={viewer.user.id} />}
-        </Stack>
-        <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <Section title={t('quickAccess')}>
-            <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }}>
-              <Button component={Link} href="/tracks">
-                {t('catalog')}
-              </Button>
-              <Button component={Link} href="/favorites">
-                {t('favorites')}
-              </Button>
-              <Button onClick={() => setQueueOpen(true)}>{t('queue')}</Button>
-              <Button component={Link} href="/upload">
-                {t('upload')}
-              </Button>
-            </Stack>
-          </Section>
-          {viewer.user && !viewer.error ? (
-            <Personal key={viewer.user.id} releases={releases} />
-          ) : (
-            !viewer.loading && (
-              <Section title={t('guestTitle')}>
-                <Typography variant="body2" color="text.secondary">
-                  {t('guestDescription')}
-                </Typography>
-                <Button component={Link} href="/login" sx={{ mt: 1 }}>
-                  {t('signIn')}
-                </Button>
-              </Section>
-            )
-          )}
-        </Stack>
-      </Box>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1, mb: 2 }}>
+        <Button component={Link} href="/tracks">
+          {t('catalog')}
+        </Button>
+        <Button component={Link} href="/favorites">
+          {t('favorites')}
+        </Button>
+        <Button onClick={() => setQueueOpen(true)}>{t('queue')}</Button>
+        <Button component={Link} href="/upload">
+          {t('upload')}
+        </Button>
+      </Stack>
+      <Stack spacing={2}>
+        <ContinueListening />
+        {viewer.user && viewer.confirmed && <ActivityFeed key={viewer.user.id} />}
+        <Releases block={releases} />
+      </Stack>
       <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
     </Box>
   )

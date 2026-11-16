@@ -1,6 +1,6 @@
 import { revalidateTag } from 'next/cache'
 
-/** Shared by browser mutations and durable events. Extend here when home gains public tags. */
+/** Shared by browser mutations and durable events, including public home data tagged tracks. */
 export function invalidateTrackCaches(trackId?: string, options: { comments?: boolean } = {}) {
   revalidateTag('tracks', { expire: 0 })
   if (trackId && /^[a-f\d]{24}$/i.test(trackId)) {

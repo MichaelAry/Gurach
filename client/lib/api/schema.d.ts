@@ -372,6 +372,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/home/discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["HomeController_discovery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/home/popular": {
         parameters: {
             query?: never;
@@ -704,7 +720,10 @@ export interface components {
         HomeActivityItem: {
             /** @enum {string} */
             action: "upload" | "comment" | "rating";
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description Publication/comment creation time; legacy rows fall back to the ObjectId timestamp.
+             */
             at: string;
             id: string;
             track: components["schemas"]["TrackListItem"];
@@ -718,6 +737,14 @@ export interface components {
         HomeActivityUser: {
             displayName: string;
             username: string;
+        };
+        HomeDiscoveryResponse: {
+            /**
+             * @description Artists from the last 30 listens and 30 favorites, or an explicit catalogue fallback.
+             * @enum {string}
+             */
+            basis: "artists" | "no-signal" | "no-matches";
+            items: components["schemas"]["TrackListItem"][];
         };
         HomePopularResponse: {
             items: components["schemas"]["TrackListItem"][];
@@ -2546,6 +2573,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HomeActivityPage"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+        };
+    };
+    HomeController_discovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeDiscoveryResponse"];
                 };
             };
             /** @description Request validation failed */
