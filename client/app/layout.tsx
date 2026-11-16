@@ -8,6 +8,10 @@ import localFont from 'next/font/local'
 import { AppThemeProvider } from '@/theme/AppThemeProvider'
 import './globals.css'
 
+// The locale cookie determines <html lang> before the document can render.
+// Allow this root layout to wait for the request with Cache Components enabled.
+export const instant = false
+
 const onest = localFont({
   src: './fonts/Onest-Variable.woff2',
   variable: '--font-onest',
