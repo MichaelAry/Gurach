@@ -4,7 +4,7 @@ import { HydratedDocument, Types } from 'mongoose';
 export const MEDIA_OPERATION_KINDS = ['upload', 'delete'] as const;
 export type MediaOperationKind = (typeof MEDIA_OPERATION_KINDS)[number];
 
-export const MEDIA_OPERATION_STATES = ['uploading', 'publishing', 'cleanup', 'done'] as const;
+export const MEDIA_OPERATION_STATES = ['queued', 'processing', 'uploading', 'publishing', 'cleanup', 'done'] as const;
 export type MediaOperationState = (typeof MEDIA_OPERATION_STATES)[number];
 
 @Schema({ _id: false, versionKey: false })
@@ -69,6 +69,22 @@ export class MediaOperation {
 
   @Prop({ type: ValidatedMediaMetadataSchema })
   metadata?: ValidatedMediaMetadata;
+
+  /** Durable request data; paths are reconstructed from the operation ID. */
+  @Prop({ type: Object })
+  upload?: { name: string; artist?: string; text?: string; audioName: string; pictureName: string; audioSize: number; pictureSize: number };
+
+  @Prop({ type: String, maxlength: 24 })
+  existingTrackId?: string;
+
+  @Prop({ type: String, maxlength: 32 })
+  duplicateReason?: string;
+
+  @Prop({ type: Boolean, default: false })
+  derivedCleaned?: boolean;
+
+  @Prop({ type: String, maxlength: 24 })
+  result?: 'published' | 'failed';
 
   @Prop({ type: Types.ObjectId, default: null })
   ownerId: Types.ObjectId | null;

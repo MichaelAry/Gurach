@@ -1,5 +1,6 @@
 export interface UploadReservation {
   readonly operationId: string;
+  durable?: boolean;
   release(): void;
   releaseQuota?(): Promise<void>;
 }

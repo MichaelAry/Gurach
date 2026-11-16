@@ -1467,6 +1467,40 @@
         },
         "type": "object"
       },
+      "UploadJobStatus": {
+        "properties": {
+          "duplicateReason": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "existingTrackId": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "published",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "trackId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "trackId",
+          "status"
+        ],
+        "type": "object"
+      },
       "UserSearchPage": {
         "properties": {
           "items": {
@@ -6371,6 +6405,241 @@
               }
             },
             "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/uploads": {
+      "post": {
+        "operationId": "TrackController_enqueue",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "artist": {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "audio": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "duration": {
+                    "example": "180",
+                    "pattern": "^\\d+(?:\\.\\d+)?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "example": "Track title",
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "picture": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Track lyrics",
+                    "maxLength": 100000,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "picture",
+                  "audio"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadJobStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request conflicts with existing data"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unsupported media type"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Upload protection index or media validation unavailable"
+          }
+        },
+        "tags": [
+          "tracks"
+        ]
+      }
+    },
+    "/tracks/uploads/{operationId}": {
+      "get": {
+        "operationId": "TrackController_uploadStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadJobStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
           },
           "500": {
             "content": {

@@ -4,6 +4,7 @@ import { lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileTypeFromFile } from 'file-type';
 import sharp from 'sharp';
+import { env } from '../common/env.js';
 import {
   allowedExtension,
   assertMediaSize,
@@ -38,6 +39,30 @@ export class MediaValidatorService {
   private readonly probeWaiters: (() => void)[] = [];
 
   constructor(@Inject(FFPROBE_EXECUTABLE) private readonly ffprobePath: string) {}
+
+  /** One encoder thread, finite wall time, finite duration and finite output. */
+  async createCompatibleAudio(source: string, target: string): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(env.mediaPrlimitPath, [
+        '--as=1073741824', '--cpu=60', `--fsize=${FILE_POLICY.maxAudioBytes}`, '--core=0', '--', env.ffmpegPath,
+        '-nostdin', '-v', 'error', '-xerror', '-max_alloc', '67108864', '-y', '-protocol_whitelist', 'file',
+        '-format_whitelist', 'mp3,wav,ogg,mov,aac,flac', '-probesize', '1048576', '-analyzeduration', '10000000',
+        '-threads', '1', '-filter_threads', '1', '-i', source,
+        '-map', '0:a:0', '-vn', '-sn', '-dn', '-map_metadata', '-1',
+        '-threads', '1', '-c:a', 'libmp3lame', '-b:a', '192k', '-ar', '44100', '-ac', '2',
+        '-t', '3600', '-fs', String(FILE_POLICY.maxAudioBytes), '-f', 'mp3', target,
+      ], { shell: false, stdio: 'ignore' });
+      let timedOut = false;
+      const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, 120_000);
+      child.once('error', () => { clearTimeout(timer); reject(new ServiceUnavailableException('Audio encoder unavailable')); });
+      child.once('close', (code) => {
+        clearTimeout(timer);
+        if (timedOut || code !== 0) reject(new ServiceUnavailableException('Audio encoding failed or timed out'));
+        else resolve();
+      });
+    });
+    await this.validateRegularFile(target, 'audio');
+  }
 
   async validateAudio(filePath: string, originalName: string): Promise<AudioMetadata> {
     await this.validateRegularFile(filePath, 'audio');

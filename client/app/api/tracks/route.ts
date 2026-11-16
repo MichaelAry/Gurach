@@ -41,7 +41,9 @@ export async function POST(request: Request) {
       controller.enqueue(chunk)
     },
   }))
-  const response = await proxyBackend('/tracks', {
+  const mode = request.headers.get('x-gurach-upload-mode')
+  if (mode !== null && mode !== 'background') return apiErrorResponse(400, 'VALIDATION_ERROR', 'Unsupported upload mode', requestId)
+  const response = await proxyBackend(mode === 'background' ? '/tracks/uploads' : '/tracks', {
     method: 'POST',
     body,
     duplex: 'half',

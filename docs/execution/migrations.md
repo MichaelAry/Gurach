@@ -171,3 +171,8 @@ explicit recovery. CLI verify returned nonzero for the missing playlist index.
 This checks synthetic backup/restore and the real readiness controller through
 an HTTPS harness; it does not establish production-data recovery, browser login,
 playback or a full deployed application smoke test.
+
+For task 22 and later, `MEDIA_STAGING_DIR` also retains private original audio
+and covers for published background jobs. It must be backed up and restored with
+Mongo and `STATIC_DIR`; see [background-media.md](../implementation/background-media.md)
+for job recovery, quota accounting, rollback compatibility and proxy checks.

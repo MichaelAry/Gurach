@@ -5,7 +5,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -84,6 +84,7 @@ export class FileService {
     stagedPath: string,
     originalName: string,
     allocatedName: string,
+    idempotent = false,
   ): Promise<StoredFile> {
     const allocated = this.validateAllocatedFile(type, originalName, allocatedName);
 
@@ -124,7 +125,18 @@ export class FileService {
         await temporaryHandle.sync();
         await temporaryHandle.close();
         temporaryHandle = undefined;
-        await fs.link(temporaryPath, targetPath);
+        try { await fs.link(temporaryPath, targetPath); }
+        catch (error) {
+          if (!idempotent || (error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          const digest = async (filePath: string) => {
+            const handle = await fs.open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+            const hash = createHash('sha256');
+            try { for await (const chunk of handle.createReadStream()) hash.update(chunk); }
+            finally { await handle.close(); }
+            return hash.digest('hex');
+          };
+          if (await digest(temporaryPath) !== await digest(targetPath)) throw new Error('Publication content conflict');
+        }
         linked = true;
         await fs.unlink(temporaryPath);
         const directoryHandle = await fs.open(directory, constants.O_RDONLY);
@@ -135,7 +147,8 @@ export class FileService {
         }
         return { ...allocated, size: (await fs.stat(targetPath)).size };
       } catch (error) {
-        if (linked) await fs.unlink(targetPath).catch(() => undefined);
+        // Durable keys may already be referenced by a winning worker. Cleanup checks live references.
+        if (linked && !idempotent) await fs.unlink(targetPath).catch(() => undefined);
         throw error;
       } finally {
         await sourceHandle?.close().catch(() => undefined);

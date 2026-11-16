@@ -23,6 +23,6 @@ import { CacheEvent, CacheEventSchema } from '../maintenance/schemas/cache-event
   ],
   controllers: [...TRACK_API_CONTROLLERS],
   providers: [TrackReadService, TrackService, TrackAccessService, UploadAdmissionService, UploadAdmissionGuard, UploadStagingInterceptor],
-  exports: [TrackAccessService, TrackReadService],
+  exports: [TrackAccessService, TrackReadService, TrackService],
 })
 export class TrackModule {}

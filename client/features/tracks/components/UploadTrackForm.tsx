@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Alert, Button, LinearProgress, Stack, TextField } from '@mui/material'
 import Link from 'next/link'
-import { DuplicateTrackError, uploadTrack } from '../api/uploadTrack'
+import { DuplicateTrackError, UploadJobFailedError, uploadTrack, waitForUpload } from '../api/uploadTrack'
 import { useRouter } from 'next/navigation'
 import { useViewer } from '@/features/auth/ViewerProvider'
 
@@ -30,6 +30,7 @@ export function UploadTrackForm() {
   const [audioError, setAudioError] = useState('')
   const [coverError, setCoverError] = useState('')
   const [pending, setPending] = useState(false)
+  const [progress, setProgress] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null)
   const [uploaded, setUploaded] = useState(false)
@@ -37,9 +38,40 @@ export function UploadTrackForm() {
 
   useEffect(() => () => { requestRef.current?.abort() }, [])
 
+  useEffect(() => {
+    if (!confirmed || !user) return
+    const saved = sessionStorage.getItem(`gurach-upload:${user.id}`)
+    if (!saved || !/^[a-f0-9-]{36}$/i.test(saved) || requestRef.current) return
+    const controller = new AbortController()
+    requestRef.current = controller
+    void Promise.resolve().then(async () => {
+      if (controller.signal.aborted) return
+      setPending(true)
+      try {
+        const trackId = await waitForUpload(saved, controller.signal, setProgress)
+        sessionStorage.removeItem(`gurach-upload:${user.id}`)
+        setUploaded(true)
+        router.push(`/tracks/${trackId}`)
+        router.refresh()
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : 'Не удалось проверить обработку.')
+          if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) sessionStorage.removeItem(`gurach-upload:${user.id}`)
+          setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
+        }
+      } finally {
+        if (requestRef.current === controller) requestRef.current = null
+        if (!controller.signal.aborted) setPending(false)
+      }
+    })
+    return () => { controller.abort(); if (requestRef.current === controller) requestRef.current = null }
+  }, [confirmed, user, router])
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!user || !isConfirmed(user.id) || requestRef.current || uploaded || !event.currentTarget.reportValidity()) return
+    if (!user || !isConfirmed(user.id) || requestRef.current || uploaded) return
+    const saved = sessionStorage.getItem(`gurach-upload:${user.id}`)
+    if (!saved && !event.currentTarget.reportValidity()) return
     const body = new FormData(event.currentTarget)
     body.set('name', String(body.get('name') ?? '').trim())
     body.set('artist', String(body.get('artist') ?? '').trim())
@@ -49,14 +81,18 @@ export function UploadTrackForm() {
     setError(null)
     setExistingTrackId(null)
     try {
-      const trackId = await uploadTrack(body, controller.signal)
+      const trackId = saved && /^[a-f0-9-]{36}$/i.test(saved)
+        ? await waitForUpload(saved, controller.signal, setProgress)
+        : await uploadTrack(body, controller.signal, true, setProgress, (operationId) => { sessionStorage.setItem(`gurach-upload:${user.id}`, operationId) })
       if (!controller.signal.aborted) {
+        sessionStorage.removeItem(`gurach-upload:${user.id}`)
         setUploaded(true)
         router.push(`/tracks/${trackId}`)
         router.refresh()
       }
     } catch (cause) {
       if (!controller.signal.aborted) {
+        if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) sessionStorage.removeItem(`gurach-upload:${user.id}`)
         setError(cause instanceof Error ? cause.message : 'Не удалось загрузить трек.')
         setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
       }
@@ -69,7 +105,7 @@ export function UploadTrackForm() {
   }
 
   return (
-    <Stack component="form" spacing={2.5} onSubmit={submit} aria-busy={pending}>
+    <Stack component="form" noValidate spacing={2.5} onSubmit={submit} aria-busy={pending}>
       <Stack component="fieldset" disabled={!confirmed || pending || uploaded} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
         <TextField
           label="Аудиофайл"
@@ -77,7 +113,7 @@ export function UploadTrackForm() {
           type="file"
           required
           error={Boolean(audioError)}
-          helperText={audioError || 'MP3, WAV, OGG, OGA, M4A, FLAC, AAC — до 50 МиБ.'}
+          helperText={audioError || 'MP3, WAV, OGG, OGA, M4A, FLAC, AAC — до 50 МиБ и одного часа. После приёма сервер подготовит версию для плеера в фоне.'}
           slotProps={{
             inputLabel: { shrink: true },
             htmlInput: { accept: AUDIO_EXTENSIONS.map((extension) => `.${extension}`).join(',') },
@@ -122,6 +158,7 @@ export function UploadTrackForm() {
         />
       </Stack>
       {pending && <LinearProgress aria-label="Загрузка трека" />}
+      {progress && <Alert severity="info">{progress}</Alert>}
       {error && <Alert severity="error">{error}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>Открыть существующий трек</Link></>}</Alert>}
       {uploaded && <Alert severity="success">Трек успешно загружен. Открываем страницу трека…</Alert>}
       <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? 'Трек загружен' : pending ? 'Загружаем…' : 'Загрузить трек'}</Button>

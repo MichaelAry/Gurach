@@ -1,3 +1,5 @@
+import { DuplicateTrackError } from '../track/duplicate-track.error.js';
+import { TrackService } from '../track/track.service.js';
 import { StagingService } from '../file/staging.service.js';
 import { releaseAccountQuota, quotaAccounts } from '../file/account-quota.js';
 import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -18,6 +20,10 @@ const MAX_RETRY_DELAY_MS = 5 * 60_000;
 const DEFAULT_BATCH_SIZE = 100;
 
 interface ClaimedOperation {
+  state?: string;
+  upload?: MediaOperation['upload'];
+  ownerId?: MediaOperation['ownerId'];
+  stageDirectory?: string;
   operationId: string;
   kind: 'upload' | 'delete';
   trackId: TrackDocument['_id'];
@@ -52,6 +58,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     @InjectConnection() private readonly connection: Connection,
     private readonly fileService: FileService,
     private readonly staging?: StagingService,
+    private readonly tracks?: TrackService,
   ) {}
 
   onModuleInit(): void {
@@ -98,6 +105,14 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
       eventsDelivered: 0,
       eventsRetried: 0,
     };
+    // A crash after DB activation can leave an attempt-local encoded copy.
+    const published = await this.operationModel.find({ kind: 'upload', state: 'done', result: 'published',
+      derivedCleaned: { $ne: true } }).limit(limit).lean().exec();
+    for (const operation of published) {
+      await this.staging?.removeDerivedFiles(operation.operationId);
+      await this.operationModel.updateOne({ operationId: operation.operationId, state: 'done' },
+        { $set: { derivedCleaned: true } }).exec();
+    }
     // Expiry fences publication: commitAccountQuota refuses expired holds.
     const expired = quotaAccounts(this.connection).find({ 'quotaEntries': { $elemMatch: {
       state: 'reserved', expiresAt: { $lte: new Date() },
@@ -105,8 +120,8 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     for await (const user of expired) {
       for (const entry of user.quotaEntries ?? []) {
         if (entry.state !== 'reserved' || !entry.expiresAt || entry.expiresAt > new Date()) continue;
-        await this.operationModel.updateOne({ operationId: entry.operationId, kind: 'upload', state: { $in: ['uploading', 'publishing'] } },
-          { $set: { state: 'cleanup', nextAttemptAt: new Date() }, $unset: { leaseToken: '', leaseUntil: '', leaseOwner: '' } }).exec();
+        await this.operationModel.updateOne({ operationId: entry.operationId, kind: 'upload', state: { $in: ['queued', 'processing', 'uploading', 'publishing'] } },
+          { $set: { state: 'cleanup', result: 'failed', lastErrorCode: 'quota_expired', nextAttemptAt: new Date() }, $unset: { leaseToken: '', leaseUntil: '', leaseOwner: '' } }).exec();
         await this.staging?.removeOperation(entry.operationId);
         await releaseAccountQuota(this.connection, entry.operationId);
       }
@@ -135,7 +150,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     const leaseToken = randomUUID();
     const claimed = await this.operationModel.findOneAndUpdate(
       {
-        state: 'cleanup',
+        state: { $in: ['cleanup', 'queued', 'processing'] },
         nextAttemptAt: { $lte: now },
         $or: [
           { leaseUntil: { $exists: false } },
@@ -154,6 +169,10 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     ).lean().exec();
     if (!claimed) return null;
     return {
+      state: claimed.state,
+      upload: claimed.upload,
+      ownerId: claimed.ownerId,
+      stageDirectory: claimed.stageDirectory,
       operationId: claimed.operationId,
       kind: claimed.kind,
       trackId: claimed.trackId,
@@ -261,12 +280,26 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     }, LEASE_HEARTBEAT_MS);
     try {
       await this.renewLease(operation);
+      if (operation.upload && operation.state !== 'cleanup') {
+        if (!this.tracks || !this.staging) throw new Error('Upload worker dependencies unavailable');
+        const started = await this.operationModel.findOneAndUpdate(
+          { operationId: operation.operationId, leaseToken: operation.leaseToken, state: { $in: ['queued', 'processing'] } },
+          { $set: { state: 'processing' } }, { returnDocument: 'after' }).lean().exec();
+        if (!started) throw new LostMaintenanceLeaseError();
+        operation.state = 'processing';
+        if (operation.attempts > 3) throw new BadRequestException('Upload retry limit reached');
+        await this.tracks.processUpload(started, this.staging);
+        return true;
+      }
       if (operation.kind === 'delete') {
         await this.commentModel.deleteMany({ track_id: operation.trackId }).exec();
+        const upload = await this.operationModel.findOne({ trackId: operation.trackId, kind: 'upload', upload: { $exists: true } }).lean().exec();
+        if (upload) await this.staging?.removeOperation(upload.operationId);
       }
 
       await this.removeIfUnreferenced(operation, operation.audioKey, FileType.AUDIO, 'audioKey');
       await this.removeIfUnreferenced(operation, operation.pictureKey, FileType.PICTURE, 'pictureKey');
+      if (operation.kind === 'upload' && operation.upload) await this.staging?.removeOperation(operation.operationId);
       clearInterval(heartbeat);
       if (leaseLost) throw new LostMaintenanceLeaseError();
       await this.renewLease(operation);
@@ -313,7 +346,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     const inFlightUploadReference = await this.operationModel.exists({
       operationId: { $ne: operation.operationId },
       kind: 'upload',
-      state: { $in: ['uploading', 'publishing'] },
+      state: { $in: ['queued', 'processing', 'uploading', 'publishing'] },
       [field]: key,
     }).exec();
     if (inFlightUploadReference) return;
@@ -361,7 +394,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
     const updated = await this.operationModel.updateOne(
       {
         operationId: operation.operationId,
-        state: 'cleanup',
+        state: operation.upload && operation.state !== 'cleanup' ? { $in: ['queued', 'processing'] } : 'cleanup',
         leaseToken: operation.leaseToken,
       },
       { $set: { leaseUntil: new Date(Date.now() + LEASE_DURATION_MS) } },
@@ -375,13 +408,18 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
       await this.operationModel.updateOne(
         {
           operationId: operation.operationId,
-          state: 'cleanup',
+          state: operation.upload && operation.state !== 'cleanup' ? { $in: ['queued', 'processing'] } : 'cleanup',
           leaseToken: operation.leaseToken,
         },
         {
           $set: {
+            ...(operation.upload && operation.state !== 'cleanup'
+              ? operation.attempts >= 3 || error instanceof BadRequestException || (error as { getStatus?: () => number }).getStatus?.() === 409
+                ? { state: 'cleanup', result: 'failed' }
+                : { state: 'queued' } : {}),
             nextAttemptAt: new Date(Date.now() + delay),
-            lastErrorCode: this.safeErrorCode(error),
+            lastErrorCode: error instanceof DuplicateTrackError ? 'TRACK_DUPLICATE' : this.safeErrorCode(error),
+            ...(error instanceof DuplicateTrackError ? { existingTrackId: error.existingTrackId, duplicateReason: error.duplicateReason } : {}),
           },
           $unset: { leaseOwner: '', leaseToken: '', leaseUntil: '' },
         },

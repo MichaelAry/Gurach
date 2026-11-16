@@ -1,3 +1,4 @@
+import { TrackModule } from '../track/track.module.js';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { FileModule } from '../file/file.module.js';
@@ -10,6 +11,7 @@ import { MaintenanceService } from './maintenance.service.js';
 @Module({
   imports: [
     FileModule,
+    TrackModule,
     MongooseModule.forFeature([
       { name: Track.name, schema: TrackSchema },
       { name: Comment.name, schema: CommentSchema },

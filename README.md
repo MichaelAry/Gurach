@@ -432,3 +432,8 @@ plan/apply/verify с этим ID и соблюдайте ограничения 
 Controlled registration, verified recovery, account upload quotas and moderation:
 [task 21 operating procedure](docs/implementation/controlled-registration.md).
 Registration remains disabled by default.
+
+Фоновая обработка аудио, явный асинхронный контракт, лимиты и восстановление
+описаны в [background-media.md](docs/implementation/background-media.md).
+`MEDIA_STAGING_DIR` содержит приватные оригиналы опубликованных фоновых загрузок
+и входит в согласованную резервную копию вместе с MongoDB и `STATIC_DIR`.

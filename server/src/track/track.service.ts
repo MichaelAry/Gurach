@@ -13,6 +13,10 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import mongoose, { Types } from 'mongoose';
 import type { Connection, Model } from 'mongoose';
 import { randomUUID } from 'node:crypto';
+import { open, rm, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { StagingService } from '../file/staging.service.js';
+import { UploadJobStatus } from '../contracts/track.contract.js';
 import { FileService, FileType } from '../file/file.service.js';
 import { MediaValidatorService } from '../file/media-validator.service.js';
 import { AudioFingerprintService, similarAudio, type AudioFingerprints } from '../file/audio-fingerprint.service.js';
@@ -58,12 +62,63 @@ export class TrackService {
     private fingerprints: AudioFingerprintService = new AudioFingerprintService(),
   ) {}
 
+  async enqueue(dto: CreateTrackDto, picture: Express.Multer.File, audio: Express.Multer.File,
+    operationId: string, actor: Actor): Promise<UploadJobStatus> {
+    new PermissionService().requireActor(actor);
+    if (!audio || !picture) throw new BadRequestException('picture and audio are required');
+    // Persist file contents before acknowledging the durable database intent.
+    for (const file of [audio, picture]) {
+      const handle = await open(file.path, 'r');
+      try { await handle.sync(); } finally { await handle.close(); }
+    }
+    const directory = await open(path.dirname(audio.path), 'r');
+    try { await directory.sync(); } finally { await directory.close(); }
+    const operation = await this.operationModel.create({
+      operationId, kind: 'upload', trackId: new Types.ObjectId(), ownerId: new Types.ObjectId(actor.id),
+      stageDirectory: operationId, state: 'queued', attempts: 0, nextAttemptAt: new Date(),
+      audioKey: this.fileService.allocateFile(FileType.AUDIO, 'compatible.mp3').name,
+      pictureKey: this.fileService.allocateFile(FileType.PICTURE, picture.originalname).name,
+      upload: { name: dto.name, artist: dto.artist, text: dto.text, audioName: audio.originalname,
+        pictureName: picture.originalname, audioSize: audio.size, pictureSize: picture.size },
+    });
+    return Object.assign(new UploadJobStatus(), { operationId, trackId: String(operation.trackId), status: 'queued' });
+  }
+
+  async uploadStatus(operationId: string, actor: Actor): Promise<UploadJobStatus> {
+    const operation = await this.operationModel.findOne({ operationId, kind: 'upload', ownerId: new Types.ObjectId(actor.id),
+      upload: { $exists: true } }).lean().exec();
+    if (!operation) throw new NotFoundException('Upload job not found');
+    return Object.assign(new UploadJobStatus(), { operationId, trackId: String(operation.trackId),
+      status: operation.result === 'published' ? 'published' : operation.result === 'failed' ? 'failed'
+        : operation.state === 'queued' ? 'queued' : 'processing',
+      ...(operation.lastErrorCode ? { errorCode: operation.lastErrorCode } : {}),
+      ...(operation.existingTrackId ? { existingTrackId: operation.existingTrackId } : {}),
+      ...(operation.duplicateReason ? { duplicateReason: operation.duplicateReason } : {}),
+    });
+  }
+
+  async processUpload(operation: MediaOperation, staging: StagingService): Promise<void> {
+    if (!operation.upload || !operation.ownerId || !operation.leaseToken) throw new Error('Invalid durable upload');
+    await staging.removeDerivedFiles(operation.operationId);
+    const upload = operation.upload;
+    const directory = staging.resolveOperationPath(operation.operationId);
+    const output = path.join(directory, `${operation.leaseToken}.mp3`);
+    const audio = { path: path.join(directory, 'audio.upload'), originalname: upload.audioName, size: upload.audioSize } as Express.Multer.File;
+    const picture = { path: path.join(directory, 'picture.upload'), originalname: upload.pictureName, size: upload.pictureSize } as Express.Multer.File;
+    try {
+      await this.create({ name: upload.name, artist: upload.artist, text: upload.text } as CreateTrackDto,
+        picture, audio, operation.operationId,
+        { id: String(operation.ownerId), role: 'user', username: '', displayName: '' }, { operation, output });
+    } finally { await rm(output, { force: true }); }
+  }
+
   async create(
     dto: CreateTrackDto,
     picture: Express.Multer.File,
     audio: Express.Multer.File,
     operationId: string,
     actor?: Actor,
+    job?: { operation: MediaOperation; output: string },
   ): Promise<TrackDetail> {
     const identity = new PermissionService().requireActor(actor);
     if (!audio) {
@@ -76,10 +131,10 @@ export class TrackService {
       throw new BadRequestException('Upload operation identity is missing or invalid');
     }
 
-    const trackId = new Types.ObjectId();
+    const trackId = job?.operation.trackId ?? new Types.ObjectId();
     let intentCreated = false;
     let committed = false;
-    let leaseToken: string | undefined;
+    let leaseToken: string | undefined = job?.operation.leaseToken;
     let audioPrints: AudioFingerprints | undefined;
 
     const nameKey = normalizeTrackIdentity(dto.name);
@@ -108,14 +163,26 @@ export class TrackService {
       // Still private: no allocated or public file exists when preflight rejects.
       audioPrints = await this.fingerprints.compute(audio.path);
       await this.assertNoAudioDuplicate(audioPrints);
-      const audioFile = this.fileService.allocateFile(FileType.AUDIO, audio.originalname);
+      const compatiblePath = job?.output ?? path.join(path.dirname(audio.path), `${operationId}.mp3`);
+      if (audioMetadata.durationSeconds > 3600) throw new BadRequestException('Audio duration exceeds one hour');
+      await this.mediaValidator.createCompatibleAudio(audio.path, compatiblePath);
+      const compatibleMetadata = await this.mediaValidator.validateAudio(compatiblePath, 'compatible.mp3');
+      if (Math.abs(compatibleMetadata.durationSeconds - audioMetadata.durationSeconds) > 2) {
+        throw new BadRequestException('Compatible audio was truncated');
+      }
+      const compatibleSize = (await stat(compatiblePath)).size;
+      await this.assertNoAudioDuplicate(audioPrints);
+      await this.assertNoAudioDuplicate(await this.fingerprints.compute(compatiblePath));
+      const audioFile = this.fileService.allocateFile(FileType.AUDIO, 'compatible.mp3');
+      if (job) audioFile.name = job.operation.audioKey!;
       const pictureFile = this.fileService.allocateFile(FileType.PICTURE, picture.originalname);
+      if (job) pictureFile.name = job.operation.pictureKey!;
       const validatedMetadata = {
         audioDurationSeconds: audioMetadata.durationSeconds,
-        audioSizeBytes: audio.size,
+        audioSizeBytes: compatibleSize,
         audioMimeType: audioFile.mimeType,
-        audioCodec: audioMetadata.codec,
-        audioContainer: audioMetadata.container,
+        audioCodec: compatibleMetadata.codec,
+        audioContainer: compatibleMetadata.container,
         pictureSizeBytes: picture.size,
         pictureMimeType: pictureFile.mimeType,
         pictureWidth: coverMetadata.width,
@@ -124,37 +191,44 @@ export class TrackService {
         picturePages: coverMetadata.pages,
       };
 
-      await this.operationModel.create({
-        operationId,
-        kind: 'upload',
-        trackId,
-        audioKey: audioFile.name,
-        pictureKey: pictureFile.name,
-        stageDirectory: operationId,
-        metadata: validatedMetadata,
-        ownerId: new Types.ObjectId(identity.id),
-        state: 'uploading',
-        attempts: 0,
-        nextAttemptAt: new Date(),
-      });
-      intentCreated = true;
+      if (!job) {
+        await this.operationModel.create({
+          operationId,
+          kind: 'upload',
+          trackId,
+          audioKey: audioFile.name,
+          pictureKey: pictureFile.name,
+          stageDirectory: operationId,
+          metadata: validatedMetadata,
+          ownerId: new Types.ObjectId(identity.id),
+          state: 'uploading',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+        });
+        intentCreated = true;
 
-      leaseToken = randomUUID();
-      const leased = await this.operationModel.updateOne(
-        { operationId, trackId, state: 'uploading' },
-        {
-          $set: {
-            state: 'publishing',
-            leaseOwner: `http:${operationId}`,
-            leaseToken,
-            leaseUntil: new Date(Date.now() + 30_000),
+        leaseToken = randomUUID();
+        const leased = await this.operationModel.updateOne(
+          { operationId, trackId, state: 'uploading' },
+          {
+            $set: {
+              state: 'publishing',
+              leaseOwner: `http:${operationId}`,
+              leaseToken,
+              leaseUntil: new Date(Date.now() + 30_000),
+            },
           },
-        },
-      ).exec();
-      if (leased.matchedCount !== 1) throw new Error('Upload operation could not acquire its publication lease');
+        ).exec();
+        if (leased.matchedCount !== 1) throw new Error('Upload operation could not acquire its publication lease');
 
-      await this.fileService.publishStagedFile(FileType.AUDIO, audio.path, audio.originalname, audioFile.name);
-      await this.fileService.publishStagedFile(FileType.PICTURE, picture.path, picture.originalname, pictureFile.name);
+      }
+      if (job) {
+        const owned = await this.operationModel.exists({ operationId, state: 'processing', leaseToken, leaseUntil: { $gt: new Date() } }).exec();
+        if (!owned) throw new Error('Upload lease lost');
+      }
+      await this.fileService.publishStagedFile(FileType.AUDIO, compatiblePath, 'compatible.mp3', audioFile.name, Boolean(job));
+      await this.fileService.publishStagedFile(FileType.PICTURE, picture.path, picture.originalname, pictureFile.name, Boolean(job));
+      if (job) await rm(job.output, { force: true });
 
       let createdTrack: TrackDocument | undefined;
       const session = await this.connection.startSession();
@@ -177,13 +251,13 @@ export class TrackService {
             lifecycle: 'active',
             publishedAt: new Date(),
           });
-          await commitAccountQuota(this.connection, identity.id, operationId, trackId, audio.size + picture.size, session);
+          await commitAccountQuota(this.connection, identity.id, operationId, trackId, compatibleSize + picture.size + (job ? audio.size + picture.size : 0), session);
           await track.save({ session });
 
           const completed = await this.operationModel.updateOne(
-            { operationId, trackId, state: 'publishing', leaseToken },
+            { operationId, trackId, state: job ? 'processing' : 'publishing', leaseToken, ...(job ? { leaseUntil: { $gt: new Date() } } : {}) },
             {
-              $set: { state: 'done', nextAttemptAt: new Date() },
+              $set: { state: 'done', ...(job ? { result: 'published', metadata: validatedMetadata } : {}), nextAttemptAt: new Date() },
               $unset: { leaseOwner: '', leaseToken: '', leaseUntil: '' },
             },
             { session },
@@ -209,7 +283,7 @@ export class TrackService {
       committed = true;
       return toTrackDetail(createdTrack);
     } catch (error) {
-      if (intentCreated && !committed) await this.markUploadForCleanup(operationId, leaseToken, error);
+      if (!job && intentCreated && !committed) await this.markUploadForCleanup(operationId, leaseToken, error);
       // Cleanup must happen before looking up the winner of a publication race.
       if (error instanceof mongoose.mongo.MongoServerError && error.code === 11000
         && error.message.includes(`index: ${TRACK_IDENTITY_INDEX} dup key`)) {

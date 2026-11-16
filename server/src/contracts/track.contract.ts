@@ -80,3 +80,14 @@ export class DeletionAccepted {
   @ApiProperty({ enum: ['accepted'], example: 'accepted' })
   status: 'accepted';
 }
+
+/** Owner-only durable upload progress; track is playable only after published. */
+export class UploadJobStatus {
+  @ApiProperty() operationId: string;
+  @ApiProperty() trackId: string;
+  @ApiProperty({ enum: ['queued', 'processing', 'published', 'failed'] })
+  status: 'queued' | 'processing' | 'published' | 'failed';
+  @ApiProperty({ required: false }) errorCode?: string;
+  @ApiProperty({ required: false }) existingTrackId?: string;
+  @ApiProperty({ required: false }) duplicateReason?: string;
+}

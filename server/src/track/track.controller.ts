@@ -36,6 +36,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  UploadJobStatus,
   DeletionAccepted,
   ListenResult,
   PlayableTrack,
@@ -121,6 +122,54 @@ export class TrackController {
     if (!operationId) throw new InternalServerErrorException('Upload operation reservation is missing');
 
     return this.trackService.create(dto, picture[0], audio[0], operationId, actor);
+  }
+
+  @Post('uploads')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: {
+    type: 'object',
+    required: ['name', 'picture', 'audio'],
+    properties: {
+      name: { type: 'string', maxLength: 200, example: 'Track title' },
+      artist: { type: 'string', maxLength: 200 },
+      text: { type: 'string', maxLength: 100_000, description: 'Track lyrics' },
+      duration: { type: 'string', pattern: '^\\d+(?:\\.\\d+)?$', example: '180' },
+      picture: { type: 'string', format: 'binary' },
+      audio: { type: 'string', format: 'binary' },
+    },
+  } })
+  @ApiAcceptedResponse({ type: UploadJobStatus })
+  @ApiServiceUnavailableResponse({ description: 'Upload protection index or media validation unavailable', type: ApiErrorDto })
+  @ApiStandardErrors({ authenticated: true, payloadTooLarge: true, unsupportedMediaType: true, conflict: true, rateLimited: true })
+  @UseGuards(UploadAdmissionGuard)
+  @UseInterceptors(UploadStagingInterceptor)
+  async enqueue(
+    @Body() dto: CreateTrackDto,
+    @CurrentActor() actor: Actor,
+    @UploadedFiles()
+    files: Record<string, Express.Multer.File[]>,
+    @Req() request: Request & UploadRequestContext,
+  ) {
+    const { picture, audio } = files ?? {};
+
+    if (!picture?.[0] || !audio?.[0]) {
+      throw new BadRequestException('picture and audio are required');
+    }
+    const operationId = request[UPLOAD_RESERVATION]?.operationId;
+    if (!operationId) throw new InternalServerErrorException('Upload operation reservation is missing');
+
+    const result = await this.trackService.enqueue(dto, picture[0], audio[0], operationId, actor);
+    request[UPLOAD_RESERVATION]!.durable = true;
+    return result;
+  }
+
+  @Get('uploads/:operationId')
+  @ApiParam({ name: 'operationId', type: String })
+  @ApiOkResponse({ type: UploadJobStatus })
+  @ApiStandardErrors({ authenticated: true, notFound: true })
+  uploadStatus(@Param('operationId') operationId: string, @CurrentActor() actor: Actor) {
+    return this.trackService.uploadStatus(operationId, actor);
   }
 
   @Public()

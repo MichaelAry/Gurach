@@ -11,7 +11,7 @@ interface QuotaAccount {
 }
 export function quotaAccounts(connection: Connection) { return connection.db!.collection<QuotaAccount>('users'); }
 
-export const UPLOAD_RESERVE_BYTES = FILE_POLICY.maxAudioBytes + FILE_POLICY.maxCoverBytes;
+export const UPLOAD_RESERVE_BYTES = 3 * FILE_POLICY.maxAudioBytes + 2 * FILE_POLICY.maxCoverBytes;
 export const UPLOAD_RESERVE_MS = 60 * 60_000;
 
 export async function reserveAccountQuota(connection: Connection, ownerId: string, operationId: string) {
@@ -28,7 +28,7 @@ export async function reserveAccountQuota(connection: Connection, ownerId: strin
 export async function commitAccountQuota(connection: Connection, ownerId: string, operationId: string,
   trackId: Types.ObjectId, bytes: number, session: ClientSession) {
   if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > UPLOAD_RESERVE_BYTES) throw new ServiceUnavailableException('Invalid upload quota size');
-  const result = await quotaAccounts(connection).updateOne({ _id: new Types.ObjectId(ownerId), quotaReady: true,
+  const result = await quotaAccounts(connection).updateOne({ _id: new Types.ObjectId(ownerId), disabled: false, quotaReady: true,
     quotaEntries: { $elemMatch: { operationId, state: 'reserved', expiresAt: { $gt: new Date() } } },
   }, { $set: { 'quotaEntries.$.state': 'committed', 'quotaEntries.$.bytes': bytes, 'quotaEntries.$.trackId': trackId },
     $unset: { 'quotaEntries.$.expiresAt': '' } }, { session });

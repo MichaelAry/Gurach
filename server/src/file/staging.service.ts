@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, realpath, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { MediaKind } from './file-policy.js';
 
@@ -64,6 +64,18 @@ export class StagingService {
     const filePath = path.join(operationPath, STAGE_NAME[kind]);
     const handle = await open(filePath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     return { path: filePath, handle };
+  }
+
+  async removeDerivedFiles(operationId: string): Promise<void> {
+    const directory = this.resolveOperationPath(operationId);
+    try {
+      await this.assertPrivateDirectory(directory);
+      for (const name of await readdir(directory)) {
+        if (/^[a-f0-9-]{36}\.mp3$/i.test(name)) await rm(path.join(directory, name), { force: true });
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 
   async removeOperation(operationId: string): Promise<void> {

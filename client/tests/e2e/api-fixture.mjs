@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 const port = Number(process.env.FIXTURE_API_PORT ?? 5300);
 const total = 121;
@@ -30,6 +30,7 @@ const commentsByTrack = new Map([
 ]);
 let failFirstNextCommentPage = true;
 const sessions = new Map();
+const uploadJobs = new Map();
 const accountFavorites = new Map();
 const accountQueues = new Map();
 const accountHistory = new Map();
@@ -207,7 +208,7 @@ const server = createServer((request, response) => {
     response.end('{"status":"ok"}');
     return;
   }
-  if (url.pathname === '/tracks' && request.method === 'POST') {
+  if (['/tracks', '/tracks/uploads'].includes(url.pathname) && request.method === 'POST') {
     if (!sessionUser) { response.writeHead(401); response.end(); return; }
     const chunks = [];
     request.on('data', (chunk) => chunks.push(chunk));
@@ -225,13 +226,30 @@ const server = createServer((request, response) => {
           lyrics: String(form.get('text') ?? ''), ownerId: sessionUser.id,
           audio: tracks[0].audio, picture: null, duration: 20, listens: 0,
         };
-        tracks.push(track);
-        response.writeHead(201, { 'content-type': 'application/json' });
-        response.end(JSON.stringify(track));
+        if (url.pathname === '/tracks/uploads') {
+          const operationId = randomUUID();
+          uploadJobs.set(operationId, { track, ownerId: sessionUser.id, polls: 0 });
+          response.writeHead(202, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ operationId, trackId: track._id, status: 'queued' }));
+        } else {
+          tracks.push(track);
+          response.writeHead(201, { 'content-type': 'application/json' });
+          response.end(JSON.stringify(track));
+        }
       } catch {
         response.writeHead(400); response.end();
       }
     });
+    return;
+  }
+  const uploadMatch = /^\/tracks\/uploads\/([a-f0-9-]{36})$/i.exec(url.pathname);
+  if (uploadMatch && request.method === 'GET') {
+    const job = uploadJobs.get(uploadMatch[1]);
+    if (!sessionUser || job?.ownerId !== sessionUser.id) { response.writeHead(404); response.end(); return; }
+    job.polls += 1;
+    if (job.polls === 2) tracks.push(job.track);
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ operationId: uploadMatch[1], trackId: job.track._id, status: job.polls < 2 ? 'processing' : 'published' }));
     return;
   }
   if (url.pathname === '/tracks' && request.method === 'GET') {

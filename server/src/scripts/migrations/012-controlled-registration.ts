@@ -29,7 +29,16 @@ async function entriesFor(db: Db, ownerId: ObjectId) {
       if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Quota backfill requires regular media files');
       bytes += stat.size;
     }
-    entries.push({ operationId: `legacy:${String(track._id)}`, trackId: track._id, bytes, state: 'committed' });
+    const upload = await db.collection('mediaoperations').findOne({ trackId: track._id, kind: 'upload', result: 'published', upload: { $exists: true } });
+    if (upload) {
+      if (typeof upload.operationId !== 'string' || !/^[a-f0-9-]{36}$/i.test(upload.operationId)) throw new Error('Unsafe private media operation');
+      for (const file of ['audio.upload', 'picture.upload']) {
+        const stat = await lstat(path.join(env.mediaStagingDir, upload.operationId, file));
+        if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Quota verification requires private originals');
+        bytes += stat.size;
+      }
+    }
+    entries.push({ operationId: upload?.operationId ?? `legacy:${String(track._id)}`, trackId: track._id, bytes, state: 'committed' });
   }
   return entries;
 }

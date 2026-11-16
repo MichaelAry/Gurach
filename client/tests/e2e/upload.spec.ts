@@ -94,8 +94,10 @@ test('publishes through the proxy and exposes the track to another account', asy
     const published = page.waitForResponse((response) => response.url().endsWith('/api/tracks') && response.request().method() === 'POST')
     await page.getByRole('button', { name: 'Загрузить трек', exact: true }).click()
     const response = await published
-    expect(response.status()).toBe(201)
-    const track = await response.json()
+    expect(response.status()).toBe(202)
+    const job = await response.json()
+    expect(job.status).toBe('queued')
+    const track = { _id: job.trackId }
     await expect(page).toHaveURL(new RegExp(`/tracks/${track._id}$`))
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     await reader.reload()

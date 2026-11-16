@@ -136,14 +136,14 @@ export class UploadStagingInterceptor implements NestInterceptor {
 
   private async cleanup(request: Request & UploadRequestContext, reservation: UploadReservation): Promise<void> {
     try {
-      await this.staging.removeOperation(reservation.operationId);
+      if (!reservation.durable) await this.staging.removeOperation(reservation.operationId);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
       this.logger.error(`Could not clean staged upload operation ${reservation.operationId} (code: ${code})`);
       throw error;
     } finally {
       reservation.release();
-      await reservation.releaseQuota?.();
+      if (!reservation.durable) await reservation.releaseQuota?.();
       delete request[UPLOAD_RESERVATION];
     }
   }
