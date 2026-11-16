@@ -165,7 +165,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
     const date = new Date()
     date.setDate(date.getDate() - 6 + i)
     return {
-      day: date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric' }),
+      day: date.toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
       count:
         history.data?.items.filter(
           (item) => new Date(item.listenedAt).toDateString() === date.toDateString(),
@@ -194,7 +194,7 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
                 <MusicRows tracks={recommendations} />
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Пока нет подходящих рекомендаций. <Link href="/tracks">Открыть каталог</Link>
+                  {t('recommendationsEmpty')} <Link href="/tracks">{t('catalog')}</Link>
                 </Typography>
               )}
             </>
@@ -214,15 +214,15 @@ function Personal({ releases }: { releases: ReleasesBlock }) {
             {history.data && (
               <Typography variant="body2" color="text.secondary">
                 {week.some((day) => day.count > 0)
-                  ? <>Прослушивания за последние 7 дней (по выборке из 30 последних):{' '}
+                  ? <>{t('weekSample')}:{' '}
                       {week.map((day) => `${day.day}: ${day.count}`).join(' · ')}
                     </>
-                  : 'Среди 30 последних прослушиваний нет событий за последние 7 дней.'}
+                  : t('weekEmpty')}
               </Typography>
             )}
             {history.data && history.data.items.length === 0 && (
               <Typography variant="body2" color="text.secondary">
-                История прослушиваний пока пуста. <Link href="/tracks">Выбрать трек</Link>
+                {t('historyEmpty')} <Link href="/tracks">{t('catalog')}</Link>
               </Typography>
             )}
             {history.data && history.data.items.length > 0 && (
@@ -295,7 +295,7 @@ function HomeContent() {
       }}
     >
       <Typography variant="overline" color="text.secondary">
-        GURACH / МУЗЫКА РЯДОМ
+        GURACH / MUSIC
       </Typography>
       <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
         {t('hero')}
