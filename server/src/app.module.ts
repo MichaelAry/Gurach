@@ -1,3 +1,4 @@
+import { PlaylistsModule } from './playlists/playlists.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { HomeModule } from './home/home.module.js';
 import { FriendsModule } from './friends/friends.module.js';
@@ -17,7 +18,7 @@ import { CommentModule } from './comment/comment.module.js';
 import { AuthModule } from './auth/auth.module.js';
 
 @Module({
-  imports: [NotificationsModule,
+  imports: [PlaylistsModule, NotificationsModule,
     HomeModule,
     AccountModule,
     FriendsModule,

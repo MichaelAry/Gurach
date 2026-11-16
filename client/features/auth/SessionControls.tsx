@@ -21,6 +21,7 @@ export function SessionControls() {
   }
   return <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 1, flexWrap: 'wrap' }}>
     {confirmed && <NotificationIndicator />}
+    <Button component={Link} href="/playlists">Плейлисты</Button>
     <Button component={Link} href="/account" aria-label="Мой аккаунт">{user.displayName}</Button>
     <Button disabled={pending} onClick={() => void logout()}>{pending ? 'Выходим…' : 'Выйти'}</Button>
     {error && <Typography variant="caption">Сессия временно не подтверждена. <Button onClick={refresh}>Проверить сессию</Button></Typography>}

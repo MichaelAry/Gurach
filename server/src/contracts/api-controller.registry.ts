@@ -1,3 +1,4 @@
+import { PlaylistsController } from '../playlists/playlists.controller.js';
 import { NotificationsController } from '../notifications/notifications.controller.js';
 import { HomeController } from '../home/home.controller.js';
 import { FriendsController } from '../friends/friends.controller.js';
@@ -14,4 +15,4 @@ export const TRACK_API_CONTROLLERS = [TrackController] as const;
 export const COMMENT_API_CONTROLLERS = [CommentController] as const;
 export const HEALTH_API_CONTROLLERS = [HealthController] as const;
 export const HOME_API_CONTROLLERS = [HomeController] as const;
-export const API_CONTROLLERS = [NotificationsController, ...HOME_API_CONTROLLERS, ...TRACK_API_CONTROLLERS, ...COMMENT_API_CONTROLLERS, ...HEALTH_API_CONTROLLERS, AuthController, QueueController, AccountController, FriendsController, UsersController] as const;
+export const API_CONTROLLERS = [PlaylistsController, NotificationsController, ...HOME_API_CONTROLLERS, ...TRACK_API_CONTROLLERS, ...COMMENT_API_CONTROLLERS, ...HEALTH_API_CONTROLLERS, AuthController, QueueController, AccountController, FriendsController, UsersController] as const;
