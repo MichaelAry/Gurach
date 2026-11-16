@@ -5,6 +5,7 @@ import { Alert, Box, Button, Stack, Typography } from '@mui/material'
 import type { TrackListItem } from '@/features/tracks/types'
 import { TrackRow } from '@/features/tracks/components/TrackRow'
 import { getAccountData, type AccountPage, type HistoryItem } from './api'
+import { TrackMetadataEditor } from './TrackMetadataEditor'
 import { useAccountData } from './useAccountData'
 
 type Row = TrackListItem | HistoryItem
@@ -23,6 +24,8 @@ export function AccountTracks({ kind, revision }: { kind: 'uploads' | 'history' 
 
 function AccountTrackPages({ kind, initialPage }: { kind: 'uploads' | 'history' | 'favorites'; initialPage: AccountPage<Row> }) {
   const [page, setPage] = useState(initialPage)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const request = useRef<AbortController | null>(null)
@@ -50,6 +53,12 @@ function AccountTrackPages({ kind, initialPage }: { kind: 'uploads' | 'history' 
 
   return (
     <Stack spacing={2}>
+      {saved && <Alert severity="success" onClose={() => setSaved(false)}>Изменения сохранены.</Alert>}
+      {editingId && <TrackMetadataEditor id={editingId} onClose={() => setEditingId(null)} onSaved={(track) => {
+        setPage((old) => ({ ...old, items: old.items.map((row) => !('listenedAt' in row) && row._id === track._id
+          ? { ...row, name: track.name, artist: track.artist } : row) }))
+        setSaved(true)
+      }} />}
       {!page.items.length && <Typography variant="body2" color="text.secondary">{kind === 'favorites' ? 'В избранном пока нет треков. Нажмите сердечко рядом с понравившимся треком.' : kind === 'uploads' ? 'Вы ещё не загрузили ни одного трека.' : 'Вы ещё не прослушали ни одного трека после начала учёта истории.'}</Typography>}
       {page.items.map((row) => (
         <Box key={rowId(row)}>
@@ -58,7 +67,10 @@ function AccountTrackPages({ kind, initialPage }: { kind: 'uploads' | 'history' 
               {new Date(row.listenedAt).toLocaleString('ru-RU')}
             </Typography>
             {row.track ? <TrackRow track={row.track} /> : <Typography color="text.secondary">Трек недоступен</Typography>}
-          </> : <TrackRow track={row} />}
+          </> : <>
+            <TrackRow track={row} />
+            {kind === 'uploads' && <Button size="small" aria-label={`Редактировать трек ${row.name}`} onClick={() => { setSaved(false); setEditingId(row._id) }}>Редактировать</Button>}
+          </>}
         </Box>
       ))}
       {error && <Alert severity="error">{error}</Alert>}

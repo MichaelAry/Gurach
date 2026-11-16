@@ -20,6 +20,7 @@ import {
   encodeCursor,
   encodeScopedCursor,
 } from '../common/cursor.js';
+import { UpdateTrackDto } from './dto/update-track.dto.js';
 import { CreateTrackDto } from './dto/create-track.dto.js';
 import {
   DeletionAccepted,
@@ -242,13 +243,15 @@ export class TrackService {
     } finally { await candidates.close(); }
   }
 
-  private async findDuplicate(nameKey: string, artistKey: string): Promise<string | undefined> {
-    const keyed = await this.trackModel.findOne({ lifecycle: 'active', nameKey, artistKey }).select('_id').lean().exec();
+  private async findDuplicate(nameKey: string, artistKey: string, excludeId?: Types.ObjectId): Promise<string | undefined> {
+    const exclusion = excludeId ? { _id: { $ne: excludeId } } : {};
+    const keyed = await this.trackModel.findOne({ lifecycle: 'active', nameKey, artistKey, ...exclusion }).select('_id').lean().exec();
     if (keyed) return String(keyed._id);
     // A partial index alone cannot protect a legacy catalogue. Check all unkeyed
     // active rows with the same JS normalizer until the complete backfill passes.
     const legacy = this.trackModel.find({
       lifecycle: 'active',
+      ...exclusion,
       $or: [{ nameKey: { $not: { $type: 'string' } } }, { artistKey: { $not: { $type: 'string' } } }],
     }).select('_id name artist').lean().cursor();
     for await (const track of legacy) {
@@ -328,6 +331,72 @@ export class TrackService {
     }
 
     return toTrackDetail(track);
+  }
+
+  async update(id: string, dto: UpdateTrackDto, actor?: Actor): Promise<TrackDetail> {
+    const permissions = new PermissionService();
+    const identity = permissions.requireActor(actor);
+    this.assertValidId(id);
+    if (dto.name === undefined && dto.artist === undefined && dto.text === undefined) {
+      throw new BadRequestException('Provide at least one of: name, artist, text');
+    }
+    const trackId = new Types.ObjectId(id);
+    const eventId = `${randomUUID()}:updated`;
+    let nameKey = '';
+    let artistKey = '';
+    let result: TrackDetail | undefined;
+    const session = await this.connection.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const current = await this.trackModel.findOne({ _id: trackId, lifecycle: 'active' }).session(session).lean().exec();
+        if (!current) throw new NotFoundException(`Track with id "${id}" was not found`);
+        permissions.assertOwner(identity, current.ownerId);
+
+        const indexes = await this.trackModel.collection.listIndexes().toArray();
+        if (!indexes.some(isTrackIdentityIndex)) {
+          throw new ServiceUnavailableException('Track identity index is missing; run migration 008-track-identity');
+        }
+        nameKey = normalizeTrackIdentity(dto.name ?? current.name);
+        artistKey = normalizeTrackIdentity(dto.artist ?? current.artist);
+        const duplicate = await this.findDuplicate(nameKey, artistKey, trackId);
+        if (duplicate) throw new DuplicateTrackError(duplicate);
+
+        // An explicit $set keeps media, fingerprints, ownership and counters untouched.
+        // The transaction retries against fresh metadata after concurrent edits/deletion.
+        const updated = await this.trackModel.findOneAndUpdate(
+          { _id: trackId, lifecycle: 'active', ...(identity.role === 'admin' ? {} : { ownerId: new Types.ObjectId(identity.id) }) },
+          { $set: {
+            ...(dto.name !== undefined ? { name: dto.name } : {}),
+            ...(dto.artist !== undefined ? { artist: dto.artist } : {}),
+            ...(dto.text !== undefined ? { text: dto.text } : {}),
+            nameKey,
+            artistKey,
+          } },
+          { session, returnDocument: 'after', runValidators: true },
+        ).select('_id name artist audio picture duration listens text ownerId').lean().exec();
+        if (!updated) throw new NotFoundException(`Track with id "${id}" was not found`);
+        await this.cacheEventModel.create([{
+          eventId,
+          type: 'track.updated',
+          trackId,
+          state: 'pending',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+        }], { session });
+        result = toTrackDetail(updated);
+      });
+    } catch (error) {
+      if (error instanceof mongoose.mongo.MongoServerError && error.code === 11000
+        && error.message.includes(`index: ${TRACK_IDENTITY_INDEX} dup key`)) {
+        const existing = await this.findDuplicate(nameKey, artistKey, trackId).catch(() => undefined);
+        throw new DuplicateTrackError(existing);
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+    if (!result) throw new Error('Update transaction committed without returning its track');
+    return result;
   }
 
   async deleteOne(id: string, actor?: Actor): Promise<DeletionAccepted> {

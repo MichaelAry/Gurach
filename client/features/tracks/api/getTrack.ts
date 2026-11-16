@@ -6,7 +6,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 export async function getTrack(id: string): Promise<TrackDetail | null> {
   'use cache'
   cacheLife('minutes')
-  cacheTag(`track:${id}`)
+  cacheTag(`track:${id.toLowerCase()}`)
 
   if (!/^[a-f\d]{24}$/i.test(id)) return null
   const response = await fetchBackend(`/tracks/${encodeURIComponent(id)}`)

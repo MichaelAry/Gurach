@@ -1,12 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { revalidateTag } from 'next/cache'
+import { invalidateTrackCaches } from '@/lib/server/track-cache'
 
 const SECRET_HEADER = 'x-gurach-cache-secret'
 const MAX_BODY_BYTES = 4 * 1024
 const OBJECT_ID = /^[a-f\d]{24}$/i
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-type CacheEventType = 'track.activated' | 'track.deleted'
+type CacheEventType = 'track.activated' | 'track.deleted' | 'track.updated'
 
 interface CacheEventMessage {
   eventId: string
@@ -73,12 +73,13 @@ function parseEvent(value: unknown): CacheEventMessage | null {
     typeof record.eventId !== 'string' ||
     typeof record.trackId !== 'string' ||
     !OBJECT_ID.test(record.trackId) ||
-    (record.type !== 'track.activated' && record.type !== 'track.deleted')
+    (record.type !== 'track.activated' && record.type !== 'track.deleted' && record.type !== 'track.updated')
   ) return null
 
-  const eventIdValid = record.type === 'track.activated'
-    ? typeof record.eventId === 'string' && record.eventId.length === 46 && `${record.eventId}`.endsWith(':activated') && UUID_V4.test(record.eventId.slice(0, -10))
-    : record.eventId === `track.deleted:${record.trackId.toLowerCase()}`
+  const suffix = record.type === 'track.activated' ? ':activated' : ':updated'
+  const eventIdValid = record.type === 'track.deleted'
+    ? record.eventId === `track.deleted:${record.trackId.toLowerCase()}`
+    : record.eventId.endsWith(suffix) && UUID_V4.test(record.eventId.slice(0, -suffix.length))
   if (!eventIdValid) return null
   return {
     eventId: record.eventId,
@@ -105,9 +106,6 @@ export async function POST(request: Request): Promise<Response> {
   const event = parseEvent(parsed.value)
   if (!event) return response(400, { error: true })
 
-  const tags = ['tracks', `track:${event.trackId}`]
-  if (event.type === 'track.deleted') tags.push(`track-comments:${event.trackId}`)
-  // The installed Next revalidateTag API supports CacheLifeConfig; expire: 0 makes stale entries unusable immediately.
-  for (const tag of tags) revalidateTag(tag, { expire: 0 })
+  invalidateTrackCaches(event.trackId, { comments: event.type === 'track.deleted' })
   return response(202, { accepted: true })
 }

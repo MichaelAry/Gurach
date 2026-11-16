@@ -1,6 +1,6 @@
 export interface CacheEventMessage {
   eventId: string;
-  type: 'track.activated' | 'track.deleted';
+  type: 'track.activated' | 'track.deleted' | 'track.updated';
   trackId: string;
 }
 

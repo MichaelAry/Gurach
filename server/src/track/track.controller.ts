@@ -12,6 +12,7 @@ import {
   HttpStatus,
   InternalServerErrorException,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -44,6 +45,7 @@ import { ApiStandardErrors } from '../contracts/api-response.decorators.js';
 import { env } from '../common/env.js';
 import { parseCursorPageQuery } from './dto/list-tracks-query.dto.js';
 import { parseSearchTracksQuery } from './dto/search-tracks-query.dto.js';
+import { UpdateTrackDto } from './dto/update-track.dto.js';
 import { CreateTrackDto } from './dto/create-track.dto.js';
 import { TrackService } from './track.service.js';
 import { UploadAdmissionGuard } from '../file/upload-admission.guard.js';
@@ -146,6 +148,15 @@ export class TrackController {
   @ApiStandardErrors({ notFound: true })
   getOne(@Param('id') id: string) {
     return this.trackService.getOne(id);
+  }
+
+  @Patch(':id')
+  @ApiParam({ name: 'id', schema: { type: 'string', pattern: '^[a-fA-F0-9]{24}$' } })
+  @ApiOkResponse({ type: TrackDetail })
+  @ApiServiceUnavailableResponse({ description: 'Track identity index unavailable', type: ApiErrorDto })
+  @ApiStandardErrors({ authenticated: true, notFound: true, conflict: true })
+  update(@Param('id') id: string, @Body() dto: UpdateTrackDto, @CurrentActor() actor: Actor) {
+    return this.trackService.update(id, dto, actor);
   }
 
   @Delete(':id')

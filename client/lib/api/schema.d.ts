@@ -449,7 +449,7 @@ export interface paths {
         delete: operations["TrackController_deleteOne"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["TrackController_update"];
         trace?: never;
     };
     "/tracks/{id}/listen": {
@@ -874,6 +874,14 @@ export interface components {
             items: components["schemas"]["TrackListItem"][];
             /** @example eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9 */
             nextCursor: string | null;
+        };
+        UpdateTrackDto: {
+            /** @example Artist name */
+            artist?: string;
+            /** @example Track title */
+            name?: string;
+            /** @example Track lyrics */
+            text?: string;
         };
         UserSearchPage: {
             items: components["schemas"]["SocialUserProfile"][];
@@ -3046,6 +3054,92 @@ export interface operations {
             };
             /** @description Unexpected server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+        };
+    };
+    TrackController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTrackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackDetail"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Request conflicts with existing data */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Track identity index unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

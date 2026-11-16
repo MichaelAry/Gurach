@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
-export const CACHE_EVENT_TYPES = ['track.activated', 'track.deleted'] as const;
+export const CACHE_EVENT_TYPES = ['track.activated', 'track.deleted', 'track.updated'] as const;
 export type CacheEventType = (typeof CACHE_EVENT_TYPES)[number];
 
 export const CACHE_EVENT_STATES = ['pending', 'delivered'] as const;

@@ -150,7 +150,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
 
   private async claimNextCacheEvent(): Promise<{
     eventId: string;
-    type: 'track.activated' | 'track.deleted';
+    type: 'track.activated' | 'track.deleted' | 'track.updated';
     trackId: string;
     leaseToken: string;
     attempts: number;
@@ -188,7 +188,7 @@ export class MaintenanceService implements OnModuleInit, OnModuleDestroy {
 
   private async deliverClaimedEvent(event: {
     eventId: string;
-    type: 'track.activated' | 'track.deleted';
+    type: 'track.activated' | 'track.deleted' | 'track.updated';
     trackId: string;
     leaseToken: string;
     attempts: number;

@@ -3,7 +3,7 @@ import { proxyBackend } from '@/lib/server/backend'
 import { apiErrorResponse } from '@/lib/server/api-error-response'
 import { checkBrowserMutation } from '@/lib/server/csrf'
 import { sessionToken } from '@/lib/server/session'
-import { revalidateTag } from 'next/cache'
+import { invalidateTrackCaches } from '@/lib/server/track-cache'
 
 // 50 MiB audio + 10 MiB cover, with room for text fields and multipart headers.
 const MAX_UPLOAD_BYTES = 61 * 1024 * 1024
@@ -52,10 +52,11 @@ export async function POST(request: Request) {
   if (tooLarge) return apiErrorResponse(413, 'PAYLOAD_TOO_LARGE', 'Upload exceeds the request size limit', requestId)
   if (response.status === 201) {
     // Invalidate shared data before the browser opens the newly published track.
-    revalidateTag('tracks', { expire: 0 })
     const track: unknown = await response.clone().json().catch(() => null)
     if (track && typeof track === 'object' && '_id' in track && typeof track._id === 'string' && /^[a-f\d]{24}$/i.test(track._id)) {
-      revalidateTag(`track:${track._id.toLowerCase()}`, { expire: 0 })
+      invalidateTrackCaches(track._id)
+    } else {
+      invalidateTrackCaches()
     }
   }
   return response
