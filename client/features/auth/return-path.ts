@@ -1,5 +1,5 @@
 const localOrigin = 'https://local.invalid'
-const productPath = /^\/(?:tracks(?:\/[a-f\d]{24})?|upload|account|favorites|friends|users\/[a-zA-Z0-9_]+)?\/?$/
+const productPath = /^\/(?:tracks(?:\/[a-f\d]{24})?|player|upload|account|favorites|friends|users\/[a-zA-Z0-9_]+)?\/?$/
 
 export function safeReturnPath(value: string | null | undefined): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\x00-\x20\x7f]/.test(value)) return '/'

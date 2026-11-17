@@ -3,7 +3,7 @@ import { safeReturnPath } from './return-path'
 
 it.each([
   '/', '/tracks', '/tracks/', '/tracks/0123456789abcdef01234567',
-  '/upload', '/account', '/favorites', '/friends', '/users/alice_1',
+  '/player', '/player?returnTo=%2Ftracks%3Fsearch%3Dmusic', '/upload', '/account', '/favorites', '/friends', '/users/alice_1',
   '/tracks?search=%D0%BC%D1%83%D0%B7%D1%8B%D0%BA%D0%B0&page=2',
   '/tracks?search=hello+world&filter=a%26b%3Dc#results',
   '/tracks/0123456789abcdef01234567?view=all#comment-123',

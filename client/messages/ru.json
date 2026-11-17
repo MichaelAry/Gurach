@@ -76,6 +76,9 @@
     "login": "Войти"
   },
   "ui": {
+    "openFullscreenPlayer": "Открыть полноэкранный плеер",
+    "closeFullscreenPlayer": "Свернуть плеер",
+    "openTrackCatalogue": "Открыть каталог треков",
     "theDisplayNameCannotContainOnlySpaces": "Отображаемое имя не должно состоять только из пробелов.",
     "thePasswordMustContainCharactersAndUseNoMore": "Пароль должен содержать от 8 до 128 символов и занимать не более 512 байт UTF-8.",
     "thisUsernameIsAlreadyTaken": "Это имя пользователя уже занято.",

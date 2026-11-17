@@ -76,6 +76,9 @@
     "login": "Sign in"
   },
   "ui": {
+    "openFullscreenPlayer": "Open fullscreen player",
+    "closeFullscreenPlayer": "Collapse player",
+    "openTrackCatalogue": "Open track catalogue",
     "theDisplayNameCannotContainOnlySpaces": "The display name cannot contain only spaces.",
     "thePasswordMustContainCharactersAndUseNoMore": "The password must contain 8–128 characters and use no more than 512 UTF-8 bytes.",
     "thisUsernameIsAlreadyTaken": "This username is already taken.",
