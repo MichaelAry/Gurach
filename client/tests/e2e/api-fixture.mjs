@@ -265,18 +265,22 @@ const server = createServer((request, response) => {
     response.end(JSON.stringify({ operationId: uploadMatch[1], trackId: job.track._id, status: job.polls < 2 ? 'processing' : 'published' }));
     return;
   }
-  if (url.pathname === '/tracks' && request.method === 'GET') {
+  if (['/tracks', '/tracks/search'].includes(url.pathname) && request.method === 'GET') {
     const count = Number(url.searchParams.get('count') ?? 20);
     const offset = Number(url.searchParams.get('cursor') ?? 0);
-    if (!Number.isSafeInteger(count) || count < 1 || count > 100 || !Number.isSafeInteger(offset) || offset < 0) {
+    const searching = url.pathname === '/tracks/search';
+    const query = url.searchParams.get('nameOrArtist')?.trim().toLowerCase();
+    if (!Number.isSafeInteger(count) || count < 1 || count > 100 || !Number.isSafeInteger(offset) || offset < 0 || (searching && !query)) {
       response.writeHead(400);
       response.end();
       return;
     }
-    const end = Math.min(offset + count, tracks.length);
+    const matches = searching ? tracks.filter((track) =>
+      track.name.toLowerCase().includes(query) || track.artist?.toLowerCase().includes(query)) : tracks;
+    const end = Math.min(offset + count, matches.length);
     const body = JSON.stringify({
-      items: tracks.slice(offset, end),
-      nextCursor: end < tracks.length ? String(end) : null,
+      items: matches.slice(offset, end),
+      nextCursor: end < matches.length ? String(end) : null,
     });
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(body);
