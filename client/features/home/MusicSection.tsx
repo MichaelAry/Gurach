@@ -1,7 +1,9 @@
 'use client'
 import { useText } from '@/i18n/LocaleProvider'
 import Link from 'next/link'
-import { Avatar, Box, Button, Stack, Typography } from '@mui/material'
+import { PlayerArtwork } from '@/features/player/PlayerArtwork'
+import { typeRoles } from '@/theme/tokens'
+import { Box, Button, Stack, Typography } from '@mui/material'
 import type { TrackListItem } from '@/features/tracks/types'
 import { PlayButton } from '@/features/tracks/components/PlayButton'
 export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
@@ -22,14 +24,7 @@ export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
             borderColor: 'divider',
           }}
         >
-          <Avatar
-            variant="rounded"
-            src={track.picture || undefined}
-            alt=""
-            sx={{ width: 44, height: 44, bgcolor: 'action.hover' }}
-          >
-            ♪
-          </Avatar>
+          <Box sx={{ width: 44, height: 44, flexShrink: 0, borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden' }}><PlayerArtwork picture={track.picture} name="" /></Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               component={Link}
@@ -74,19 +69,17 @@ export function Section({
     <Box
       component="section"
       sx={{
-        p: { xs: 2, md: 2.5 },
-        bgcolor: 'background.paper',
-        border: '1px solid',
+        pt: { xs: 3, md: 5 },
+        borderTop: '1px solid',
         borderColor: 'divider',
-        borderRadius: 2,
         minWidth: 0,
       }}
     >
       <Stack
         direction="row"
-        sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}
+        sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 3 }}
       >
-        <Typography variant="h6" component="h2">
+        <Typography component="h2" sx={typeRoles.section}>
           {title}
         </Typography>
         {href && (

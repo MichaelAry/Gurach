@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Badge, Button } from '@mui/material'
+import { Badge, Button, IconButton } from '@mui/material'
+import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import { useTranslations } from '@/i18n/LocaleProvider'
 
 export const notificationsChanged = 'gurach:notifications-changed'
-export function NotificationIndicator() {
+export function NotificationIndicator({ compact = false }: { compact?: boolean }) {
   const { user, isConfirmed } = useViewer()
   const identity = user?.id ?? null
   const t = useTranslations('notifications')
@@ -31,6 +32,7 @@ export function NotificationIndicator() {
     window.addEventListener(notificationsChanged, refresh)
     return () => { controller?.abort(); window.clearInterval(timer); window.removeEventListener(notificationsChanged, refresh) }
   }, [identity, isConfirmed])
+  if (compact) return <IconButton component={Link} href="/notifications" aria-label={`${t('title')}: ${count === null ? t('countUnavailable') : count}`}><Badge badgeContent={count ?? '?'} color="primary"><NotificationsOutlined /></Badge></IconButton>
   return <Button component={Link} href="/notifications" aria-label={`${t('title')}: ${count === null ? t('countUnavailable') : count}`}>
     <Badge badgeContent={count ?? '?'} color="primary" sx={{ '& .MuiBadge-badge': { right: -8 } }}>{t('title')}</Badge>
   </Button>

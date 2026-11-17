@@ -76,6 +76,10 @@
     "login": "Sign in"
   },
   "ui": {
+    "randomNextTrack": "Random track",
+    "nowPlaying": "Now playing",
+    "upNext": "Up next",
+    "queueEnd": "End of queue",
     "openFullscreenPlayer": "Open fullscreen player",
     "closeFullscreenPlayer": "Collapse player",
     "openTrackCatalogue": "Open track catalogue",
@@ -466,6 +470,12 @@
     "validationPattern": "Check the format of this field.",
     "languageSavingAccount": "Saving your account language…",
     "chooseFile": "Choose file",
-    "noFileChosen": "No file chosen"
+    "noFileChosen": "No file chosen",
+    "skipToContent": "Skip to content",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "playbackSettings": "Playback settings",
+    "playlistsEmpty": "No playlists yet. Create your first collection.",
+    "playlistLoading": "Loading playlists…"
   }
 }

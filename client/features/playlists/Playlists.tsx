@@ -3,7 +3,9 @@ import { useText, useMessage } from '@/i18n/LocaleProvider'
 import { message as localMessage } from '@/i18n/messages'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Alert, Button, Paper, Stack, TextField, Typography } from '@mui/material'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { PlayerArtwork } from '@/features/player/PlayerArtwork'
+import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import { useQueue, useQueueStore } from '@/features/queue/hooks'
 import { createOccurrence } from '@/features/queue/commands'
@@ -59,21 +61,51 @@ function Editor({ initial, shared = false }: { initial: View; shared?: boolean }
   function move(index: number, delta: number) {
     setIds(old => { const next = [...old]; [next[index], next[index + delta]] = [next[index + delta], next[index]]; return next })
   }
-  return <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
-    {shared ? <Typography variant="h5">{name}</Typography> : <TextField label={lt('title')} value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />}
-    <Typography>{view.visibility === 'private' ? lt('private') : lt('anyoneWithTheLink')} · {ids.length}/100</Typography>
-    {ids.map((id, index) => <Stack key={`${id}-${index}`} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-      <Typography>{index + 1}. {view.entries.find(e => e.trackId === id)?.track?.name ?? lt('unavailableTrack')} ({id})</Typography>
-      {!shared && <><Button disabled={busy || index === 0} aria-label={lt('moveUp', { p0: index + 1 })} onClick={() => move(index, -1)}>↑</Button><Button disabled={busy || index === ids.length - 1} aria-label={lt('moveDown', { p0: index + 1 })} onClick={() => move(index, 1)}>↓</Button><Button disabled={busy} onClick={() => setIds(old => old.filter((_, i) => i !== index))}>{lt('delete')}</Button></>}
-    </Stack>)}
-    {!shared && <><TextField label={lt('trackId')} value={newId} onChange={e => setNewId(e.target.value)} /><Button disabled={busy || ids.length >= 100 || !/^[a-f\d]{24}$/i.test(newId)} onClick={() => { setIds(old => [...old, newId.toLowerCase()]); setNewId('') }}>{lt('addTrack')}</Button><Button disabled={busy || queue.status !== 'ready'} onClick={() => setIds(queue.canonical.entries.map(e => e.trackId))}>{lt('useTracksFromQueue')}</Button><Button disabled={busy || !name.trim()} onClick={() => void save()}>{lt('saveTitleAndOrder')}</Button>
-      <Button disabled={busy} onClick={() => void sharing('link')}>{lt('createRenewLink')}</Button><Button disabled={busy} onClick={() => void sharing('private')}>{lt('revokeLink')}</Button>
-      {link && <TextField label={lt('readOnlyLink')} value={link} slotProps={{ htmlInput: { readOnly: true } }} />}</>}
-    <Typography variant="caption">{lt('theSavedListWillBeSentToTheQueue')}</Typography>
-    <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(true)}>{lt('play238')}</Button>
-    <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(false)}>{lt('addToQueue')}</Button>
+  return <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 'var(--wae-radius-panel)' }}><Stack spacing={3} aria-busy={busy}>
+    {shared ? <PageHeader title={name} /> : <TextField label={lt('title')} value={name} disabled={busy} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />}
+    <Typography color="text.secondary">{view.visibility === 'private' ? lt('private') : lt('anyoneWithTheLink')} · {ids.length}/100</Typography>
+    <Stack spacing={0}>
+    {ids.map((id, index) => {
+      const entry = view.entries.find(e => e.trackId === id)
+      return <Box key={`${id}-${index}`} sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider', py: 1.5, gap: 1 }}>
+        <Box sx={{ width: 44, height: 44, overflow: 'hidden', borderRadius: 'var(--wae-radius-artwork)', flexShrink: 0 }}><PlayerArtwork picture={entry?.track?.picture} name="" /></Box>
+        <Box sx={{ minWidth: 0, flex: '1 1 160px', overflowWrap: 'anywhere' }}>
+          <Typography sx={{ fontWeight: 500 }}>{index + 1}. {entry ? entry.track?.name ?? lt('unavailableTrack') : lt('trackId')}</Typography>
+          <Typography variant="body2" color="text.secondary">{entry?.track?.artist}</Typography>
+          {!shared && <Typography variant="caption" color="text.secondary" sx={{ userSelect: 'all' }}>{id}</Typography>}
+        </Box>
+        {!shared && <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: .5 }}>
+          <Button disabled={busy || index === 0} aria-label={lt('moveUp', { p0: index + 1 })} onClick={() => move(index, -1)}>↑</Button>
+          <Button disabled={busy || index === ids.length - 1} aria-label={lt('moveDown', { p0: index + 1 })} onClick={() => move(index, 1)}>↓</Button>
+          <Button disabled={busy} onClick={() => setIds(old => old.filter((_, i) => i !== index))}>{lt('delete')}</Button>
+        </Stack>}
+      </Box>
+    })}
+    </Stack>
+    {!shared && <>
+      <Box component="details"><Typography component="summary" sx={{ cursor: 'pointer', minHeight: 44, py: 1 }}>{lt('trackId')}</Typography>
+        <Stack spacing={1} sx={{ mt: 1 }}><TextField label={lt('trackId')} value={newId} disabled={busy} onChange={e => setNewId(e.target.value)} />
+        <Button disabled={busy || ids.length >= 100 || !/^[a-f\d]{24}$/i.test(newId)} onClick={() => { setIds(old => [...old, newId.toLowerCase()]); setNewId('') }}>{lt('addTrack')}</Button></Stack>
+      </Box>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Button variant="outlined" disabled={busy || queue.status !== 'ready'} onClick={() => setIds(queue.canonical.entries.map(e => e.trackId))}>{lt('useTracksFromQueue')}</Button>
+        <Button variant="contained" disabled={busy || !name.trim()} onClick={() => void save()}>{lt('saveTitleAndOrder')}</Button>
+      </Stack>
+      <Stack spacing={1} sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }}><Button disabled={busy} onClick={() => void sharing('link')}>{lt('createRenewLink')}</Button><Button disabled={busy} onClick={() => void sharing('private')}>{lt('revokeLink')}</Button></Stack>
+        {link && <TextField label={lt('readOnlyLink')} value={link} slotProps={{ htmlInput: { readOnly: true } }} />}
+      </Stack>
+    </>}
+    <Stack spacing={1} sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+      <Typography variant="caption">{lt('theSavedListWillBeSentToTheQueue')}</Typography>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }}>
+        <Button variant={shared ? 'contained' : 'outlined'} disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(true)}>{lt('play238')}</Button>
+        <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(false)}>{lt('addToQueue')}</Button>
+      </Stack>
+    </Stack>
     {error && <Alert severity="error">{resolve(error)}</Alert>}
   </Stack></Paper>
+
 }
 function Library({ identity }: { identity: string }) {
   const resolve = useMessage()
@@ -83,7 +115,8 @@ function Library({ identity }: { identity: string }) {
   const { isConfirmed } = useViewer()
   const [items, setItems] = useState<List['items']>([]), [selected, setSelected] = useState<View | null>(null)
   const [name, setName] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  useEffect(() => { let active = true; api<List>('').then(data => { if (active && isConfirmed(identity)) setItems(data.items) }).catch(e => { if (active) setError(String(e)) }); return () => { active = false } }, [identity, isConfirmed])
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => { let active = true; api<List>('').then(data => { if (active && isConfirmed(identity)) { setItems(data.items); setLoaded(true) } }).catch(e => { if (active) setError(String(e)) }); return () => { active = false } }, [identity, isConfirmed])
   async function open(id: string) {
     setBusy(true); setError('')
     try { const view = await api<View>(`/${id}`); if (isConfirmed(identity)) setSelected(view) } catch (e) { setError(String(e)) } finally { setBusy(false) }
@@ -92,11 +125,21 @@ function Library({ identity }: { identity: string }) {
     setBusy(true); setError('')
     try { const view = await api<View>('', 'POST', { name, trackIds: [] }); if (isConfirmed(identity)) { setItems(old => [{ id: view.id, name: view.name }, ...old]); setSelected(view); setName('') } } catch (e) { setError(String(e)) } finally { setBusy(false) }
   }
-  return <Stack spacing={2} sx={{ p: 3 }}><Typography variant="h4">{lt('myPlaylists')}</Typography>
-    <TextField label={lt('newPlaylistTitle')} value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} /><Button disabled={busy || !name.trim()} onClick={() => void create()}>{lt('createPrivatePlaylist')}</Button>
-    {items.map(item => <Button key={item.id} disabled={busy} onClick={() => void open(item.id)}>{selected?.id === item.id ? selected.name : item.name}</Button>)}
-    {selected && <Editor key={`${selected.id}-${selected.revision}`} initial={selected} />}{error && <Alert severity="error">{resolve(error)}</Alert>}
-  </Stack>
+  return <Box>
+    <PageHeader title={lt('myPlaylists')} />
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '280px minmax(0, 1fr)' }, gap: 4, alignItems: 'start' }}>
+     <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <TextField label={lt('newPlaylistTitle')} value={name} onChange={e => setName(e.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} />
+      <Button variant="contained" disabled={busy || !name.trim()} onClick={() => void create()}>{lt('createPrivatePlaylist')}</Button>
+      {!loaded && !error && <Typography role="status">{lt('playlistLoading')}</Typography>}
+      {loaded && !items.length && <Typography color="text.secondary">{lt('playlistsEmpty')}</Typography>}
+      {items.map(item => <Button key={item.id} disabled={busy} aria-pressed={selected?.id === item.id} sx={{ justifyContent: 'flex-start', overflowWrap: 'anywhere', bgcolor: selected?.id === item.id ? 'action.selected' : undefined }} onClick={() => void open(item.id)}>{selected?.id === item.id ? selected.name : item.name}</Button>)}
+     </Stack>
+     <Box sx={{ minWidth: 0 }}>{selected && <Editor key={`${selected.id}-${selected.revision}`} initial={selected} />}</Box>
+    </Box>
+    {error && <Alert severity="error" sx={{ mt: 2 }}>{resolve(error)}</Alert>}
+  </Box>
+
 }
 export function Playlists() {
   const lt = useText()

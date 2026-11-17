@@ -55,7 +55,7 @@ export function CommentsSection({ trackId }: { trackId: string }) {
 
   return (
     <Box component="section" aria-labelledby="comments-heading" sx={{ my: 2 }}>
-      <Typography id="comments-heading" variant="h6" sx={{ fontSize: '0.875rem', mb: 2 }}>
+      <Typography id="comments-heading" component="h2" sx={{ fontSize: { xs: 24, sm: 28, md: 32 }, fontWeight: 500, mb: 3 }}>
         {lt('comments')}</Typography>
 
       {viewerError ? <Alert severity="error">{lt('couldNotCheckYourSessionRefreshThePage')}</Alert> : viewerLoading ? (

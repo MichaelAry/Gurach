@@ -1,48 +1,13 @@
 'use client'
-
-import { Paper } from '@mui/material'
+import { Box, ListItemButton } from '@mui/material'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Suspense } from 'react'
-import { NavbarItem } from './NavbarItem'
-import { trackStructure } from './trackStructure'
-import { useTranslations } from '@/i18n/LocaleProvider'
-
-function NavigationLinks() {
-  const pathname = usePathname()
-  const t = useTranslations('navigation')
-
-  return trackStructure
-    .filter((item) => item.isAnchor)
-    .map((item) => (
-      <NavbarItem
-        key={item.id}
-        item={{ ...item, label: item.href === '/' ? t('main') : item.href === '/tracks' ? t('tracks') : item.href === '/favorites' ? t('favorites') : item.href === '/friends' ? t('friends') : item.label }}
-        active={
-          pathname === item.href ||
-          (item.href !== '/' && !!item.href && pathname.startsWith(`${item.href}/`))
-        }
-      />
-    ))
+import { useText, useTranslations } from '@/i18n/LocaleProvider'
+export function Navbar({ onNavigate }: { onNavigate?: () => void }) {
+ const pathname = usePathname(), t = useTranslations('navigation'), lt = useText()
+ const links = [['/', t('main')], ['/tracks', t('tracks')], ['/favorites', t('favorites')], ['/playlists', lt('playlists')], ['/friends', t('friends')]]
+ return <Box component="nav" aria-label={t('main')} sx={{ display: 'flex', gap: .5, flexDirection: { xs: 'column', md: 'row' }, py: .5 }}>
+ {links.map(([href, label]) => { const active = pathname === href || (href !== '/' && pathname.startsWith(href + '/')) || (href === '/friends' && pathname.startsWith('/users/')); return <ListItemButton key={href} component={Link} href={href} selected={active} aria-current={active ? 'page' : undefined} onClick={onNavigate} sx={{ minHeight: 44, flexGrow: 0, borderRadius: 1, px: 2, fontWeight: active ? 600 : 500 }}>{label}</ListItemButton> })}
+ </Box>
 }
-
-export const Navbar = () => {
-  const t = useTranslations('navigation')
-  return <Paper
-    component="nav"
-    aria-label={t('main')}
-    variant="outlined"
-    sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 0.5,
-      p: 0.5,
-      borderRadius: 3,
-    }}
-  >
-    <Suspense fallback={null}>
-      <NavigationLinks />
-    </Suspense>
-  </Paper>
-}
-
 export default Navbar

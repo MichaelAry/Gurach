@@ -7,7 +7,7 @@ export function FriendCard(props: FriendActionsProps & { requestedAt?: string | 
   const { locale } = useLocale()
 
   const { profile, requestedAt } = props
-  return <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3 }}>
+  return <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 0, border: 0, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'transparent' }}>
     <Stack spacing={2} direction={{ xs: 'column', sm: 'row' }} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}>
         <Avatar aria-hidden="true">{(profile.displayName || profile.username).slice(0, 1).toUpperCase()}</Avatar>

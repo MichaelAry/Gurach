@@ -25,6 +25,11 @@ test('keeps the same playing audio and position when opening, collapsing and usi
   await expect(page.getByRole('contentinfo')).toHaveCount(0)
   await expect(page.getByRole('navigation')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Track 1', exact: true })).toBeVisible()
+  await expect(page.locator('[data-waveform="ready"]')).toBeVisible()
+  await expect(page.locator('main [data-playing]')).toHaveAttribute('data-playing', 'true')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect.poll(() => page.getByRole('main').evaluate(node => [...node.querySelectorAll('.fullscreen-player-recordLabel, .fullscreen-player-glow')].map(element => getComputedStyle(element).animationName))).toEqual(['none', 'none'])
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   await expect(audio).toHaveCount(1)
   expect(await originalAudio!.evaluate((node) => node === document.querySelector('audio'))).toBe(true)
   expect(await audio.evaluate((node: HTMLAudioElement) => node.currentTime)).toBeGreaterThanOrEqual(5)
@@ -124,4 +129,47 @@ test('preserves the source filters and shows retry after an audio error', async 
   await page.screenshot({ path: '/tmp/gurach-player-desktop.png', fullPage: true })
   await page.getByRole('link', { name: 'Свернуть плеер' }).click()
   await expect(page).toHaveURL(/\/tracks\?search=Track$/)
+})
+
+
+test('keeps seeking and playback available when waveform decoding fails', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'OfflineAudioContext', { configurable: true, value: class {
+      decodeAudioData() {
+        document.documentElement.dataset.waveformFailed = 'true'
+        return Promise.reject(new Error('Unsupported decoder'))
+      }
+    } })
+  })
+  await page.goto('/tracks')
+  await page.getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Открыть полноэкранный плеер' }).click()
+  await expect(page.getByRole('heading', { name: 'Track 1', exact: true })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-waveform-failed', 'true')
+  await expect(page.locator('[data-waveform="fallback"]')).toBeVisible()
+  await page.getByRole('slider', { name: 'Позиция воспроизведения' }).press('ArrowRight')
+  await expect(page.getByRole('button', { name: 'Пауза', exact: true })).toBeEnabled()
+  await expect.poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => !audio.paused)).toBe(true)
+})
+
+
+test('uses the real artwork and keeps long titles readable at narrow widths', async ({ page }) => {
+  const name = 'Длинное название трека ' + 'безпробелов'.repeat(14)
+  const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#986049"/></svg>')
+  await page.route('**/api/queue', async route => {
+    if (route.request().method() !== 'GET') return route.continue()
+    const response = await route.fetch()
+    const body = await response.json()
+    if (body.entries?.[0]?.track) Object.assign(body.entries[0].track, { name, picture })
+    await route.fulfill({ response, json: body })
+  })
+  await signIn(page)
+  await page.getByRole('main').getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Открыть полноэкранный плеер' }).click()
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name, exact: true })).toHaveAttribute('src', picture)
+  for (const width of [1280, 900, 600, 375, 320]) {
+    await page.setViewportSize({ width, height: 812 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
 })

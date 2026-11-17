@@ -3,6 +3,7 @@ import { useText, useMessage } from '@/i18n/LocaleProvider'
 import { message as localMessage } from '@/i18n/messages'
 import { useState } from 'react'
 import Link from 'next/link'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Alert, Button, Stack, Tab, Tabs, Typography } from '@mui/material'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import type { ListKind } from './api'
@@ -37,7 +38,7 @@ function FriendsContent() {
     {actions.expired ? <Button component={Link} href="/login?returnTo=/friends">{lt('sessionExpiredSignInAgain')}</Button> : <>
       <UserSearch revision={revision} pending={actions.pending} onAction={(profile, action) => void actions.run(profile, action)} />
       {summary.error && <Alert severity="error" action={<Button onClick={() => setRevision((old) => old + 1)}>{lt('tryAgain')}</Button>}>{resolve(summary.error)}</Alert>}
-      <Tabs value={kind} onChange={(_, value: ListKind) => setKind(value)} aria-label={lt('friendSections')} sx={{ '& .MuiTabs-list': { flexWrap: 'wrap' }, '& .MuiTabs-indicator': { display: 'none' }, '& .MuiTab-root': { minWidth: 0, minHeight: 48, px: 1, flex: { xs: '1 1 45%', sm: '1 1 auto' }, borderRadius: 2 }, '& .Mui-selected': { bgcolor: 'action.selected' } }}>
+      <Tabs value={kind} onChange={(_, value: ListKind) => setKind(value)} aria-label={lt('friendSections')} sx={{ '& .MuiTabs-list': { flexWrap: 'wrap' }, '& .MuiTabs-indicator': { display: 'none' }, '& .MuiTab-root': { minWidth: 0, minHeight: 48, px: 1, flex: { xs: '1 1 45%', sm: '1 1 auto' }, borderRadius: 'var(--wae-radius-control)' }, '& .Mui-selected': { bgcolor: 'action.selected' } }}>
         {tabs.map((tab, index) => <Tab key={tab.kind} value={tab.kind} label={`${resolve(tab.label)}${counts[index] !== undefined ? ` (${counts[index]})` : ''}`} id={`friends-tab-${tab.kind}`} aria-controls={`friends-panel-${tab.kind}`} />)}
       </Tabs>
       <FriendsList key={`${kind}:${versions[kind]}`} kind={kind} actions={actions} />
@@ -74,8 +75,8 @@ export function FriendsPage() {
   const lt = useText()
 
   const { user, loading, error } = useViewer()
-  return <Stack spacing={3} sx={{ p: { xs: 2, sm: 3 }, pr: { xs: 8, sm: 9 } }}>
-    <Typography component="h1" variant="h5">{lt('friends')}</Typography>
+  return <Stack spacing={3} sx={{ minWidth: 0 }}>
+    <PageHeader title={lt('friends')} />
     {loading ? <Typography role="status">{lt('checkingSession')}</Typography> : error ? <Alert severity="error">{lt('couldNotCheckYourSessionRefreshThePage')}</Alert> : user ? <FriendsContent key={user.id} /> : <Button component={Link} href="/login?returnTo=/friends">{lt('signIn')}</Button>}
   </Stack>
 }

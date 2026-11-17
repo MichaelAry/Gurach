@@ -81,7 +81,7 @@ test('switches track details and missing-track text locally while offline', asyn
       await page.getByRole('button', { name: 'Русский', exact: true }).click()
       if (missing) {
         await expect(page.getByRole('heading', { name: 'Трек не найден', exact: true })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'К списку треков', exact: true })).toBeVisible()
+        await expect(page.getByRole('link', { name: 'К списку треков', exact: true })).toBeVisible()
         await expect(page).toHaveTitle('Трек не найден')
       } else {
         await expect(page.getByRole('heading', { name: 'Лирика', exact: true })).toBeVisible()

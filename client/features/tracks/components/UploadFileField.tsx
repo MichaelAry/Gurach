@@ -12,7 +12,7 @@ export function UploadFileField({ label, name, accept, error, helperText, disabl
   const lt = useText()
   const input = useRef<HTMLInputElement>(null)
   const [filename, setFilename] = useState('')
-  return <FormControl required error={error} disabled={disabled}>
+  return <FormControl required error={error} disabled={disabled} sx={{ p: 2, border: '1px solid', borderColor: error ? 'error.main' : 'divider', borderRadius: 'var(--wae-radius-control)' }}>
     <FormLabel htmlFor={id}>{label}</FormLabel>
     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 1, minWidth: 0 }}>
       <Button type="button" variant="outlined" disabled={disabled} onClick={() => input.current?.click()} sx={{ flexShrink: 0 }}>{lt('chooseFile')}</Button>

@@ -1,77 +1,45 @@
 'use client'
-
-import type { ReactNode } from 'react'
-import { Suspense } from 'react'
+import { Suspense, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Box } from '@mui/material'
-import Navbar from '@/components/navbar'
+import { Box, Drawer, IconButton, Stack, Typography } from '@mui/material'
+import MenuRounded from '@mui/icons-material/MenuRounded'
+import CloseRounded from '@mui/icons-material/CloseRounded'
+import { Navbar } from './navbar/Navbar'
 import { BackButton } from '@/features/navigation/components/BackButton'
-import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { LanguageSwitcher } from './LanguageSwitcher'
 import { SessionControls } from '@/features/auth/SessionControls'
-import { PlayerBar } from '@/components/player/PlayerBar'
-
-// Only the page chrome changes; providers and the audio element stay mounted.
+import { NotificationIndicator } from '@/features/notifications/NotificationIndicator'
+import { useViewer } from '@/features/auth/ViewerProvider'
+import { useText } from '@/i18n/LocaleProvider'
+import { PlayerBar } from './player/PlayerBar'
+const container = { width: '100%', maxWidth: 1224, mx: 'auto', px: { xs: 2, sm: 3, md: 4 } }
 export function MainShell({ children }: { children: ReactNode }) {
-  const fullscreen = usePathname() === '/player'
-  if (fullscreen) return <Box component="main" sx={{ minHeight: '100dvh', minWidth: 0 }}>{children}</Box>
-
-  return <>
-    <Box sx={{ position: { xs: 'static', md: 'absolute' }, top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', alignItems: 'flex-start', gap: 1, overflowWrap: 'anywhere' }}>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <SessionControls />
-      </Box>
-      <Box sx={{ mt: 2, mr: 2, maxWidth: '50%' }}>
-        <LanguageSwitcher />
-      </Box>
-    </Box>
-    <Box
-      sx={{
-        position: { xs: 'static', md: 'fixed' },
-        zIndex: 1200,
-        right: 0,
-        top: '50%',
-        transform: { md: 'translateY(-50%)' },
-        display: 'flex',
-        flexDirection: { xs: 'row', md: 'column' },
-        flexWrap: 'wrap',
-        '& nav': { flexDirection: { xs: 'row', md: 'column' }, flexWrap: 'wrap' },
-        alignItems: 'flex-end',
-        gap: 1,
-        p: 1,
-        perspective: '800px',
-        transformStyle: 'preserve-3d',
-        userSelect: 'none',
-      }}
-    >
-      <Suspense fallback={null}>
-        <BackButton />
-      </Suspense>
-
-      <Navbar />
-    </Box>
-
-    {/* PlayerBar measures its full height, including errors and the safe area. */}
-    <Box
-      component="main"
-      sx={{
-        pt: { xs: 2, md: 8 },
-        pr: { md: '72px' },
-        pb: 'calc(var(--player-bar-height, 180px) + 24px)',
-        minHeight: '100dvh',
-        minWidth: 0,
-        display: 'flex',
-        '& [tabindex]:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
-        '& :is([id], input, textarea, button, a, [tabindex])': {
-          scrollMarginTop: '16px',
-          scrollMarginBottom: 'calc(var(--player-bar-height, 180px) + 24px)',
-        },
-      }}
-    >
-      <Box sx={{ width: '100%', maxWidth: 1000, margin: 'auto', '&:has([data-home-page])': { maxWidth: 1200 } }}>
-        {children}
-      </Box>
-    </Box>
-
-    <PlayerBar />
-  </>
+ const pathname = usePathname(), lt = useText(), viewer = useViewer()
+ const [menu, setMenu] = useState(false)
+ if (pathname === '/player') return <Box component="main" sx={{ minHeight: '100dvh', minWidth: 0 }}>{children}</Box>
+ return <>
+ <a className="skip-link" href="#main-content">{lt('skipToContent')}</a>
+ <Box component="header" sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
+  <Box sx={{ ...container, display: 'flex', alignItems: 'center', gap: 2, minHeight: 64 }}>
+   <Typography component={Link} href="/" sx={{ fontSize: 24, fontWeight: 600, letterSpacing: '-.04em', color: 'text.primary', textDecoration: 'none', mr: 'auto' }}>{'Gurach'}</Typography>
+   <Stack direction="row" sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 2 }}><LanguageSwitcher /><SessionControls /></Stack>
+   <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center' }}>{viewer.confirmed && viewer.user && <NotificationIndicator compact />}<IconButton aria-label={lt('openMenu')} aria-expanded={menu} aria-controls={menu ? 'mobile-menu' : undefined} onClick={() => setMenu(true)}><MenuRounded /></IconButton></Box>
+  </Box>
+  <Box sx={{ ...container, display: { xs: 'none', md: 'block' } }}><Suspense fallback={null}><Navbar /></Suspense></Box>
+ </Box>
+ <Drawer open={menu} onClose={() => setMenu(false)} slotProps={{ paper: { sx: { width: 'min(320px, calc(100vw - 32px))', p: 2, pb: 'max(24px, env(safe-area-inset-bottom))' } } }}>
+  <Stack id="mobile-menu" spacing={2}>
+   <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">{'Gurach'}</Typography><IconButton aria-label={lt('closeMenu')} onClick={() => setMenu(false)}><CloseRounded /></IconButton></Stack>
+   <Suspense fallback={null}><Navbar onNavigate={() => setMenu(false)} /></Suspense>
+   <Box onClick={event => { if ((event.target as HTMLElement).closest('a')) setMenu(false) }}><SessionControls /></Box>
+   <LanguageSwitcher />
+  </Stack>
+ </Drawer>
+ <Box component="main" id="main-content" tabIndex={-1} sx={{ ...container, pt: { xs: 3, md: 5 }, pb: 'calc(var(--player-bar-height, 200px) + 24px)', minHeight: '70dvh', minWidth: 0, '& :is([id], input, textarea, button, a, [tabindex])': { scrollMarginTop: 16, scrollMarginBottom: 'calc(var(--player-bar-height, 200px) + 24px)' } }}>
+  {pathname !== '/' && <Box sx={{ mb: 3 }}><Suspense fallback={null}><BackButton /></Suspense></Box>}
+  {children}
+ </Box>
+ <PlayerBar />
+ </>
 }

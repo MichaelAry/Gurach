@@ -19,16 +19,16 @@ export function QueueRow({ entry, index, total, current, playing, disabled, chec
   return <Card component="li" draggable={!disabled} onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))}
     onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) onDrop(from, index) }}
     aria-label={label} aria-current={current ? 'true' : undefined} sx={{ listStyle: 'none', p: 1, border: '1px solid', borderColor: current ? 'primary.main' : 'divider', bgcolor: current ? 'action.selected' : 'background.paper' }}>
-    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
       <Checkbox size="small" checked={checked} disabled={disabled} onChange={onCheck} slotProps={{ input: { 'aria-label': lt('select', { p0: label }) } }} sx={{ p: 0.5 }} />
       <Typography sx={{ width: 22, flexShrink: 0, textAlign: 'right' }} aria-label={lt('position', { p0: index + 1 })}>{index + 1}</Typography>
       <IconButton size="small" aria-label={`${current && playing ? lt('pause') : lt('play')}: ${label}`} disabled={disabled || entry.availability !== 'playable' || !entry.track?.audio} onClick={onSelect}>
         {current && playing ? <Pause fontSize="small" /> : <PlayArrow fontSize="small" />}
       </IconButton>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: 1, minWidth: 0, flexBasis: { xs: 'calc(100% - 140px)', sm: 'auto' } }}>
         <Typography noWrap sx={{ fontWeight: current ? 700 : 400 }}>{entry.display.name}</Typography>
         {entry.source !== 'automatic' && <Chip size="small" label={lt('addedManually')} sx={{ height: 20, maxWidth: '100%', '& .MuiChip-label': { px: 0.75 } }} />}
-        <Typography noWrap variant="caption" color="text.secondary">
+        <Typography noWrap variant="caption" color={current ? 'var(--wae-textSecondaryStrong)' : 'text.secondary'}>
           {entry.display.artist ?? '—'}{entry.availability === 'unavailable' ? lt('unavailable290', { p0: entry.reason === 'deleted' ? lt('reason_deleted') : entry.reason === 'missing-audio' ? lt('reason_audio_missing') : lt('reason_unavailable') }) : ''}
         </Typography>
       </Box>

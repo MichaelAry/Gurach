@@ -4,6 +4,9 @@ export default defineConfig({
   testDir: './tests/e2e',
   testIgnore: 'production-cookie.spec.ts',
   fullyParallel: false,
+  // The fixture shares account language preferences across login sessions.
+  // Cross-tab concurrency is exercised explicitly within the relevant tests.
+  workers: 1,
   retries: 0,
   reporter: 'list',
   use: {

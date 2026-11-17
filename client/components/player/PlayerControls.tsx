@@ -21,36 +21,34 @@ function formatTime(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`
 }
 
-export function PlaybackControls({ large = false, children }: { large?: boolean; children?: ReactNode }) {
-  const lt = useText()
-  const { current, playing, toggle, prev, next, shuffle, toggleShuffle, repeat, cycleRepeat } = usePlayerTransport()
-  const repeatLabel = repeat === 'off' ? lt('repeatOff') : repeat === 'all' ? lt('repeatQueue') : lt('repeatTrack')
-  return <Stack direction="row" spacing={large ? 1 : 0.5} sx={{ alignItems: 'center', justifyContent: 'center' }}>
-    {children}
-    <IconButton onClick={toggleShuffle} aria-label={lt('shufflePlaybackOrder')} aria-pressed={shuffle} color={shuffle ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
-      <ShuffleRounded />
-    </IconButton>
-    <IconButton onClick={prev} disabled={!current} aria-label={lt('previous')} sx={{ minWidth: 44, minHeight: 44 }}>
-      <SkipPreviousRounded fontSize={large ? 'large' : 'medium'} />
-    </IconButton>
-    <IconButton onClick={toggle} disabled={!current?.audio} aria-label={playing ? lt('pause') : lt('play')}
-      sx={{ width: large ? 64 : 44, height: large ? 64 : 44, bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}>
-      {playing ? <PauseRounded fontSize={large ? 'large' : 'medium'} /> : <PlayArrowRounded fontSize={large ? 'large' : 'medium'} />}
-    </IconButton>
-    <IconButton onClick={next} disabled={!current} aria-label={lt('next')} sx={{ minWidth: 44, minHeight: 44 }}>
-      <SkipNextRounded fontSize={large ? 'large' : 'medium'} />
-    </IconButton>
-    <IconButton onClick={cycleRepeat} aria-label={lt('changeRepeatMode', { p0: repeatLabel })} title={repeatLabel} aria-pressed={repeat !== 'off'} color={repeat !== 'off' ? 'primary' : 'default'} sx={{ minWidth: 44, minHeight: 44 }}>
-      {repeat === 'one' ? <RepeatOneRounded /> : <RepeatRounded />}
-    </IconButton>
-  </Stack>
+export function PlaybackModes({ only }: { only?: 'shuffle' | 'repeat' }) {
+ const lt = useText()
+ const { shuffle, toggleShuffle, repeat, cycleRepeat } = usePlayerTransport()
+ const repeatLabel = repeat === 'off' ? lt('repeatOff') : repeat === 'all' ? lt('repeatQueue') : lt('repeatTrack')
+ return <>
+  {only !== 'repeat' && <IconButton onClick={toggleShuffle} aria-label={lt('shufflePlaybackOrder')} aria-pressed={shuffle} sx={{ bgcolor: shuffle ? 'action.selected' : undefined }}><ShuffleRounded /></IconButton>}
+  {only !== 'shuffle' && <IconButton onClick={cycleRepeat} aria-label={lt('changeRepeatMode', { p0: repeatLabel })} title={repeatLabel} aria-pressed={repeat !== 'off'} sx={{ bgcolor: repeat !== 'off' ? 'action.selected' : undefined }}>{repeat === 'one' ? <RepeatOneRounded /> : <RepeatRounded />}</IconButton>}
+ </>
+}
+export function PlaybackControls({ large = false, compact = false, children, actions }: { large?: boolean; compact?: boolean; children?: ReactNode; actions?: ReactNode }) {
+ const lt = useText()
+ const { current, playing, toggle, prev, next } = usePlayerTransport()
+ return <Stack direction="row" spacing={large ? 1 : .5} sx={{ alignItems: 'center', justifyContent: 'center' }}>
+  {children}
+  {!compact && <PlaybackModes only="shuffle" />}
+  <IconButton onClick={prev} disabled={!current} aria-label={lt('previous')}><SkipPreviousRounded fontSize={large ? 'large' : 'medium'} /></IconButton>
+  <IconButton onClick={toggle} disabled={!current?.audio} aria-label={playing ? lt('pause') : lt('play')} sx={{ width: large ? 64 : 52, height: large ? 64 : 52, bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}>{playing ? <PauseRounded fontSize={large ? 'large' : 'medium'} /> : <PlayArrowRounded fontSize={large ? 'large' : 'medium'} />}</IconButton>
+  <IconButton onClick={next} disabled={!current} aria-label={lt('next')}><SkipNextRounded fontSize={large ? 'large' : 'medium'} /></IconButton>
+  {!compact && <PlaybackModes only="repeat" />}
+  {actions}
+ </Stack>
 }
 
 export function PlaybackProgress({ expanded = false }: { expanded?: boolean }) {
   const lt = useText()
   const { current, seek } = usePlayerTransport()
   const { currentTime, duration } = usePlayerProgress()
-  const timeStyle = { fontSize: expanded ? '0.8rem' : '0.7rem', color: 'text.secondary', minWidth: 32, fontVariantNumeric: 'tabular-nums', display: expanded ? 'block' : { xs: 'none', sm: 'block' } }
+  const timeStyle = { fontSize: expanded ? '0.8rem' : '0.7rem', color: 'text.secondary', minWidth: 32, fontVariantNumeric: 'tabular-nums', display: 'block' }
   return <Stack direction="row" spacing={1} sx={{ width: '100%', minWidth: 0, alignItems: 'center' }}>
     <Typography sx={timeStyle}>{formatTime(currentTime)}</Typography>
     <Slider size={expanded ? 'medium' : 'small'} aria-label={lt('playbackPosition')}

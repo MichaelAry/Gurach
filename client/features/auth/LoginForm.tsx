@@ -39,9 +39,9 @@ export function LoginForm() {
     } catch { setError(localMessage('couldNotReachTheServerCheckYourConnection')) }
     finally { setPending(false) }
   }
-  return <Card sx={{ p: 3, maxWidth: 420, width: '100%' }}>
+  return <Card sx={{ p: 3, maxWidth: 460, width: '100%' }}>
     <Stack component="form" onSubmit={submit} spacing={2}>
-      <Typography component="h1" variant="h4">{lt('signIn115')}</Typography>
+      <Typography component="h1" sx={{ fontSize: { xs: 32, sm: 36, md: 40 }, lineHeight: 1.12, letterSpacing: '-.03em', fontWeight: 500 }}>{lt('signIn115')}</Typography>
       {params.get('registered') === '1' && <Alert severity="success">{lt('accountCreatedSignInWithYourUsernameAndPassword')}</Alert>}
       <TextField label={lt('username')} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required disabled={pending} slotProps={{ htmlInput: { maxLength: 32 } }} />
       <TextField label={lt('password')} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={pending} />

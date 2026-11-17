@@ -5,10 +5,13 @@ import { useEffect, useRef, useState } from 'react'
 
 import OpenInFullRounded from '@mui/icons-material/OpenInFullRounded'
 import { useRouter } from 'next/navigation'
-import { Box, Button, IconButton, Stack, Typography } from '@mui/material'
+import TuneRounded from '@mui/icons-material/TuneRounded'
+import QueueMusicRounded from '@mui/icons-material/QueueMusicRounded'
+import { PlayerArtwork } from '@/features/player/PlayerArtwork'
+import { Box, Popover, IconButton, Stack, Typography } from '@mui/material'
 import { QueuePanel } from '@/features/queue/components/QueuePanel'
 import { usePlayerTransport } from './PlayerProvider'
-import { PlaybackControls, PlaybackProgress, PlayerFeedback, VolumeControl } from './PlayerControls'
+import { PlaybackModes, PlaybackControls, PlaybackProgress, PlayerFeedback, VolumeControl } from './PlayerControls'
 
 /**
  * Плеер, приклеенный к низу экрана: обложка, название, кнопки
@@ -36,101 +39,32 @@ export function PlayerBar() {
 
   const [queueOpen, setQueueOpen] = useState(false)
   const { current, position, count, oneOff } = usePlayerTransport()
-  const hasTrack = Boolean(current?._id)
-  const cover = current?.picture
-
+  const [settings, setSettings] = useState<HTMLElement | null>(null)
   return <>
-    <Box
-      component="footer"
-      ref={footerRef}
-      sx={{
-        position: 'fixed',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1300,
-        bgcolor: 'background.paper',
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        px: 2,
-        pt: 1,
-        pb: 'calc(8px + env(safe-area-inset-bottom, 0px))',
-        '& .Mui-focusVisible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
-      }}
-    >
-      <Stack
-        direction="row"
-        sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: { xs: 1, md: 2 } }}
-      >
-        <Stack direction="row" spacing={1.5} sx={{ flex: { xs: '1 1 100%', md: '1 1 0' }, minWidth: 0, alignItems: 'center' }}>
-          {/* Обложка / заглушка */}
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              flexShrink: 0,
-              borderRadius: 1,
-              overflow: 'hidden',
-              bgcolor: 'background.default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {cover ? (
-              <Box component="img" src={cover} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <Typography sx={{ fontSize: '1.2rem' }}>♪</Typography>
-            )}
-          </Box>
-
-          {/* Название + позиция в очереди */}
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography title={current?.name} noWrap sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
-              {current?.name ?? lt('chooseATrack')}
-            </Typography>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-              <Typography title={current?.artist ?? undefined} noWrap sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                {current?.artist ?? lt('readyToPlay')}
-              </Typography>
-              {/* Позиция в очереди видна только когда очередь длиннее одного трека */}
-              {hasTrack && count > 0 && (
-                <Typography
-                  sx={{
-                    fontSize: '0.7rem',
-                    color: 'text.secondary',
-                    flexShrink: 0,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}
-                >
-                  {oneOff ? lt('oneTimePlayback') : `${position} / ${count}`}
-                </Typography>
-              )}
-            </Stack>
-          </Box>
-          <IconButton aria-label={lt('openFullscreenPlayer')} title={lt('openFullscreenPlayer')}
-            onClick={() => router.push(`/player?returnTo=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`)}
-            sx={{ minWidth: 44, minHeight: 44 }}>
-            <OpenInFullRounded />
-          </IconButton>
-        </Stack>
-
-        <Stack spacing={0.5} sx={{ order: { xs: 3, md: 0 }, width: { xs: '100%', md: '46%' }, maxWidth: { md: 560 }, flexShrink: 0, alignItems: 'center' }}>
-          <PlaybackControls>
-            {current && <FavoriteButton trackId={current._id} name={current.name} />}
-          </PlaybackControls>
-          <PlaybackProgress />
-        </Stack>
-
-        <Box sx={{ order: { xs: 4, md: 0 }, flex: { xs: '1 1 100%', md: '1 1 0' }, minWidth: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
-          <Stack spacing={0.5} sx={{ width: 140, maxWidth: '100%', minWidth: 0, alignItems: 'center' }}>
-            <VolumeControl />
-            <Button size="small" sx={{ minWidth: 0, whiteSpace: 'nowrap' }} aria-label={lt('openQueueOf', { p0: count })} onClick={() => setQueueOpen(true)}>{lt('queue')}{count}/100</Button>
-          </Stack>
-        </Box>
-      </Stack>
-      <PlayerFeedback />
+   <Box component="footer" ref={footerRef} sx={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1100, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider', px: { xs: 2, md: 4 }, pt: 1, pb: 'calc(8px + env(safe-area-inset-bottom, 0px))' }}>
+    <Box sx={{ maxWidth: 1160, mx: 'auto', display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .7fr)' }, gap: { xs: .5, md: 3 }, alignItems: 'center' }}>
+     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+      <Box sx={{ width: { xs: 40, md: 48 }, height: { xs: 40, md: 48 }, flexShrink: 0, borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden' }}><PlayerArtwork picture={current?.picture} name="" /></Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+       <Typography title={current?.name} noWrap sx={{ fontSize: 15, fontWeight: 600 }}>{current?.name ?? lt('chooseATrack')}</Typography>
+       <Typography title={current?.artist ?? undefined} noWrap sx={{ fontSize: 12, color: 'text.secondary' }}>{current?.artist ?? lt('readyToPlay')}{current && count > 0 && <> · <span>{oneOff ? lt('oneTimePlayback') : `${position} / ${count}`}</span></>}</Typography>
+      </Box>
+      <IconButton aria-label={lt('openFullscreenPlayer')} onClick={() => router.push(`/player?returnTo=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`)}><OpenInFullRounded /></IconButton>
+      <IconButton aria-label={lt('playbackSettings')} aria-expanded={Boolean(settings)} aria-controls={settings ? 'playback-settings' : undefined} onClick={event => setSettings(event.currentTarget)} sx={{ display: { md: 'none' } }}><TuneRounded /></IconButton>
+     </Stack>
+     <Box sx={{ minWidth: 0 }}>
+      <PlaybackControls compact actions={<IconButton aria-label={lt('openQueueOf', { p0: count })} onClick={() => setQueueOpen(true)}><QueueMusicRounded /></IconButton>}>
+       {current && <FavoriteButton trackId={current._id} name={current.name} />}
+      </PlaybackControls>
+      <PlaybackProgress />
+     </Box>
+     <Box sx={{ display: { xs: 'none', md: 'block' }, minWidth: 0 }}><Stack direction="row" sx={{ justifyContent: 'center' }}><PlaybackModes /></Stack><VolumeControl /></Box>
     </Box>
-    <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
+    <PlayerFeedback />
+   </Box>
+   <Popover open={Boolean(settings)} anchorEl={settings} onClose={() => setSettings(null)} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+    <Box id="playback-settings" sx={{ width: 260, p: 2 }}><Typography variant="subtitle2">{lt('playbackSettings')}</Typography><Stack direction="row" sx={{ my: 1 }}><PlaybackModes /></Stack><VolumeControl /></Box>
+   </Popover>
+   <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
   </>
 }

@@ -1,15 +1,16 @@
 // theme/index.ts
 import { createTheme } from '@mui/material/styles'
+import { colors, shadows, radii } from './tokens'
 
 // Shared warm graphite scale; CSS variables are emitted by CssBaseline.
 const mono = {
-  25: '#F0EFE9', 50: '#E8E7E1', 100: '#DFDED7',
-  200: '#D8D7D0', 300: '#CECDC6', 400: '#777873',
-  500: '#62635F', 600: '#555650', 700: '#454640',
-  800: '#343530', 900: '#292A28',
+  25: colors.surface, 50: colors.page, 100: colors.surfaceMuted,
+  200: colors.divider, 300: colors.border, 400: colors.controlBorder,
+  500: colors.textSecondary, 600: colors.textSecondaryStrong, 700: '#454640',
+  800: colors.action, 900: colors.text,
 } as const
 
-const surfaces = { secondary: mono[100], hover: '#D7D6CE', selected: '#CECDC4', border: mono[300] }
+const surfaces = { secondary: mono[100], hover: colors.surfaceHover, selected: colors.surfaceSelected, border: mono[300] }
 
 export const theme = createTheme({
   palette: {
@@ -60,7 +61,7 @@ export const theme = createTheme({
   },
 
   shape: {
-    borderRadius: 10,
+    borderRadius: radii.control,
   },
 
   typography: {
@@ -86,18 +87,27 @@ export const theme = createTheme({
   },
 
   components: {
+    MuiAvatar: { styleOverrides: { root: { backgroundColor: colors.surfaceSelected, color: colors.text } } },
+    MuiIconButton: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
+    MuiDialog: { styleOverrides: { paper: { borderRadius: radii.panel, margin: 16, maxWidth: 'calc(100% - 32px)', maxHeight: 'calc(100dvh - 32px)', boxShadow: shadows.floating } } },
+    MuiDialogTitle: { styleOverrides: { root: { fontSize: 28, fontWeight: 500, letterSpacing: '-.02em', lineHeight: 1.2, padding: 24, '@media(max-width:599px)': { fontSize: 24, padding: 20 } } } },
+    MuiDialogActions: { styleOverrides: { root: { padding: '16px 24px', flexWrap: 'wrap', gap: 8 } } },
+    MuiMenu: { styleOverrides: { paper: { borderRadius: radii.control, boxShadow: shadows.floating } } },
+    MuiPopover: { styleOverrides: { paper: { boxShadow: shadows.floating } } },
+    MuiAlert: { styleOverrides: { root: { borderRadius: radii.control, overflowWrap: 'anywhere' }, message: { minWidth: 0 }, action: { flexWrap: 'wrap' } } },
+    MuiTab: { styleOverrides: { root: { textTransform: 'none' } } },
     MuiBackdrop: { styleOverrides: { root: { backgroundColor: 'rgba(41, 42, 40, 0.32)' } } },
-    MuiOutlinedInput: { styleOverrides: { root: { backgroundColor: mono[25], '& .MuiOutlinedInput-notchedOutline': { borderColor: surfaces.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: mono[400] } } } },
+    MuiOutlinedInput: { styleOverrides: { root: { backgroundColor: mono[25], '& .MuiOutlinedInput-notchedOutline': { borderColor: colors.controlBorder }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: mono[400] } } } },
     MuiTableCell: { styleOverrides: { head: { backgroundColor: surfaces.secondary, fontWeight: 600 } } },
     MuiSnackbarContent: { styleOverrides: { root: { backgroundColor: mono[800], color: mono[25], boxShadow: 'none' } } },
     MuiSlider: { styleOverrides: { thumb: { '&:hover, &.Mui-focusVisible, &.Mui-active': { boxShadow: 'none', outline: `2px solid ${mono[500]}`, outlineOffset: 3 } } } },
     MuiCssBaseline: {
       styleOverrides: (theme) => ({
         html: { fontFamily: theme.typography.fontFamily, scrollbarColor: `${mono[400]} ${mono[50]}` },
-        ':root': Object.fromEntries(Object.entries(mono).map(([key, value]) => [`--mono-${key}`, value])),
+        ':root': { ...Object.fromEntries(Object.entries(mono).map(([key, value]) => [`--mono-${key}`, value])), ...Object.fromEntries(Object.entries(colors).map(([key, value]) => [`--wae-${key}`, value])), ...Object.fromEntries(Object.entries(radii).map(([key, value]) => [`--wae-radius-${key}`, `${value}px`])), ...Object.fromEntries(Object.entries(shadows).map(([key, value]) => [`--wae-shadow-${key}`, value])) },
         ':focus-visible': { outline: `2px solid ${mono[500]}`, outlineOffset: 3 },
-        '.Mui-selected': { color: mono[900] },
         '::selection': { background: surfaces.selected, color: mono[900] },
+        a: { color: colors.action },
         'button, input, select, textarea': { fontFamily: 'inherit' },
       }),
     },
@@ -115,8 +125,8 @@ export const theme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { textTransform: 'none', padding: '8px 16px', transition: 'background-color 160ms ease, border-color 160ms ease', '&:active': { filter: 'brightness(0.96)' } },
-        outlined: { borderColor: surfaces.border, color: mono[900], backgroundColor: surfaces.secondary, '&:hover': { backgroundColor: surfaces.hover, borderColor: mono[400] } },
+        root: { minHeight: 44, borderRadius: radii.control, textTransform: 'none', padding: '8px 16px', transition: 'background-color 160ms ease, border-color 160ms ease', '&:active': { filter: 'brightness(0.96)' } },
+        outlined: { borderColor: colors.controlBorder, color: mono[900], backgroundColor: surfaces.secondary, '&:hover': { backgroundColor: surfaces.hover, borderColor: mono[400] } },
       },
     },
     // Мягкая граница у paper — читается на светлом фоне

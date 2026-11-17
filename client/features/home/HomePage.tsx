@@ -9,6 +9,8 @@ import { usePlayer } from '@/features/player/PlayerProvider'
 import { QueuePanel } from '@/features/queue/components/QueuePanel'
 import { Box, Button, LinearProgress, Stack, Typography } from '@mui/material'
 import Link from 'next/link'
+import { PlayerArtwork } from '@/features/player/PlayerArtwork'
+import { typeRoles } from '@/theme/tokens'
 import { useEffect, useState } from 'react'
 import { ActivityFeed } from './ActivityFeed'
 import { BlockState } from './BlockState'
@@ -175,24 +177,26 @@ export default function HomePage() {
 function HomeContent() {
   const t = useTranslations('home')
   const viewer = useViewer()
+  const player = usePlayer()
   const releases = useHomeBlock<HomeReleasesPage>('/api/home/releases')
   const [queueOpen, setQueueOpen] = useState(false)
   return (
     <Box
       data-home-page
-      sx={{ maxWidth: 1000, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 4 } }}
+      sx={{ minWidth: 0 }}
     >
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1.5fr) minmax(0, 1fr)' }, alignItems: 'center', gap: { xs: 3, md: 8 }, mb: { xs: 4, md: 8 } }}><Box>
       <Typography variant="overline" color="text.secondary">
         {t('brandCaption')}
       </Typography>
-      <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
+      <Typography component="h1" sx={{ ...typeRoles.hero, mb: 2 }}>
         {t('hero')}
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         {viewer.user ? `${viewer.user.displayName}, ${t('greeting')}` : t('tagline')}
       </Typography>
       <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1, mb: 2 }}>
-        <Button component={Link} href="/tracks">
+        <Button component={Link} href="/tracks" variant="contained">
           {t('catalog')}
         </Button>
         <Button component={Link} href="/favorites">
@@ -203,7 +207,8 @@ function HomeContent() {
           {t('upload')}
         </Button>
       </Stack>
-      <Stack spacing={2}>
+      </Box><Box aria-hidden="true" sx={{ width: { xs: 180, md: '100%' }, maxWidth: 320, aspectRatio: '1', justifySelf: 'center', boxShadow: 'var(--wae-shadow-artwork)', borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden' }}><PlayerArtwork picture={player.current?.picture} name="" /></Box></Box>
+      <Stack spacing={4}>
         <ContinueListening />
         {viewer.user && viewer.confirmed && <ActivityFeed key={viewer.user.id} />}
         <Releases block={releases} />

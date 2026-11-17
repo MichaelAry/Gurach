@@ -25,7 +25,7 @@ const onest = localFont({
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale()
   return (
-    <html lang={locale} className={onest.variable}>
+    <html data-scroll-behavior="smooth" lang={locale} className={onest.variable}>
       <body suppressHydrationWarning>
         <AppRouterCacheProvider>
           <LocaleProvider initialLocale={locale}><AppThemeProvider><FormValidation />{children}</AppThemeProvider></LocaleProvider>

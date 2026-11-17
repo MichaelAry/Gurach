@@ -1,0 +1,90 @@
+import { expect, test } from '@playwright/test'
+
+test('mobile menu and playback settings keep the same audio and shared transport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto('/tracks')
+  await page.getByRole('main').getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  const original = await page.locator('audio').elementHandle()
+  const menu = page.getByRole('button', { name: 'Открыть меню', exact: true })
+  await menu.focus(); await menu.press('Enter')
+  await page.getByRole('navigation').getByRole('link', { name: 'Избранное', exact: true }).click()
+  await expect(page).toHaveURL(/\/favorites$/)
+  await expect(page.getByRole('button', { name: 'Закрыть меню' })).toHaveCount(0)
+  expect(await original!.evaluate(node => node === document.querySelector('audio'))).toBe(true)
+  await page.getByRole('button', { name: 'Настройки воспроизведения' }).click()
+  await page.getByRole('button', { name: 'Перемешать порядок воспроизведения' }).click()
+  await page.getByRole('button', { name: /Переключить режим повтора/ }).click()
+  await page.getByRole('slider', { name: 'Громкость', exact: true }).press('Home')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Открыть полноэкранный плеер' }).click()
+  await expect(page.getByRole('button', { name: 'Перемешать порядок воспроизведения' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: /Переключить режим повтора/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('slider', { name: 'Громкость', exact: true })).toHaveValue('0')
+  expect(await original!.evaluate(node => node === document.querySelector('audio'))).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+const friend = { id: '000000000000000000000009', username: 'analog_listener', displayName: 'Analog Listener', relationship: { status: 'friends', friendsSince: '2026-01-01T12:00:00Z', requestId: null, revision: 1 }, requestedAt: null }
+
+test('friends and notifications show real response rows, empty and failed states', async ({ page, context }) => {
+  await context.addCookies([{ name: 'gurach_session', value: 'a'.repeat(43), domain: '127.0.0.1', path: '/', httpOnly: true }])
+  await page.route('**/api/account/preferences', route => route.fulfill({ json: { preferredLocale: 'ru' } }))
+  let empty = false, failed = false
+  await page.route('**/api/friends?**', route => route.fulfill({ json: { items: empty ? [] : [friend], nextCursor: null } }))
+  await page.goto('/friends')
+  await expect(page.getByRole('link', { name: 'Analog Listener', exact: true })).toBeVisible()
+  empty = true; await page.reload()
+  await expect(page.getByText('Пока нет друзей. Найдите пользователя и отправьте заявку.')).toBeVisible()
+  await page.route('**/api/notifications', route => failed ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: { items: empty ? [] : [{ id: 'notice', actor: friend, kind: 'friend.accepted', trackId: null, trackName: null, commentId: null, readAt: null, createdAt: '2026-11-17T12:00:00Z' }], nextCursor: null } }))
+  empty = false; await page.goto('/notifications')
+  await expect(page.getByRole('link', { name: 'Analog Listener', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Отметить прочитанным' })).toBeVisible()
+  empty = true; await page.reload()
+  await expect(page.getByText('Уведомлений пока нет.')).toBeVisible()
+  failed = true; await page.reload()
+  await expect(page.getByRole('alert')).toBeVisible()
+})
+
+test('playlist library and shared view keep occurrence rows and read-only controls', async ({ page, context }) => {
+  await context.addCookies([{ name: 'gurach_session', value: 'a'.repeat(43), domain: '127.0.0.1', path: '/', httpOnly: true }])
+  await page.route('**/api/account/preferences', route => route.fulfill({ json: { preferredLocale: 'ru' } }))
+  const track = { _id: '000000000000000000000001', name: 'Evening track', artist: 'Artist', picture: null, audio: null, duration: null, listens: 0 }
+  const view = { id: track._id, name: 'Evening collection', ownerId: track._id, revision: 1, visibility: 'private', entries: [{ trackId: track._id, track }, { trackId: track._id, track }] }
+  let empty = true
+  await page.route('**/api/playlists', route => route.fulfill({ json: { items: empty ? [] : [{ id: view.id, name: view.name }] } }))
+  await page.route('**/api/playlists/**', route => route.fulfill({ json: view }))
+  await page.goto('/playlists')
+  await expect(page.getByText('Плейлистов пока нет. Создайте первую подборку.')).toBeVisible()
+  empty = false; await page.reload()
+  await page.getByRole('button', { name: view.name, exact: true }).click()
+  await expect(page.getByLabel('Название', { exact: true })).toHaveValue(view.name)
+  await expect(page.getByRole('button', { name: /Выше:/ })).toHaveCount(2)
+  await page.goto('/playlists/shared/review-token')
+  await expect(page.getByRole('heading', { name: view.name })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Выше:/ })).toHaveCount(0)
+  await expect(page.getByLabel('ID трека', { exact: true })).toHaveCount(0)
+})
+
+test('shared artwork recovers from a failed URL before visiting the full player', async ({ page }) => {
+  const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#986049"/></svg>')
+  await page.route('**/api/queue', async route => {
+    if (route.request().method() !== 'GET') return route.continue()
+    const response = await route.fetch(), body = await response.json()
+    body.entries[0].track.picture = 'data:image/png;base64,broken'
+    body.entries[2].track.picture = picture
+    await route.fulfill({ response, json: body })
+  })
+  await page.goto('/login?returnTo=/tracks')
+  await page.getByLabel('Имя пользователя').fill('fixture_user')
+  await page.getByLabel('Пароль').fill('fixture password long')
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  const footer = page.getByRole('contentinfo')
+  await expect(footer.locator('[data-placeholder]')).toBeVisible()
+  await footer.getByRole('button', { name: /Открыть очередь/ }).click()
+  const queue = page.getByRole('region', { name: 'Очередь воспроизведения' })
+  await queue.getByRole('button', { name: 'Играть: 3. Track 2 — Artist 2', exact: true }).click()
+  await queue.getByRole('button', { name: 'Закрыть', exact: true }).click()
+  await expect(footer.locator('img')).toHaveAttribute('src', picture)
+  await expect(footer.locator('[data-placeholder]')).toHaveCount(0)
+})

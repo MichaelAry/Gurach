@@ -2,6 +2,7 @@
 import { useText } from '@/i18n/LocaleProvider'
 
 import Link from 'next/link'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Alert, Button, Stack, Typography } from '@mui/material'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import { AccountTracks } from '@/features/account/AccountTracks'
@@ -12,8 +13,8 @@ export function FavoritesPage() {
 
   const { user, loading, error } = useViewer()
   const { revision } = useFavorites()
-  return <Stack spacing={3} sx={{ p: { xs: 2, sm: 3 } }}>
-    <Typography component="h1" variant="h5">{lt('favoriteTracks')}</Typography>
+  return <Stack spacing={3} sx={{ minWidth: 0 }}>
+    <PageHeader title={lt('favoriteTracks')} />
     {loading ? <Typography role="status">{lt('checkingSession')}</Typography>
       : error ? <Alert severity="error">{lt('couldNotCheckYourSessionRefreshThePage')}</Alert>
       : !user ? <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>

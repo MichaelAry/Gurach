@@ -8,6 +8,8 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import { PlayerArtwork } from '@/features/player/PlayerArtwork'
+import { typeRoles } from '@/theme/tokens'
 import { notFound } from 'next/navigation'
 
 import { getTrack } from '@/features/tracks/api/getTrack'
@@ -29,7 +31,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
     <Box sx={{
       width: '100%',
       minWidth: 0,
-      px: { xs: 2, sm: 3 },
+
     }}>
       <LocaleMetadata
         title={`${track.name} — ${track.artist ?? ''}`.trim()}
@@ -38,25 +40,24 @@ export default async function TrackPage({ params }: TrackPageProps) {
       />
       <Card
         sx={{
-          p: { xs: 2.5, sm: 3.5 },
+          p: 0, border: 0, bgcolor: 'transparent', overflow: 'visible',
           mx: 'auto',
           width: '100%',
-          height: { md: 'max(520px, calc(100dvh - 240px))' },
+
           display: 'grid',
-          gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1fr)' },
-          gap: 2.5,
-          overflow: { xs: 'visible', md: 'hidden' },
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          gap: { xs: 4, md: 8 },
         }}
       >
-        <Stack spacing={2.5} sx={{ minWidth: 0, minHeight: { md: 0 }, overflowY: { md: 'auto' } }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '340px minmax(0, 1fr)' }, gap: { xs: 3, md: 8 }, alignItems: 'center', minWidth: 0 }}>
           <Box
             sx={{
-              width: { xs: 176, sm: 288 },
+              width: { xs: 'min(100%, 320px)', md: 340 },
               maxWidth: '100%',
               aspectRatio: '1',
               height: 'auto',
               flexShrink: 0,
-              borderRadius: 2,
+              borderRadius: 'var(--wae-radius-artwork)', boxShadow: 'var(--wae-shadow-artwork)',
               overflow: 'hidden',
               bgcolor: 'background.default',
               display: 'flex',
@@ -65,14 +66,11 @@ export default async function TrackPage({ params }: TrackPageProps) {
               fontSize: '2rem',
             }}
           >
-            {track.picture ? (
-              <Box component="img" src={track.picture} alt={track.name}
-                sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : '♪'}
+            <PlayerArtwork picture={track.picture} name={track.name} />
           </Box>
-          <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+          <Box><Stack spacing={0.5} sx={{ minWidth: 0 }}>
             <Typography variant="h2" component="h1"
-              sx={{ fontSize: { xs: '1.375rem', sm: '2rem' }, overflowWrap: 'anywhere' }}>
+              sx={{ ...typeRoles.hero, fontSize: { xs: 36, sm: 48, md: 64 } }}>
               {track.name}
             </Typography>
             <Typography color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
@@ -82,45 +80,33 @@ export default async function TrackPage({ params }: TrackPageProps) {
               <ListenCount trackId={track._id} value={track.listens} />
             </Typography>
           </Stack>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1, mt: { md: 'auto !important' }, pt: 2.5, flexShrink: 0 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1,  pt: 2.5, flexShrink: 0 }}>
             <PlayTrackButton track={track} />
             <FavoriteButton trackId={track._id} name={track.name} />
             <QueueTrackActions track={track} />
           </Stack>
-        </Stack>
+        </Box></Box>
 
         <Box sx={{
           display: 'grid',
-          gridTemplateRows: { xs: 'auto auto', md: 'minmax(0, 1fr) minmax(0, 1fr)' },
+          gridTemplateRows: 'auto auto',
           gap: 2,
           minWidth: 0,
           minHeight: { md: 0 },
         }}>
           <Box component="section" aria-labelledby="lyrics-heading" sx={{
-            p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2,
+            py: 3, borderTop: '1px solid', borderColor: 'divider', maxWidth: '70ch',
             minHeight: 0, display: 'flex', flexDirection: 'column',
           }}>
-            <Typography id="lyrics-heading" component="h2" sx={{
-              fontWeight: 700, mb: 1.5, px: 1.5, py: 1,
-              bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', borderRadius: 1,
-            }}>
+            <Typography id="lyrics-heading" component="h2" sx={{ ...typeRoles.section, mb: 3 }}>
               <LocalizedText messageKey="lyrics" /></Typography>
-            <Box tabIndex={0} role="region" aria-labelledby="lyrics-heading" sx={{ overflowY: { xs: 'visible', md: 'auto' }, minHeight: 0 }}>
+            <Box tabIndex={0} role="region" aria-labelledby="lyrics-heading" sx={{ overflowY: 'visible', minHeight: 0 }}>
               <Typography color="text.primary" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
                 {track.lyrics || <LocalizedText messageKey="lyricsUnavailable" />}
               </Typography>
             </Box>
           </Box>
-          <Box tabIndex={0} role="region" aria-labelledby="comments-heading" sx={{
-            px: 2, pb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2,
-            overflowY: { xs: 'visible', md: 'auto' }, minHeight: 0,
-            overflowWrap: 'anywhere',
-            '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
-            '& #comments-heading': {
-              fontSize: '1rem', fontWeight: 700, mb: 1.5, px: 1.5, py: 1,
-              bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', borderRadius: 1,
-            },
-          }}>
+          <Box role="region" aria-labelledby="comments-heading" sx={{ borderTop: '1px solid', borderColor: 'divider', py: 3, minWidth: 0, maxWidth: '70ch', overflowWrap: 'anywhere' }}>
             <CommentsSection key={track._id} trackId={track._id} />
           </Box>
         </Box>

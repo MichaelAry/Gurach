@@ -58,9 +58,9 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
   }
 
   return <>
-    <Drawer open={open} onClose={onClose} anchor={mobile ? 'bottom' : 'right'} ModalProps={{ keepMounted: true }}>
-      <Box component="section" aria-label={lt('playbackQueue')} sx={{ width: mobile ? '100vw' : { sm: 380, md: 440 }, height: mobile ? '82vh' : '100%', display: 'flex', flexDirection: 'column', p: 2, pb: mobile ? 3 : 2 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+    <Drawer open={open} onClose={onClose} anchor={mobile ? 'bottom' : 'right'} ModalProps={{ keepMounted: true }} slotProps={{ paper: { sx: { borderRadius: mobile ? '12px 12px 0 0' : 0 } } }}>
+      <Box component="section" aria-label={lt('playbackQueue')} sx={{ width: mobile ? '100%' : { sm: 380, md: 440 }, height: mobile ? '86dvh' : '100dvh', maxWidth: '100vw', minHeight: 0, display: 'flex', flexDirection: 'column', p: 2, pb: 'max(16px, env(safe-area-inset-bottom))' }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
           <Box>
             <Typography component="h2" variant="h6">{lt('playbackQueue')}</Typography>
             <Typography variant="body2" color="text.secondary" aria-live="polite">{entries.length} {lt('tracks264')}</Typography>

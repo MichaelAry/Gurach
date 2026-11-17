@@ -113,7 +113,7 @@ export function UploadTrackForm() {
   }
 
   return (
-    <Stack component="form" noValidate spacing={2.5} onSubmit={submit} aria-busy={pending}>
+    <Stack component="form" noValidate spacing={2.5} onSubmit={submit} aria-busy={pending} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 'var(--wae-radius-panel)', p: { xs: 2.5, md: 4 } }}>
       <Stack component="fieldset" disabled={!confirmed || pending || uploaded} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
         <UploadFileField label={lt('audioFile')} name="audio"
           accept={AUDIO_EXTENSIONS.map(extension => `.${extension}`).join(',')}

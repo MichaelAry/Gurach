@@ -1,4 +1,5 @@
 'use client'
+import { typeRoles } from '@/theme/tokens'
 import { message as localMessage } from '@/i18n/messages'
 import { useText, useMessage } from '@/i18n/LocaleProvider'
 
@@ -30,10 +31,10 @@ export function AccountFriends({ revision }: { revision: number }) {
   const items = current ? state.data?.items ?? [] : []
 
   return (
-    <Paper component="section" aria-labelledby="account-friends" variant="outlined" sx={{ p: 2 }}>
+    <Paper component="section" aria-labelledby="account-friends" variant="outlined" sx={{ py: 3, border: 0, borderTop: '1px solid', borderColor: 'divider', borderRadius: 0, bgcolor: 'transparent' }}>
       <Stack spacing={2} aria-busy={!current}>
         <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <Typography id="account-friends" component="h2" variant="h6">{lt('friends')}</Typography>
+          <Typography id="account-friends" component="h2" sx={typeRoles.section}>{lt('friends')}</Typography>
           <Button component={Link} href="/friends" variant="outlined">{lt('allFriends')}</Button>
         </Stack>
         {!current ? <Typography role="status" color="text.secondary">{lt('loadingFriends')}</Typography>
@@ -42,7 +43,7 @@ export function AccountFriends({ revision }: { revision: number }) {
           : <Stack component="ul" spacing={1} sx={{ m: 0, p: 0, listStyle: 'none' }}>
             {items.map((friend) => (
               <Box component="li" key={friend.id}>
-                <Stack component={Link} href={`/users/${encodeURIComponent(friend.username)}`} direction="row" spacing={1.5} sx={{ alignItems: 'center', minHeight: 48, p: 1, borderRadius: 2, color: 'text.primary', textDecoration: 'none', '&:hover': { bgcolor: 'action.hover' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'text.primary', outlineOffset: 2 } }}>
+                <Stack component={Link} href={`/users/${encodeURIComponent(friend.username)}`} direction="row" spacing={1.5} sx={{ alignItems: 'center', minHeight: 48, p: 1, borderRadius: 'var(--wae-radius-control)', color: 'text.primary', textDecoration: 'none', '&:hover': { bgcolor: 'action.hover' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'text.primary', outlineOffset: 2 } }}>
                   <Avatar aria-hidden="true">{(friend.displayName || friend.username).slice(0, 1).toUpperCase()}</Avatar>
                   <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                     <Typography sx={{ fontWeight: 600 }}>{friend.displayName}</Typography>

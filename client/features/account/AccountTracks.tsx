@@ -2,6 +2,7 @@
 import { useLocale, useText, useMessage } from '@/i18n/LocaleProvider'
 import { message as localMessage } from '@/i18n/messages'
 
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Box, Button, Stack, Typography } from '@mui/material'
 import type { TrackListItem } from '@/features/tracks/types'
@@ -72,6 +73,7 @@ function AccountTrackPages({ kind, initialPage }: { kind: 'uploads' | 'history' 
         setSaved(true)
       }} />}
       {!page.items.length && <Typography variant="body2" color="text.secondary">{kind === 'favorites' ? lt('noFavoriteTracksYetSelectTheHeartNextTo') : kind === 'uploads' ? lt('youHaveNotUploadedAnyTracksYet') : lt('youHaveNotPlayedAnyTracksSinceHistoryTracking')}</Typography>}
+      {!page.items.length && kind === 'favorites' && <Button component={Link} href="/tracks" sx={{ alignSelf: 'flex-start' }}>{lt('browseTracks')}</Button>}
       {page.items.map((row) => (
         <Box key={rowId(row)}>
           {'listenedAt' in row ? <>

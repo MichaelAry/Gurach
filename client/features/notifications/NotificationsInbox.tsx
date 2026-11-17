@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Alert, Button, Paper, Stack, Typography } from '@mui/material'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import { useLocale, useTranslations } from '@/i18n/LocaleProvider'
@@ -68,10 +69,10 @@ function Inbox({ identity }: { identity: string }) {
     setCursor(null); setItems([]); setNext(null); setFailed(false); setLoading(true); setAttempt((value) => value + 1)
     window.dispatchEvent(new Event(notificationsChanged))
   }
-  return <Stack spacing={2} sx={{ p: 3 }}>
-    <Typography variant="h4" component="h1">{t('title')}</Typography>
+  return <Stack spacing={2} sx={{ minWidth: 0 }}>
+    <PageHeader title={t('title')} />
     <Button disabled={loading || !!pending} onClick={reload}>{t('refresh')}</Button>
-    {items.map((item) => <Paper key={item.id} variant="outlined" sx={{ p: 2 }}>
+    {items.map((item) => <Paper key={item.id} variant="outlined" sx={{ p: 2, border: 0, borderBottom: '1px solid', borderColor: 'divider', borderRadius: 0, bgcolor: item.readAt ? 'transparent' : 'background.paper', borderLeft: item.readAt ? 0 : '3px solid', borderLeftColor: 'primary.main' }}>
       <Stack spacing={1}>
         <Typography sx={{ fontWeight: item.readAt ? 'normal' : 'bold' }}>
           <Link href={`/users/${item.actor.username}`}>{item.actor.displayName}</Link>{' '}
@@ -93,7 +94,7 @@ function Inbox({ identity }: { identity: string }) {
 export function NotificationsInbox() {
   const { user, confirmed } = useViewer()
   const t = useTranslations('notifications')
-  if (!confirmed) return <Typography role="status" sx={{ p: 3 }}>{t('checkingSession')}</Typography>
+  if (!confirmed) return <Typography role="status" sx={{ minWidth: 0 }}>{t('checkingSession')}</Typography>
   if (!user) return <Button component={Link} href="/login?returnTo=/notifications">{t('login')}</Button>
   return <Inbox key={user.id} identity={user.id} />
 }

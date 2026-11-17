@@ -40,8 +40,8 @@ export default function RegisterPage() {
     } catch { setError(localMessage('couldNotReachTheServerCheckYourConnection')) }
     finally { setPending(false) }
   }
-  return <Card sx={{ p: 3, maxWidth: 420, width: '100%' }}><LocaleMetadata /><Stack component="form" onSubmit={submit} spacing={2}>
-    <Typography component="h1" variant="h4">{lt('createAnAccount')}</Typography>
+  return <Card sx={{ p: 3, maxWidth: 460, width: '100%' }}><LocaleMetadata /><Stack component="form" onSubmit={submit} spacing={2}>
+    <Typography component="h1" sx={{ fontSize: { xs: 32, sm: 36, md: 40 }, lineHeight: 1.12, letterSpacing: '-.03em', fontWeight: 500 }}>{lt('createAnAccount')}</Typography>
     <TextField label={lt('username')} helperText={lt('latinLettersDigitsOrCaseInsensitive')} autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required disabled={pending} slotProps={{ htmlInput: { minLength: 3, maxLength: 32, pattern: '[A-Za-z0-9_]+' } }} />
     <TextField label={lt('displayName')} helperText={lt('charactersTheNameCannotContainOnlySpaces')} autoComplete="name" value={displayName} onChange={e => setDisplayName(e.target.value)} required disabled={pending} slotProps={{ htmlInput: { maxLength: 64 } }} />
     <TextField label={lt('password')} helperText={lt('charactersIncludingSpacesAndEmoji')} type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} required disabled={pending} />

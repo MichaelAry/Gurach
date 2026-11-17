@@ -54,3 +54,6 @@ a:focus-visible {
     animation-duration: 0s;
   }
 }
+
+.skip-link { position: fixed; top: 8px; left: 16px; transform: translateY(-160%); z-index: 1500; padding: 12px 20px; background: var(--wae-action); color: var(--wae-onAction); border-radius: 8px; }
+.skip-link:focus { transform: none; }

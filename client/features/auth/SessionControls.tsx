@@ -24,8 +24,7 @@ export function SessionControls() {
   }
   return <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 1, flexWrap: 'wrap' }}>
     {confirmed && <NotificationIndicator />}
-    <Button component={Link} href="/playlists">{lt('playlists')}</Button>
-    <Button component={Link} href="/account" aria-label={lt('myAccount')}>{user.displayName}</Button>
+    <Button component={Link} href="/account" aria-label={lt('myAccount')} title={user.displayName} sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{user.displayName}</Button>
     <Button disabled={pending} onClick={() => void logout()}>{pending ? lt('signingOut') : lt('signOut')}</Button>
     {error && <Typography variant="caption">{lt('yourSessionCouldNotBeConfirmed')}<Button onClick={refresh}>{lt('checkSession')}</Button></Typography>}
     {failed && <Alert severity="error">{lt('couldNotSignOutTryAgain')}</Alert>}
