@@ -27,8 +27,13 @@ export default async function MainLayout({
     // Плеер живёт на всех страницах (main): контекст + <audio> + нижний бар
     <ViewerProvider><FavoritesProvider><ListenCountsProvider>
       <PlayerProvider>
-        <Box sx={{ position: { xs: 'static', md: 'absolute' }, top: 0, left: 0, zIndex: 10, overflowWrap: 'anywhere' }}>
-          <SessionControls />
+        <Box sx={{ position: { xs: 'static', md: 'absolute' }, top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', alignItems: 'flex-start', gap: 1, overflowWrap: 'anywhere' }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <SessionControls />
+          </Box>
+          <Box sx={{ mt: 2, mr: 2, maxWidth: '50%' }}>
+            <LanguageSwitcher />
+          </Box>
         </Box>
         <Box
           sx={{
@@ -54,7 +59,6 @@ export default async function MainLayout({
           </Suspense>
 
           <Navbar />
-          <LanguageSwitcher />
         </Box>
 
         {/* PlayerBar measures its full height, including errors and the safe area. */}

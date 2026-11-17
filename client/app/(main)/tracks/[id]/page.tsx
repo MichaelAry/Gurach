@@ -1,4 +1,5 @@
-import { getText } from '@/i18n/server'
+import { LocalizedText } from '@/i18n/LocalizedText'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 // app/(main)/tracks/[id]/page.tsx
 import { FavoriteButton } from '@/features/favorites/FavoriteButton'
 import {
@@ -19,29 +20,7 @@ interface TrackPageProps {
   params: Promise<{ id: string }>
 }
 
-export async function generateMetadata({ params }: TrackPageProps) {
-  const lt = await getText()
-  const { id } = await params
-  try {
-    const track = await getTrack(id)
-    if (!track) return { title: lt('trackNotFound') }
-
-    return {
-      title: `${track.name} — ${track.artist ?? ''}`.trim(),
-      openGraph: {
-        ...(track.picture ? { images: [track.picture] } : {}),
-        description: track.artist ? lt('artistDescription', { name: track.name, artist: track.artist }) : track.name,
-      },
-    }
-  } catch {
-    // Метадата не должна ронять рендер страницы
-    return { title: lt('tracks') }
-  }
-}
-
 export default async function TrackPage({ params }: TrackPageProps) {
-  const lt = await getText()
-
   const { id } = await params
   const track = await getTrack(id)
   if (!track) notFound()
@@ -52,6 +31,11 @@ export default async function TrackPage({ params }: TrackPageProps) {
       minWidth: 0,
       px: { xs: 2, sm: 3 },
     }}>
+      <LocaleMetadata
+        title={`${track.name} — ${track.artist ?? ''}`.trim()}
+        openGraphDescription={track.artist ? { key: 'artistDescription', values: { name: track.name, artist: track.artist } } : track.name}
+        image={track.picture ?? undefined}
+      />
       <Card
         sx={{
           p: { xs: 2.5, sm: 3.5 },
@@ -120,10 +104,10 @@ export default async function TrackPage({ params }: TrackPageProps) {
               fontWeight: 700, mb: 1.5, px: 1.5, py: 1,
               bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider', borderRadius: 1,
             }}>
-              {lt('lyrics')}</Typography>
+              <LocalizedText messageKey="lyrics" /></Typography>
             <Box tabIndex={0} role="region" aria-labelledby="lyrics-heading" sx={{ overflowY: { xs: 'visible', md: 'auto' }, minHeight: 0 }}>
               <Typography color="text.primary" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                {track.lyrics || lt('lyricsUnavailable')}
+                {track.lyrics || <LocalizedText messageKey="lyricsUnavailable" />}
               </Typography>
             </Box>
           </Box>

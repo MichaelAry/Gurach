@@ -1,11 +1,12 @@
 'use client'
 import { useText } from '@/i18n/LocaleProvider'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 import { useViewer } from '@/features/auth/ViewerProvider'
 import Link from 'next/link'
 import { Box, Button, Typography } from '@mui/material'
 import { UploadTrackForm } from '@/features/tracks/components/UploadTrackForm'
 
-export default function UploadPage() {
+function UploadContent() {
   const lt = useText()
 
   const { user, loading } = useViewer()
@@ -19,4 +20,8 @@ export default function UploadPage() {
       <UploadTrackForm />
     </Box>
   )
+}
+
+export default function UploadPage() {
+  return <><LocaleMetadata /><UploadContent /></>
 }

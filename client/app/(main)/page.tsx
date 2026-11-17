@@ -1,2 +1,3 @@
 import HomePage from '@/features/home/HomePage'
-export default HomePage
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
+export default function Page() { return <><LocaleMetadata /><HomePage /></> }

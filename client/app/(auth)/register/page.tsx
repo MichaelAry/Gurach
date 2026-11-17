@@ -1,5 +1,6 @@
 'use client'
 import { useText, useMessage } from '@/i18n/LocaleProvider'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 import { message as localMessage } from '@/i18n/messages'
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
@@ -39,7 +40,7 @@ export default function RegisterPage() {
     } catch { setError(localMessage('couldNotReachTheServerCheckYourConnection')) }
     finally { setPending(false) }
   }
-  return <Card sx={{ p: 3, maxWidth: 420, width: '100%' }}><Stack component="form" onSubmit={submit} spacing={2}>
+  return <Card sx={{ p: 3, maxWidth: 420, width: '100%' }}><LocaleMetadata /><Stack component="form" onSubmit={submit} spacing={2}>
     <Typography component="h1" variant="h4">{lt('createAnAccount')}</Typography>
     <TextField label={lt('username')} helperText={lt('latinLettersDigitsOrCaseInsensitive')} autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required disabled={pending} slotProps={{ htmlInput: { minLength: 3, maxLength: 32, pattern: '[A-Za-z0-9_]+' } }} />
     <TextField label={lt('displayName')} helperText={lt('charactersTheNameCannotContainOnlySpaces')} autoComplete="name" value={displayName} onChange={e => setDisplayName(e.target.value)} required disabled={pending} slotProps={{ htmlInput: { maxLength: 64 } }} />

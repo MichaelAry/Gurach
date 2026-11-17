@@ -1,6 +1,6 @@
 'use client'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
-import { useLocale, useText } from '@/i18n/LocaleProvider'
+import { useLocaleSync, useText } from '@/i18n/LocaleProvider'
 
 import Link from 'next/link'
 import { Alert, Avatar, Box, Button, Paper, Stack, Typography } from '@mui/material'
@@ -11,9 +11,22 @@ import { AccountStatistics } from './AccountStatistics'
 import { AccountTracks } from './AccountTracks'
 import { AccountFriends } from './AccountFriends'
 
+function AccountLanguageSettings() {
+  const lt = useText()
+  const { syncError, syncPending } = useLocaleSync()
+  return (
+    <Paper component="section" variant="outlined" sx={{ p: 2 }}>
+      <Stack spacing={1}>
+        <Typography component="h2" variant="h6">{lt('languageSettings')}</Typography>
+        <LanguageSwitcher />
+        {!syncError && <Typography variant="body2">{lt(syncPending ? 'languageSavingAccount' : 'languageSavedAccount')}</Typography>}
+      </Stack>
+    </Paper>
+  )
+}
+
 export function AccountOverview() {
   const lt = useText()
-  const { syncError, syncPending } = useLocale()
 
   const { user, loading, error } = useViewer()
   const listenRevision = useListenRevision()
@@ -50,13 +63,7 @@ export function AccountOverview() {
             </Stack>
           </Paper>
 
-          <Paper component="section" variant="outlined" sx={{ p: 2 }}>
-            <Stack spacing={1}>
-              <Typography component="h2" variant="h6">{lt('languageSettings')}</Typography>
-              <LanguageSwitcher />
-              <Typography variant="body2">{lt(syncPending ? 'languageSavingAccount' : syncError ? 'languageSavedLocally' : 'languageSavedAccount')}</Typography>
-            </Stack>
-          </Paper>
+          <AccountLanguageSettings />
           <AccountStatistics revision={revision} friendsRevision={refresh} />
           <AccountFriends revision={refresh} />
           <Button component={Link} href="/favorites" variant="outlined">{lt('favoriteTracks')}</Button>

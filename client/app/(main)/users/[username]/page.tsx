@@ -1,4 +1,5 @@
-import { getText } from '@/i18n/server'
+import { LocalizedText } from '@/i18n/LocalizedText'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { Typography } from '@mui/material'
@@ -10,8 +11,6 @@ async function PrivateUserPage({ params }: Props) {
   if (!await getViewerSession()) redirect(`/login?returnTo=${encodeURIComponent(`/users/${username}`)}`)
   return <UserProfile username={username} />
 }
-export default async function Page(props: Props) {
-  const lt = await getText()
-
-  return <Suspense fallback={<Typography role="status" sx={{ p: 3 }}>{lt('checkingSession')}</Typography>}><PrivateUserPage {...props} /></Suspense>
+export default function Page(props: Props) {
+  return <><LocaleMetadata /><Suspense fallback={<Typography role="status" sx={{ p: 3 }}><LocalizedText messageKey="checkingSession" /></Typography>}><PrivateUserPage {...props} /></Suspense></>
 }

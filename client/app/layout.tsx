@@ -1,7 +1,6 @@
 // app/layout.tsx
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter'
-import type { Metadata } from 'next'
-import { getText, getLocale } from '@/i18n/server'
+import { getLocale } from '@/i18n/server'
 import { FormValidation } from '@/i18n/FormValidation'
 import { LocaleProvider } from '@/i18n/LocaleProvider'
 import localFont from 'next/font/local'
@@ -22,11 +21,6 @@ const onest = localFont({
   preload: true,
   adjustFontFallback: 'Arial',
 })
-
-export async function generateMetadata(): Promise<Metadata> {
-  const lt = await getText()
-  return { title: 'Gurach', description: lt('musicPlayer'), openGraph: { title: 'Gurach', description: lt('musicPlayer'), type: 'website' } }
-}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale()

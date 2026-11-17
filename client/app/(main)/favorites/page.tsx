@@ -1,5 +1,4 @@
-import { getText } from '@/i18n/server'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 import { FavoritesPage } from '@/features/favorites/FavoritesPage'
 
-export async function generateMetadata() { return { title: (await getText())('favoriteTracks') } }
-export default function Page() { return <FavoritesPage /> }
+export default function Page() { return <><LocaleMetadata title={{ key: 'favoriteTracks' }} /><FavoritesPage /></> }

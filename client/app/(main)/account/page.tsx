@@ -1,8 +1,6 @@
-import { getText } from '@/i18n/server'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 import { AccountOverview } from '@/features/account/AccountOverview'
 
-export async function generateMetadata() { return { title: (await getText())('myAccount') } }
-
 export default function AccountPage() {
-  return <AccountOverview />
+  return <><LocaleMetadata title={{ key: 'myAccount' }} /><AccountOverview /></>
 }

@@ -1,19 +1,21 @@
 'use client'
 import { createContext, startTransition, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { isLocale, uiTextFor, resolveMessage, translate, type Locale, type Namespace, type Values } from './messages'
 import en from '@/messages/en.json'
 export type { Locale } from './messages'
 
 const LocaleContext = createContext<{
-  locale: Locale; setLocale: (locale: Locale) => void; syncError: boolean; syncPending: boolean; retrySync: () => void
-}>({ locale: 'en', setLocale: () => {}, syncError: false, syncPending: false, retrySync: () => {} })
+  locale: Locale; setLocale: (locale: Locale) => void
+}>({ locale: 'en', setLocale: () => {} })
+
+const LocaleSyncContext = createContext<{
+  syncError: boolean; syncPending: boolean; retrySync: () => void
+}>({ syncError: false, syncPending: false, retrySync: () => {} })
 
 export function LocaleProvider({ children, initialLocale = 'en' }: { children: React.ReactNode; initialLocale?: Locale }) {
   const [locale, updateLocale] = useState<Locale>(initialLocale)
   const [syncError, setSyncError] = useState(false)
   const [syncPending, setSyncPending] = useState(false)
-  const router = useRouter()
   const current = useRef(initialLocale)
   const generation = useRef(0)
   const account = useRef<string | null>(null)
@@ -21,14 +23,12 @@ export function LocaleProvider({ children, initialLocale = 'en' }: { children: R
   const writes = useRef(Promise.resolve())
   const pending = useRef<{ accountId: string; locale: Locale } | null>(null)
   const apply = useCallback((next: Locale, broadcast = true) => {
-    const changed = current.current !== next
     current.current = next
     startTransition(() => updateLocale(next))
     document.documentElement.lang = next
     try { document.cookie = `NEXT_LOCALE=${next}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}` } catch { /* The in-memory selection still works if cookies are blocked. */ }
     if (broadcast) channel.current?.postMessage(next)
-    if (changed) startTransition(() => router.refresh())
-  }, [router])
+  }, [])
   const save = useCallback((next: Locale, accountId: string, initialize = false) => {
     const version = ++generation.current
     pending.current = { accountId, locale: next }
@@ -107,10 +107,12 @@ export function LocaleProvider({ children, initialLocale = 'en' }: { children: R
       window.removeEventListener('gurach:session', onSession)
     }
   }, [apply, save])
-  const context = useMemo(() => ({ locale, setLocale, syncError, syncPending, retrySync }), [locale, setLocale, syncError, syncPending, retrySync])
-  return <LocaleContext.Provider value={context}>{children}</LocaleContext.Provider>
+  const context = useMemo(() => ({ locale, setLocale }), [locale, setLocale])
+  const sync = useMemo(() => ({ syncError, syncPending, retrySync }), [syncError, syncPending, retrySync])
+  return <LocaleContext.Provider value={context}><LocaleSyncContext.Provider value={sync}>{children}</LocaleSyncContext.Provider></LocaleContext.Provider>
 }
 export function useLocale() { return useContext(LocaleContext) }
+export function useLocaleSync() { return useContext(LocaleSyncContext) }
 export function useText() {
   const { locale } = useLocale()
   return useMemo(() => uiTextFor(locale), [locale])

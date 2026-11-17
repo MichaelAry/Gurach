@@ -1,4 +1,5 @@
-import { getText } from '@/i18n/server'
+import { LocalizedText } from '@/i18n/LocalizedText'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 // app/(main)/tracks/page.tsx
 import { UploadTracksButton } from '@/features/tracks/components/UploadTracksButton'
 import { getTracksPage } from '@/features/tracks/api/getTracksPage'
@@ -13,30 +14,21 @@ async function CatalogueData() {
   return <TracksCatalogue initialPage={page} />
 }
 
-export async function generateMetadata() {
-  const lt = await getText()
-  return {
-    title: lt('tracks'),
-    description: lt('browseAndSearchTracksByTitleOrArtist'),
-  }
-}
-
-export default async function TracksPage() {
-  const lt = await getText()
-
+export default function TracksPage() {
   return (
     <Box sx={{ p: 3 }}>
+      <LocaleMetadata title={{ key: 'tracks' }} description={{ key: 'browseAndSearchTracksByTitleOrArtist' }} />
       {/* Ширину задаёт центральная колонка layout — страница на всю её ширину */}
       <Card sx={{ width: '100%', p: 2 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h1" sx={{ fontSize: '1.5rem' }}>
-            {lt('trackList')}</Typography>
+            <LocalizedText messageKey="trackList" /></Typography>
           <UploadTracksButton />
         </Stack>
       </Card>
 
       <Box sx={{ width: '100%', mt: 2 }}>
-        <Suspense fallback={<Typography color="text.secondary">{lt('loadingTracks')}</Typography>}>
+        <Suspense fallback={<Typography color="text.secondary"><LocalizedText messageKey="loadingTracks" /></Typography>}>
           <CatalogueData />
         </Suspense>
       </Box>

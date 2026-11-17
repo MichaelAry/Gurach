@@ -1,5 +1,6 @@
 'use client'
 import { useText } from '@/i18n/LocaleProvider'
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
 
 import { Box, Button, Stack, Typography } from '@mui/material'
 
@@ -16,6 +17,7 @@ export default function MainError({
 
   return (
     <Box sx={{ p: 3 }} role="alert">
+      <LocaleMetadata />
       <Stack spacing={2} sx={{ alignItems: 'center' }}>
         <Typography variant="h5" component="h1">
           {lt('couldNotLoadData')}</Typography>

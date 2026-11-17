@@ -1,2 +1,3 @@
 import { Playlists } from '@/features/playlists/Playlists'
-export default function Page() { return <Playlists /> }
+import { LocaleMetadata } from '@/i18n/LocaleMetadata'
+export default function Page() { return <><LocaleMetadata /><Playlists /></> }
