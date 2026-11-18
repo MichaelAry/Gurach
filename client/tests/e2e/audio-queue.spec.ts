@@ -1,4 +1,41 @@
 import { expect, test } from '@playwright/test'
+
+test('pauses and resumes playback with Space without scrolling the catalogue', async ({ page }) => {
+  await page.goto('/tracks')
+  const audio = page.locator('audio')
+  const isPaused = () => audio.evaluate((node: HTMLAudioElement) => node.paused)
+  await page.getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  await expect.poll(isPaused).toBe(false)
+
+  const scrollPosition = await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    window.scrollTo({ top: 150, behavior: 'instant' })
+    return window.scrollY
+  })
+  expect(scrollPosition).toBeGreaterThan(0)
+  expect(await page.evaluate(() => window.scrollY + window.innerHeight)).toBeLessThan(
+    await page.evaluate(() => document.documentElement.scrollHeight),
+  )
+
+  await page.keyboard.press('Space')
+  await expect.poll(isPaused).toBe(true)
+  await page.keyboard.press('Space')
+  await expect.poll(isPaused).toBe(false)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollPosition)
+
+  const footer = page.getByRole('contentinfo')
+  await footer.getByRole('button', { name: 'Пауза', exact: true }).click()
+  await expect.poll(isPaused).toBe(true)
+  await footer.getByRole('button', { name: 'Играть', exact: true }).press('Space')
+  await expect.poll(isPaused).toBe(false)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollPosition)
+
+  const search = page.getByRole('searchbox')
+  await search.press('Space')
+  await expect(search).toHaveValue(' ')
+  await expect.poll(isPaused).toBe(false)
+})
+
 test('restarts duplicate occurrences and commits current removal/clear through the account queue', async ({ page }) => {
   await page.goto('/login?returnTo=/tracks')
   await page.getByLabel('Имя пользователя').fill('fixture_user')

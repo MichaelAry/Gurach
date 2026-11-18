@@ -256,6 +256,26 @@ function AudioPlayer({ children, enabled, identity, storageWarning }: { children
     if (audioRef.current && !audioRef.current.paused) pause()
     else void resumeCurrent()
   }, [pause, resumeCurrent])
+  const canTogglePlayback = enabled && Boolean(current?.audio)
+  useEffect(() => {
+    if (!canTogglePlayback) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== ' ' || event.defaultPrevented || event.isComposing ||
+        event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+
+      const target = event.target
+      if (target instanceof Element && target.closest(
+        'input, textarea, select, button, summary, [contenteditable], [role="button"], [role="dialog"]',
+      )) return
+
+      event.preventDefault()
+      if (!event.repeat) toggle()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [canTogglePlayback, toggle])
   const play = useCallback((track: PlayableTrack) => {
     if (!enabled || !track.audio) return
     if (oneOffEntry?.trackId === track._id) { toggle(); return }
