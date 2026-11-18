@@ -11,7 +11,10 @@ import { PlayerArtwork } from '@/features/player/PlayerArtwork'
 import { useListenCount } from './ListenCountsProvider'
 import { formatListens } from '../utils/formatListens'
 import { PlayButton } from './PlayButton'
+import { DownloadTrackButton } from './DownloadTrackButton'
 import { QueueTrackActions } from '@/features/queue/components/QueueTrackActions'
+import { activeItemStyles, density } from '@/theme/tokens'
+import { CurrentTrackLabel } from '@/features/player/CurrentTrackLabel'
 
 interface TrackRowProps {
   track: TrackListItem
@@ -24,16 +27,17 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
   const lt = useText()
   const { locale } = useLocale()
 
-  const { current } = usePlayerTransport()
+  const { current, playing } = usePlayerTransport()
   const isCurrent = current?._id === track._id
   const listens = useListenCount(track._id, track.listens)
 
   return (
     <Card
       component="div"
+      aria-current={isCurrent ? 'true' : undefined}
       sx={{
         position: 'relative',
-        px: { xs: 0.5, sm: 1.5 }, py: 1.5, minHeight: 76, border: 0, borderBottom: '1px solid', borderColor: 'divider', borderRadius: 0,
+        px: { xs: 0.5, sm: 1.5 }, py: density.rowPaddingY, minHeight: density.rowMinHeight, border: 0, borderBottom: '1px solid', borderColor: 'divider', borderRadius: 0,
         display: 'flex',
         alignItems: 'center',
         gap: { xs: 1, sm: 2 },
@@ -43,10 +47,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
 
         // активный трек: подсветка не пропадает на hover
         ...(isCurrent
-          ? {
-              bgcolor: 'action.selected',
-              '&:hover': { bgcolor: 'action.selected' },
-            }
+          ? activeItemStyles
           : {
               bgcolor: 'transparent', '&:hover': { bgcolor: 'action.hover' },
             }),
@@ -57,7 +58,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
       </Box>
       {selectionEnabled && <Checkbox sx={{ position: 'relative', zIndex: 1, order: 1, flexShrink: 0 }} size="small" checked={selected} disabled={!track.audio} onChange={(event) => onSelectionChange?.(event.target.checked)} slotProps={{ input: { 'aria-label': lt('select335', { p0: track.name }) } }} />}
 
-      <Box sx={{ width: 48, height: 48, flexShrink: 0, borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden', order: { xs: 1, sm: 0 } }}><PlayerArtwork picture={track.picture} name="" /></Box>
+      <Box sx={{ width: 48, height: 48, flexShrink: 0, borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden', order: { xs: 1, sm: 0 } }}><PlayerArtwork picture={track.picture} name="" size={48} loading="lazy" /></Box>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         sx={{
@@ -70,6 +71,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
           gap: { xs: 0, sm: 2 },
         }}
       >
+        <Stack sx={{ minWidth: 0 }}>
         <Typography
           component={Link}
           href={`/tracks/${track._id}`}
@@ -78,6 +80,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
             color: 'text.primary',
             textDecoration: 'none',
             minWidth: 0,
+            fontWeight: isCurrent ? 600 : 400,
             '&::after': { content: '""', position: 'absolute', inset: 0 },
             '&:focus-visible': {
               outline: 'none',
@@ -87,6 +90,8 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
         >
           {track.name}
         </Typography>
+        {isCurrent && <CurrentTrackLabel playing={playing} />}
+        </Stack>
         <Typography className="track-row-secondary" noWrap sx={{ color: isCurrent ? 'var(--wae-textSecondaryStrong)' : 'text.secondary', minWidth: 0, flexShrink: { xs: 1, sm: 0 } }}>
           {track.artist ?? '—'}
         </Typography>
@@ -107,6 +112,7 @@ export function TrackRow({ track, selectionEnabled = false, selected = false, on
         <FavoriteButton trackId={track._id} name={track.name} />
       </Box>
       <Box sx={{ position: 'relative', zIndex: 1, display: 'inline-flex', order: { xs: 5, sm: 0 }, flexShrink: 0 }}>
+        <DownloadTrackButton track={track} />
         <QueueTrackActions track={track} />
       </Box>
     </Card>

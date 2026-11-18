@@ -7,10 +7,14 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { PlayerArtwork } from '@/features/player/PlayerArtwork'
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useViewer } from '@/features/auth/ViewerProvider'
-import { useQueue, useQueueStore } from '@/features/queue/hooks'
+import { useQueue } from '@/features/queue/hooks'
 import { createOccurrence } from '@/features/queue/commands'
 import { usePlayer } from '@/features/player/PlayerProvider'
 import type { components } from '@/lib/api/schema'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ActionFeedback } from '@/components/ui/ActionFeedback'
+import { useQueueAction } from '@/features/queue/useQueueAction'
+import type { QueueEntry } from '@/features/queue/types'
 type View = components['schemas']['PlaylistView']
 type List = components['schemas']['PlaylistList']
 async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -20,43 +24,52 @@ async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> 
   return response.json()
 }
 function Editor({ initial, shared = false }: { initial: View; shared?: boolean }) {
-  const resolve = useMessage()
-
   const lt = useText()
 
   const [view, setView] = useState(initial), [name, setName] = useState(initial.name)
   const [ids, setIds] = useState(initial.entries.map(e => e.trackId))
   const [newId, setNewId] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [link, setLink] = useState('')
-  const store = useQueueStore(), queue = useQueue(), player = usePlayer()
+  const queue = useQueue(), player = usePlayer()
+  const queueAction = useQueueAction()
+  const [confirmation, setConfirmation] = useState<{ entries: QueueEntry[]; replace: boolean; unavailable: number; revision: number } | null>(null)
+  const [success, setSuccess] = useState('')
+  const [feedbackTarget, setFeedbackTarget] = useState<'save' | 'sharing' | 'queue'>('save')
   async function save() {
-    setBusy(true); setError('')
-    try { const saved = await api<View>(`/${view.id}`, 'PUT', { name, trackIds: ids, expectedRevision: view.revision }); setView(saved) }
-    catch (e) { setError(String(e)) } finally { setBusy(false) }
+    setBusy(true); setError(''); setSuccess(''); setFeedbackTarget('save'); queueAction.reset()
+    try { const saved = await api<View>(`/${view.id}`, 'PUT', { name, trackIds: ids, expectedRevision: view.revision }); setView(saved); setSuccess(localMessage('playlistSaved')) }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
   }
   async function sharing(visibility: 'private' | 'link') {
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setSuccess(''); setFeedbackTarget('sharing'); queueAction.reset()
     try {
       const result = await api<components['schemas']['PlaylistLink']>(`/${view.id}/sharing`, 'PUT', { visibility, expectedRevision: view.revision })
       setView(v => ({ ...v, visibility, revision: result.revision }))
       setLink(result.token ? `${location.origin}/playlists/shared/${result.token}` : '')
-    } catch (e) { setError(String(e)) } finally { setBusy(false) }
+      setSuccess(localMessage(visibility === 'link' ? 'playlistLinkCreated' : 'playlistLinkRevoked'))
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
   }
   async function enqueue(replace: boolean) {
-    setError('')
+    setError(''); setSuccess(''); setFeedbackTarget('queue'); queueAction.reset()
     const tracks = ids.map(id => view.entries.find(e => e.trackId === id)?.track)
     const unavailable = tracks.filter(track => !track?.audio).length
-    if (unavailable && !window.confirm(lt('unavailableTracksSkipThemAndSendTheRemainingTracks', { p0: unavailable }))) return
     const entries = tracks.flatMap(track => track?.audio ? [createOccurrence(track)] : [])
     if (entries.length > 100 || (!replace && queue.canonical.entries.length + entries.length > 100)) { setError(localMessage('theQueueLimitIsFreeUpSpaceTheList')); return }
     if (!entries.length) { setError(localMessage('noAvailableTracks')); return }
     if (replace && !entries.some(e => e.track?.audio)) { setError(localMessage('noTracksAvailableForPlayback')); return }
-    if (replace && !window.confirm(lt('replaceTheCurrentQueueWithThisPlaylist'))) return
+    if (unavailable || replace) {
+      setConfirmation({ entries, replace, unavailable, revision: queue.canonical.revision })
+      return
+    }
+    await sendToQueue(entries, replace)
+  }
+  async function sendToQueue(entries: QueueEntry[], replace: boolean, revision?: number) {
     setBusy(true)
     try {
-      if (!await store.dispatch({ type: replace ? 'replace' : 'append', entries })) throw new Error(localMessage('theQueueWasNotSavedCheckItsStateIn'))
+      if (!await queueAction.run({ type: replace ? 'replace' : 'append', entries }, localMessage('queueUpdated'), revision)) return
+      setConfirmation(null)
       const first = entries.find(e => e.track?.audio)
       if (replace && first) player.selectEntry(first.entryId)
-    } catch (e) { setError(String(e)) } finally { setBusy(false) }
+    } finally { setBusy(false) }
   }
   function move(index: number, delta: number) {
     setIds(old => { const next = [...old]; [next[index], next[index + delta]] = [next[index + delta], next[index]]; return next })
@@ -68,7 +81,7 @@ function Editor({ initial, shared = false }: { initial: View; shared?: boolean }
     {ids.map((id, index) => {
       const entry = view.entries.find(e => e.trackId === id)
       return <Box key={`${id}-${index}`} sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider', py: 1.5, gap: 1 }}>
-        <Box sx={{ width: 44, height: 44, overflow: 'hidden', borderRadius: 'var(--wae-radius-artwork)', flexShrink: 0 }}><PlayerArtwork picture={entry?.track?.picture} name="" /></Box>
+        <Box sx={{ width: 44, height: 44, overflow: 'hidden', borderRadius: 'var(--wae-radius-artwork)', flexShrink: 0 }}><PlayerArtwork picture={entry?.track?.picture} name="" size={44} loading="lazy" /></Box>
         <Box sx={{ minWidth: 0, flex: '1 1 160px', overflowWrap: 'anywhere' }}>
           <Typography sx={{ fontWeight: 500 }}>{index + 1}. {entry ? entry.track?.name ?? lt('unavailableTrack') : lt('trackId')}</Typography>
           <Typography variant="body2" color="text.secondary">{entry?.track?.artist}</Typography>
@@ -91,9 +104,11 @@ function Editor({ initial, shared = false }: { initial: View; shared?: boolean }
         <Button variant="outlined" disabled={busy || queue.status !== 'ready'} onClick={() => setIds(queue.canonical.entries.map(e => e.trackId))}>{lt('useTracksFromQueue')}</Button>
         <Button variant="contained" disabled={busy || !name.trim()} onClick={() => void save()}>{lt('saveTitleAndOrder')}</Button>
       </Stack>
+      {feedbackTarget === 'save' && <ActionFeedback error={error} success={success} />}
       <Stack spacing={1} sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }}><Button disabled={busy} onClick={() => void sharing('link')}>{lt('createRenewLink')}</Button><Button disabled={busy} onClick={() => void sharing('private')}>{lt('revokeLink')}</Button></Stack>
         {link && <TextField label={lt('readOnlyLink')} value={link} slotProps={{ htmlInput: { readOnly: true } }} />}
+        {feedbackTarget === 'sharing' && <ActionFeedback error={error} success={success} />}
       </Stack>
     </>}
     <Stack spacing={1} sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
@@ -102,8 +117,16 @@ function Editor({ initial, shared = false }: { initial: View; shared?: boolean }
         <Button variant={shared ? 'contained' : 'outlined'} disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(true)}>{lt('play238')}</Button>
         <Button disabled={busy || queue.status !== 'ready' || !ids.length || ids.join() !== view.entries.map(e => e.trackId).join()} onClick={() => void enqueue(false)}>{lt('addToQueue')}</Button>
       </Stack>
+      {!confirmation && <ActionFeedback {...queueAction.feedback} />}
+      {feedbackTarget === 'queue' && <ActionFeedback error={error} />}
     </Stack>
-    {error && <Alert severity="error">{resolve(error)}</Alert>}
+    <ConfirmDialog open={Boolean(confirmation)} title={lt(confirmation?.replace ? 'replaceTheCurrentQueueWithThisPlaylist' : 'addToQueue')}
+      confirmLabel={lt('confirm')} busy={busy} disabled={queue.status !== 'ready'} destructive={confirmation?.replace}
+      onClose={() => setConfirmation(null)} onConfirm={() => { if (confirmation) void sendToQueue(confirmation.entries, confirmation.replace, confirmation.revision) }}>
+      {Boolean(confirmation?.unavailable) && <Typography>{lt('unavailableTracksSkipThemAndSendTheRemainingTracks', { p0: confirmation?.unavailable ?? 0 })}</Typography>}
+      {confirmation?.replace && <Typography>{lt('replaceTheCurrentQueueWithThisPlaylist')}</Typography>}
+      <ActionFeedback {...queueAction.feedback} />
+    </ConfirmDialog>
   </Stack></Paper>
 
 }

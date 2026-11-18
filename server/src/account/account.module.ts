@@ -1,3 +1,4 @@
+import { ArtworkWearReset, ArtworkWearResetSchema } from './artwork-wear-reset.schema.js';
 import { User, UserSchema } from '../auth/schemas/user.schema.js';
 import { AccountFavorite, AccountFavoriteSchema } from './favorite.schema.js';
 import { Module } from '@nestjs/common';
@@ -13,6 +14,7 @@ import { AccountController } from './account.controller.js';
   imports: [TrackModule, MongooseModule.forFeature([
     { name: User.name, schema: UserSchema },
     { name: AccountFavorite.name, schema: AccountFavoriteSchema },
+    { name: ArtworkWearReset.name, schema: ArtworkWearResetSchema },
     { name: AccountListen.name, schema: AccountListenSchema },
     { name: Track.name, schema: TrackSchema },
     { name: Comment.name, schema: CommentSchema },

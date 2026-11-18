@@ -20,12 +20,15 @@ type RepeatMode = 'off' | 'all' | 'one'
 type PlayerSettings = { volume: number; muted: boolean; repeat: RepeatMode; shuffle: boolean }
 const DEFAULT_SETTINGS: PlayerSettings = { volume: 1, muted: false, repeat: 'off', shuffle: false }
 function settingsKey(identity: string) { return `gurach:player-settings:${identity}` }
+function roundVolume(volume: number) {
+  return Math.round(volume * 100) / 100
+}
 function readSettings(identity: string): PlayerSettings {
   try {
     const value = JSON.parse(localStorage.getItem(settingsKey(identity)) ?? 'null')
     if (value && Number.isFinite(value.volume) && value.volume >= 0 && value.volume <= 1 &&
       typeof value.muted === 'boolean' && ['off', 'all', 'one'].includes(value.repeat) && typeof value.shuffle === 'boolean') {
-      return { volume: value.volume, muted: value.muted, repeat: value.repeat, shuffle: value.shuffle }
+      return { volume: roundVolume(value.volume), muted: value.muted, repeat: value.repeat, shuffle: value.shuffle }
     }
   } catch { /* Settings are optional when storage is unavailable. */ }
   return DEFAULT_SETTINGS
@@ -55,7 +58,7 @@ function usePlayerSettings(identity: string, enabled: boolean) {
     setSettingsState((old) => ({ identity, value: update(old?.identity === identity ? old.value : readSettings(identity)) }))
   }, [enabled, identity])
   const setVolume = useCallback((value: number) => {
-    if (Number.isFinite(value)) updateSettings((old) => ({ ...old, volume: Math.min(1, Math.max(0, value)) }))
+    if (Number.isFinite(value)) updateSettings((old) => ({ ...old, volume: roundVolume(Math.min(1, Math.max(0, value))) }))
   }, [updateSettings])
   const toggleMute = useCallback(() => updateSettings((old) => ({ ...old, muted: !old.muted })), [updateSettings])
   const cycleRepeat = useCallback(() => updateSettings((old) => ({ ...old, repeat: old.repeat === 'off' ? 'all' : old.repeat === 'all' ? 'one' : 'off' })), [updateSettings])

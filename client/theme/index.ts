@@ -87,6 +87,7 @@ export const theme = createTheme({
   },
 
   components: {
+    MuiLinearProgress: { styleOverrides: { root: { backgroundColor: colors.surfaceMuted }, bar: { backgroundColor: colors.accent } } },
     MuiAvatar: { styleOverrides: { root: { backgroundColor: colors.surfaceSelected, color: colors.text } } },
     MuiIconButton: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
     MuiDialog: { styleOverrides: { paper: { borderRadius: radii.panel, margin: 16, maxWidth: 'calc(100% - 32px)', maxHeight: 'calc(100dvh - 32px)', boxShadow: shadows.floating } } },
@@ -113,7 +114,19 @@ export const theme = createTheme({
     },
     MuiButtonBase: {
       styleOverrides: {
-        root: ({ theme }) => ({ fontWeight: theme.typography.fontWeightMedium }),
+        root: ({ theme }) => ({
+          fontWeight: theme.typography.fontWeightMedium,
+          '&[aria-pressed="true"]:not(.Mui-disabled)': {
+            backgroundColor: '#C7BDB1',
+            color: colors.text,
+            '&:hover': { backgroundColor: '#BBAFA1' },
+            '@media (forced-colors: active)': {
+              forcedColorAdjust: 'none',
+              backgroundColor: 'Highlight',
+              color: 'HighlightText',
+            },
+          },
+        }),
       },
     },
     MuiFormLabel: {

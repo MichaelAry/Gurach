@@ -13,6 +13,7 @@ import { NotificationIndicator } from '@/features/notifications/NotificationIndi
 import { useViewer } from '@/features/auth/ViewerProvider'
 import { useText } from '@/i18n/LocaleProvider'
 import { PlayerBar } from './player/PlayerBar'
+import { density } from '@/theme/tokens'
 const container = { width: '100%', maxWidth: 1224, mx: 'auto', px: { xs: 2, sm: 3, md: 4 } }
 export function MainShell({ children }: { children: ReactNode }) {
  const pathname = usePathname(), lt = useText(), viewer = useViewer()
@@ -36,8 +37,8 @@ export function MainShell({ children }: { children: ReactNode }) {
    <LanguageSwitcher />
   </Stack>
  </Drawer>
- <Box component="main" id="main-content" tabIndex={-1} sx={{ ...container, pt: { xs: 3, md: 5 }, pb: 'calc(var(--player-bar-height, 200px) + 24px)', minHeight: '70dvh', minWidth: 0, '& :is([id], input, textarea, button, a, [tabindex])': { scrollMarginTop: 16, scrollMarginBottom: 'calc(var(--player-bar-height, 200px) + 24px)' } }}>
-  {pathname !== '/' && <Box sx={{ mb: 3 }}><Suspense fallback={null}><BackButton /></Suspense></Box>}
+ <Box component="main" id="main-content" tabIndex={-1} sx={{ ...container, pt: pathname === '/' ? { xs: 3, md: 5 } : density.pageTop, pb: 'calc(var(--player-bar-height, 200px) + 24px)', minHeight: '70dvh', minWidth: 0, '& :is([id], input, textarea, button, a, [tabindex])': { scrollMarginTop: 16, scrollMarginBottom: 'calc(var(--player-bar-height, 200px) + 24px)' } }}>
+  {pathname !== '/' && <Box sx={{ mb: density.headerGap }}><Suspense fallback={null}><BackButton /></Suspense></Box>}
   {children}
  </Box>
  <PlayerBar />

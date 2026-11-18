@@ -31,3 +31,8 @@ export class UpdateAccountPreferences {
   @ApiProperty({ enum: ['en', 'ru'] }) @IsIn(['en', 'ru']) preferredLocale: 'en' | 'ru';
   @ApiProperty({ required: false, default: false }) @ValidateIf((_object, value) => value !== undefined) @IsBoolean() initialize?: boolean;
 }
+
+
+export class ArtworkWear {
+  @ApiProperty({ type: 'integer', minimum: 0 }) count: number;
+}

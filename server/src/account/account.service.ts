@@ -1,3 +1,4 @@
+import { ArtworkWearReset } from './artwork-wear-reset.schema.js';
 import { User } from '../auth/schemas/user.schema.js';
 import { AccountFavorite } from './favorite.schema.js';
 import { BadRequestException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
@@ -24,6 +25,7 @@ export class AccountService implements OnModuleInit {
     @InjectModel(Comment.name) private readonly comments: Model<Comment>,
     @InjectConnection() private readonly connection: Connection,
     private readonly trackReader: TrackReadService,
+    @InjectModel(ArtworkWearReset.name) private readonly artworkWearResets: Model<ArtworkWearReset>,
   ) {}
 
   async onModuleInit() {
@@ -126,6 +128,24 @@ export class AccountService implements OnModuleInit {
       // Concurrent additions are idempotent thanks to the unique user/track index.
       if (!(error && typeof error === 'object' && 'code' in error && error.code === 11000)) throw error;
     }
+  }
+
+  async artworkWear(userId: string, id: string, reset = false) {
+    if (!/^[a-f\d]{24}$/i.test(id)) throw new BadRequestException('Invalid track id');
+    const trackId = new Types.ObjectId(id);
+    if (!await this.tracks.exists({ _id: trackId, lifecycle: 'active', audio: { $type: 'string', $ne: '' } })) {
+      throw new NotFoundException('Track is unavailable');
+    }
+    const key = { _id: `${userId}:${trackId.toHexString()}` };
+    const boundary = reset
+      ? await this.artworkWearResets.findOneAndUpdate(key, { $max: { resetAt: new Date() } },
+          { upsert: true, returnDocument: 'after' }).lean().exec()
+      : await this.artworkWearResets.findOne(key).lean().exec();
+    const count = await this.listens.countDocuments({
+      userId: new Types.ObjectId(userId), trackId,
+      ...(boundary ? { listenedAt: { $gt: boundary.resetAt } } : {}),
+    }).exec();
+    return { count };
   }
 
   async recordListen(userId: string, dto: RecordAccountListenDto): Promise<ListenResult> {

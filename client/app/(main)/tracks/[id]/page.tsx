@@ -16,6 +16,7 @@ import { getTrack } from '@/features/tracks/api/getTrack'
 import { CommentsSection } from '@/features/comments/components/CommentsSection'
 import { ListenCount } from '@/features/tracks/components/ListenCount'
 import { PlayTrackButton } from '@/features/tracks/components/PlayTrackButton'
+import { DownloadTrackButton } from '@/features/tracks/components/DownloadTrackButton'
 import { QueueTrackActions } from '@/features/queue/components/QueueTrackActions'
 
 interface TrackPageProps {
@@ -84,6 +85,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
             <PlayTrackButton track={track} />
             <FavoriteButton trackId={track._id} name={track.name} />
             <QueueTrackActions track={track} />
+            <DownloadTrackButton track={track} />
           </Stack>
         </Box></Box>
 

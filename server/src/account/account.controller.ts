@@ -8,7 +8,7 @@ import { ListenResult, TrackListPage } from '../contracts/track.contract.js';
 import { decodeScopedCursor } from '../common/cursor.js';
 import { env } from '../common/env.js';
 import { parseCursorPageQuery } from '../track/dto/list-tracks-query.dto.js';
-import { AccountHistoryPage, AccountStatistics, RecordAccountListenDto, AccountPreferences, UpdateAccountPreferences } from './account.contract.js';
+import { ArtworkWear, AccountHistoryPage, AccountStatistics, RecordAccountListenDto, AccountPreferences, UpdateAccountPreferences } from './account.contract.js';
 import { AccountService } from './account.service.js';
 
 @SetMetadata('gurach.private', true)
@@ -68,6 +68,18 @@ export class AccountController {
   @ApiParam({ name: 'id', type: String })
   @ApiNoContentResponse() @ApiStandardErrors({ authenticated: true })
   removeFavorite(@CurrentActor() actor: Actor, @Param('id') id: string) { return this.accounts.setFavorite(actor.id, id, false); }
+
+  @Get('artwork-wear/:id') @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ type: ArtworkWear }) @ApiStandardErrors({ authenticated: true, notFound: true })
+  artworkWear(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.accounts.artworkWear(actor.id, id);
+  }
+
+  @Put('artwork-wear/:id') @Header('Cache-Control', 'private, no-store')
+  @ApiOkResponse({ type: ArtworkWear }) @ApiStandardErrors({ authenticated: true, notFound: true })
+  resetArtworkWear(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.accounts.artworkWear(actor.id, id, true);
+  }
 
   @Post('listens') @HttpCode(200) @Header('Cache-Control', 'private, no-store')
   @Throttle({ default: { limit: env.throttle.listenLimit, ttl: env.throttle.ttlMs } })

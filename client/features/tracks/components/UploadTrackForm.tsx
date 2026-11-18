@@ -1,9 +1,9 @@
 'use client'
-import { useText, useMessage } from '@/i18n/LocaleProvider'
+import { useText, useMessage, useLocale } from '@/i18n/LocaleProvider'
 import { message as localMessage } from '@/i18n/messages'
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Alert, Button, LinearProgress, Stack, TextField } from '@mui/material'
+import { Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from '@mui/material'
 import Link from 'next/link'
 import { UploadFileField } from './UploadFileField'
 import { DuplicateTrackError, UploadJobFailedError, uploadTrack, waitForUpload } from '../api/uploadTrack'
@@ -32,19 +32,24 @@ export function UploadTrackForm() {
   const resolve = useMessage()
 
   const lt = useText()
+  const { locale } = useLocale()
 
   const { user, confirmed, isConfirmed } = useViewer()
   const router = useRouter()
   const [audioError, setAudioError] = useState('')
   const [coverError, setCoverError] = useState('')
   const [pending, setPending] = useState(false)
-  const [progress, setProgress] = useState('')
+  const [stage, setStage] = useState<'idle' | 'sending' | 'processing' | 'ready'>('idle')
+  const [audioBytes, setAudioBytes] = useState<number | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [previewFailed, setPreviewFailed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null)
   const [uploaded, setUploaded] = useState(false)
   const requestRef = useRef<AbortController | null>(null)
 
   useEffect(() => () => { requestRef.current?.abort() }, [])
+  useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview) }, [coverPreview])
 
   useEffect(() => {
     if (!confirmed || !user) return
@@ -55,16 +60,23 @@ export function UploadTrackForm() {
     void Promise.resolve().then(async () => {
       if (controller.signal.aborted) return
       setPending(true)
+      setStage('processing')
+      setError(null)
       try {
-        const trackId = await waitForUpload(saved, controller.signal, setProgress)
+        const trackId = await waitForUpload(saved, controller.signal)
+        if (controller.signal.aborted) return
         sessionStorage.removeItem(`gurach-upload:${user.id}`)
+        setStage('ready')
         setUploaded(true)
         router.push(`/tracks/${trackId}`)
         router.refresh()
       } catch (cause) {
         if (!controller.signal.aborted) {
           setError(cause instanceof Error ? cause.message : localMessage('couldNotCheckProcessingStatus'))
-          if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) sessionStorage.removeItem(`gurach-upload:${user.id}`)
+          if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) {
+            sessionStorage.removeItem(`gurach-upload:${user.id}`)
+            setStage('idle')
+          }
           setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
         }
       } finally {
@@ -86,21 +98,29 @@ export function UploadTrackForm() {
     const controller = new AbortController()
     requestRef.current = controller
     setPending(true)
+    setStage(saved ? 'processing' : 'sending')
     setError(null)
     setExistingTrackId(null)
     try {
       const trackId = saved && /^[a-f0-9-]{36}$/i.test(saved)
-        ? await waitForUpload(saved, controller.signal, setProgress)
-        : await uploadTrack(body, controller.signal, true, setProgress, (operationId) => { sessionStorage.setItem(`gurach-upload:${user.id}`, operationId) })
+        ? await waitForUpload(saved, controller.signal)
+        : await uploadTrack(body, controller.signal, true, undefined, (operationId) => {
+          sessionStorage.setItem(`gurach-upload:${user.id}`, operationId)
+          if (!controller.signal.aborted) setStage('processing')
+        })
       if (!controller.signal.aborted) {
         sessionStorage.removeItem(`gurach-upload:${user.id}`)
+        setStage('ready')
         setUploaded(true)
         router.push(`/tracks/${trackId}`)
         router.refresh()
       }
     } catch (cause) {
       if (!controller.signal.aborted) {
-        if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) sessionStorage.removeItem(`gurach-upload:${user.id}`)
+        if (cause instanceof UploadJobFailedError || cause instanceof DuplicateTrackError) {
+          sessionStorage.removeItem(`gurach-upload:${user.id}`)
+          setStage('idle')
+        } else if (!sessionStorage.getItem(`gurach-upload:${user.id}`)) setStage('idle')
         setError(cause instanceof Error ? cause.message : localMessage('couldNotLoadTheTrack'))
         setExistingTrackId(cause instanceof DuplicateTrackError ? cause.existingTrackId ?? null : null)
       }
@@ -119,12 +139,31 @@ export function UploadTrackForm() {
           accept={AUDIO_EXTENSIONS.map(extension => `.${extension}`).join(',')}
           error={Boolean(audioError)} helperText={resolve(audioError) || lt('mpWavOggOgaMAFlacAacUp')}
           disabled={!confirmed || pending || uploaded}
-          onChange={event => setAudioError(validateFile(event, AUDIO_EXTENSIONS, 50, resolve))} />
+          onChange={event => {
+            setAudioError(validateFile(event, AUDIO_EXTENSIONS, 50, resolve))
+            setAudioBytes(event.currentTarget.files?.[0]?.size ?? null)
+          }} />
+        {audioBytes !== null && <Typography variant="body2" color="text.secondary">
+          {audioBytes >= 1024 * 1024
+            ? lt('selectedAudioSizeMiB', { size: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(audioBytes / (1024 * 1024)) })
+            : lt('selectedAudioSizeBytes', { size: new Intl.NumberFormat(locale).format(audioBytes) })}
+        </Typography>}
         <UploadFileField label={lt('cover')} name="picture"
           accept={COVER_EXTENSIONS.map(extension => `.${extension}`).join(',')}
           error={Boolean(coverError)} helperText={resolve(coverError) || lt('jpgJpegPngWebpAvifGifUpToMib')}
           disabled={!confirmed || pending || uploaded}
-          onChange={event => setCoverError(validateFile(event, COVER_EXTENSIONS, 10, resolve))} />
+          onChange={event => {
+            const error = validateFile(event, COVER_EXTENSIONS, 10, resolve)
+            setCoverError(error)
+            setPreviewFailed(false)
+            const file = event.currentTarget.files?.[0]
+            setCoverPreview(file && !error ? URL.createObjectURL(file) : null)
+          }} />
+        {coverPreview && (previewFailed
+          ? <Typography variant="body2" color="text.secondary">{lt('coverPreviewUnavailable')}</Typography>
+          : <Box component="img" src={coverPreview} alt={lt('coverPreview')} width={160} height={160}
+              decoding="async" onError={() => setPreviewFailed(true)}
+              sx={{ width: 160, height: 160, objectFit: 'contain', bgcolor: 'action.hover', borderRadius: 'var(--wae-radius-artwork)' }} />)}
         <TextField
           label={lt('trackTitle')}
           name="name"
@@ -154,10 +193,11 @@ export function UploadTrackForm() {
         />
       </Stack>
       {pending && <LinearProgress aria-label={lt('uploadingTrack')} />}
-      {progress && <Alert severity="info">{resolve(progress)}</Alert>}
+      {pending && <Typography role="status">{lt(stage === 'processing' ? 'uploadStageProcessing' : 'uploadStageSending')}</Typography>}
+      {!uploaded && <Alert severity="info">{lt(stage === 'processing' ? 'uploadBackgroundHint' : 'uploadSendingHint')}</Alert>}
       {error && <Alert severity="error">{resolve(error)}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>{lt('openExistingTrack')}</Link></>}</Alert>}
-      {uploaded && <Alert severity="success">{lt('trackUploadedOpeningTheTrackPage')}</Alert>}
-      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? lt('trackUploaded') : pending ? lt('loading') : lt('uploadTrack')}</Button>
+      {uploaded && <Alert severity="success" role="status">{lt('trackUploadedOpeningTheTrackPage')}</Alert>}
+      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? lt('trackUploaded') : pending ? lt('loading') : stage === 'processing' ? lt('checkUploadStatus') : lt('uploadTrack')}</Button>
     </Stack>
   )
 }

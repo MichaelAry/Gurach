@@ -2,18 +2,22 @@
 import { useText } from '@/i18n/LocaleProvider'
 import Link from 'next/link'
 import { PlayerArtwork } from '@/features/player/PlayerArtwork'
-import { typeRoles } from '@/theme/tokens'
+import { activeItemStyles, typeRoles } from '@/theme/tokens'
+import { usePlayerTransport } from '@/features/player/PlayerProvider'
+import { CurrentTrackLabel } from '@/features/player/CurrentTrackLabel'
 import { Box, Button, Stack, Typography } from '@mui/material'
 import type { TrackListItem } from '@/features/tracks/types'
 import { PlayButton } from '@/features/tracks/components/PlayButton'
 export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
   const lt = useText()
+  const { current, playing } = usePlayerTransport()
 
   return (
     <Stack spacing={0.5}>
       {tracks.map((track) => (
         <Stack
           key={track._id}
+          aria-current={current?._id === track._id ? 'true' : undefined}
           direction="row"
           spacing={1.5}
           sx={{
@@ -22,9 +26,11 @@ export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
             minWidth: 0,
             borderBottom: '1px solid',
             borderColor: 'divider',
+            px: 1,
+            ...(current?._id === track._id ? activeItemStyles : {}),
           }}
         >
-          <Box sx={{ width: 44, height: 44, flexShrink: 0, borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden' }}><PlayerArtwork picture={track.picture} name="" /></Box>
+          <Box sx={{ width: 44, height: 44, flexShrink: 0, borderRadius: 'var(--wae-radius-artwork)', overflow: 'hidden' }}><PlayerArtwork picture={track.picture} name="" size={44} loading="lazy" /></Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               component={Link}
@@ -39,6 +45,7 @@ export function MusicRows({ tracks }: { tracks: TrackListItem[] }) {
             >
               {track.name}
             </Typography>
+            {current?._id === track._id && <CurrentTrackLabel playing={playing} />}
             <Typography variant="body2" color="text.secondary" noWrap>
               {track.artist || lt('unknownArtist')}
             </Typography>

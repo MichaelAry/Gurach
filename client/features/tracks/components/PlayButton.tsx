@@ -30,7 +30,7 @@ export function PlayButton({ track }: PlayButtonProps) {
       aria-label={`${isPlaying ? lt('pause') : lt('play')} ${track.name}`}
       onClick={() => play(track)}
       sx={{
-        color: isPlaying ? 'primary.main' : 'text.secondary',
+        color: isCurrent ? 'var(--wae-accentText)' : 'text.secondary',
         '&:hover': { bgcolor: 'action.hover' },
       }}
     >

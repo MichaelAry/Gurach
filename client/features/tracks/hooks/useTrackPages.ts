@@ -80,9 +80,10 @@ export function useTrackPages(initialPage: TrackListPage, search = '') {
   }, [query])
 
   useEffect(() => {
-    const timer = query ? setTimeout(() => void fetchPage(), 300) : undefined
+    // TracksCatalogue already debounces URL changes; history navigation and
+    // retries should not introduce another wait before fetching results.
+    if (query) void fetchPage()
     return () => {
-      clearTimeout(timer)
       requestRef.current?.abort()
       requestRef.current = null
     }

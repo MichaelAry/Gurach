@@ -42,6 +42,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const users = actors.map((actor) => actor.id);
   await db.collection('accountfavorites').deleteMany({ userId: { $in: users } });
+  await db.collection<{ _id: string }>('artworkwearresets').deleteMany({ _id: `${actors[0].id.toHexString()}:${owned[0].toHexString()}` });
   await db.collection('accountlistens').deleteMany({ userId: { $in: users } });
   await db.collection('comments').deleteMany({ authorId: { $in: users } });
   await db.collection('tracks').deleteMany({ _id: { $in: [...owned, foreign, deleted, silent] } });
@@ -85,8 +86,19 @@ it('commits one listen and global increment for concurrent retries, retaining di
   expect(results[1].body).toEqual({ listens: 4 });
   expect(await db.collection('accountlistens').countDocuments({ userId: actors[0].id })).toBe(1);
   expect((await db.collection('tracks').findOne({ _id: owned[0] }))?.listens).toBe(4);
+  const wearPath = `/account/artwork-wear/${owned[0].toHexString()}`;
+  await request(app.getHttpServer()).get(wearPath).expect(401);
+  await request(app.getHttpServer()).put(wearPath).expect(401);
+  await auth('get', '/account/artwork-wear/bad').expect(400);
+  await auth('put', `/account/artwork-wear/${deleted.toHexString()}`).expect(404);
+  await auth('get', wearPath).expect(200, { count: 1 });
+  await auth('get', wearPath, 1).expect(200, { count: 0 });
+  await auth('put', wearPath).expect(200, { count: 0 });
+  await auth('post', '/account/listens').send(body).expect(200);
+  await auth('get', wearPath).expect(200, { count: 0 });
   await auth('post', '/account/listens').send({ ...body, trackId: String(foreign) }).expect(400);
   await auth('post', '/account/listens').send({ trackId: String(owned[0]), playbackId: randomUUID() }).expect(200);
+  await auth('get', wearPath).expect(200, { count: 1 });
   await auth('post', '/account/listens').send({ trackId: String(foreign), playbackId: randomUUID() }).expect(200);
   expect((await auth('get', '/account/statistics').expect(200)).body).toEqual({ uploadedTracks: 2, totalListens: 3, uniqueTracks: 2, receivedListens: 8, comments: 1 });
   expect((await auth('get', '/account/history', 1).expect(200)).body.items).toEqual([]);

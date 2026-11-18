@@ -26,7 +26,7 @@ export function PlayTrackButton({ track }: { track: TrackDetail }) {
       disabled={!track.audio || pending}
       onClick={() => play(track)}
       sx={{
-        bgcolor: 'primary.main',
+        bgcolor: isCurrent ? 'var(--wae-accent)' : 'primary.main',
         color: 'primary.contrastText',
         '&:hover': { bgcolor: 'primary.dark' },
       }}

@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { guestWearChanged, saveGuestWear } from '@/features/player/artworkWear'
 import { useViewer } from '@/features/auth/ViewerProvider'
 
 type ListenCountsContextValue = {
@@ -24,6 +25,15 @@ export function ListenCountsProvider({ children }: { children: ReactNode }) {
   const { user, isConfirmed } = useViewer()
   const recordListen = useCallback(
     async (trackId: string, playbackId: string): Promise<boolean> => {
+      if (!isConfirmed(user?.id ?? null)) return false
+      if (!user) {
+        try {
+          await saveGuestWear(trackId, playbackId, () => isConfirmed(null))
+        } catch {
+          // Browser storage is optional for guest playback.
+          window.dispatchEvent(new Event(guestWearChanged))
+        }
+      }
       if (!isConfirmed(user?.id ?? null)) return false
       try {
         const response = await fetch(

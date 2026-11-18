@@ -66,7 +66,7 @@ export function TracksCatalogue({ initialPage }: { initialPage: TrackListPage })
       />
       {input && <Button onClick={clearSearch}>{lt('clearSearch')}</Button>}
       <Typography variant="body2" color="text.secondary">
-        {lt('startingATrackAddsTheFollowingLoadedTracksTo')}</Typography>
+        {lt('cataloguePlaybackHint')}</Typography>
       {tracks.length > 0 && <TrackList tracks={tracks} />}
       {loading && <Typography role="status" color="text.secondary">{lt('loadingTracks')}</Typography>}
       {!loading && !error && tracks.length === 0 && (

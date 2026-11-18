@@ -20,7 +20,8 @@ test('keeps the same playing audio and position when opening, collapsing and usi
     node.dataset.loads = '0'
     node.addEventListener('loadstart', () => { node.dataset.loads = String(Number(node.dataset.loads) + 1) })
   })
-  await page.getByRole('button', { name: 'Открыть полноэкранный плеер' }).click()
+  // Keep the click above the Next.js development indicator in the lower-left corner.
+  await page.getByRole('button', { name: 'Развернуть плеер с обложки' }).click({ position: { x: 48, y: 8 } })
   await expect(page).toHaveURL(/\/player\?returnTo=/)
   await expect(page.getByRole('contentinfo')).toHaveCount(0)
   await expect(page.getByRole('navigation')).toHaveCount(0)
@@ -67,8 +68,16 @@ test('shares account transport, queue and favorites with the compact player', as
   await page.getByRole('button', { name: 'Перемешать порядок воспроизведения' }).click()
   await expect(page.getByRole('button', { name: 'Перемешать порядок воспроизведения' })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: /Переключить режим повтора/ }).click()
-  await page.getByRole('slider', { name: 'Громкость', exact: true }).press('Home')
-  await page.getByRole('slider', { name: 'Громкость', exact: true }).press('ArrowRight')
+  await page.getByRole('heading', { name: 'Track 1', exact: true }).hover()
+  for (const label of [/Убрать из избранного: Track 1/, /Перемешать порядок воспроизведения/, /Переключить режим повтора/]) {
+    await expect(page.getByRole('button', { name: label })).toHaveCSS('background-color', 'rgb(199, 189, 177)')
+  }
+  const volume = page.getByRole('slider', { name: 'Громкость', exact: true })
+  await volume.press('End')
+  await expect(page.locator('main [data-volume-lit]')).toHaveCount(14)
+  await volume.press('Home')
+  await volume.press('ArrowRight')
+  await expect(volume).toHaveAttribute('aria-valuetext', '1%')
   await page.getByRole('button', { name: 'Без звука', exact: true }).click()
   await expect.poll(() => page.locator('audio').evaluate((node: HTMLAudioElement) => node.muted && Math.round(node.volume * 100) === 1)).toBe(true)
   await page.getByRole('button', { name: /Открыть очередь/ }).first().click()
@@ -82,7 +91,10 @@ test('shares account transport, queue and favorites with the compact player', as
   await expect(footer.getByText('3 / 3', { exact: true })).toBeVisible()
   await expect(footer.getByRole('button', { name: 'Перемешать порядок воспроизведения' })).toHaveAttribute('aria-pressed', 'true')
   await expect(footer.getByRole('button', { name: /Переключить режим повтора/ })).toHaveAttribute('aria-pressed', 'true')
-  await expect(footer.getByRole('slider', { name: 'Громкость', exact: true })).toHaveValue('1')
+  for (const label of [/Перемешать порядок воспроизведения/, /Переключить режим повтора/, /^Без звука$/]) {
+    await expect(footer.getByRole('button', { name: label })).toHaveCSS('background-color', 'rgb(199, 189, 177)')
+  }
+  await expect(footer.getByRole('slider', { name: 'Громкость', exact: true })).toHaveAttribute('aria-valuenow', '1')
 })
 
 test('opens directly with an empty queue, fits mobile and returns to the catalogue', async ({ page }) => {
@@ -172,4 +184,102 @@ test('uses the real artwork and keeps long titles readable at narrow widths', as
     await page.setViewportSize({ width, height: 812 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   }
+})
+
+test('applies the current cover to vinyl, controls and queue across viewport sizes', async ({ page }) => {
+  let releaseCool!: () => void
+  const coolResponse = new Promise<void>(resolve => { releaseCool = resolve })
+  const colors = [['#b84e32', '#f5d7a4', '#26528c'], ['#182742', '#556476', '#8191a4', '#e9913c']]
+  await page.route('**/api/queue', async route => {
+    if (route.request().method() !== 'GET') return route.continue()
+    const response = await route.fetch()
+    const body = await response.json()
+    for (const [index, entry] of (body.entries ?? []).entries()) {
+      if (entry.track?.name === 'Track 1') entry.track.picture = index === 0 ? '/theme-cover-0.svg' : '/theme-cover-broken.svg'
+      if (entry.track?.name === 'Track 2') entry.track.picture = '/theme-cover-1.svg'
+    }
+    await route.fulfill({ response, json: body })
+  })
+  await page.route('**/theme-cover-*.svg', async route => {
+    if (route.request().url().endsWith('broken.svg')) return route.fulfill({ status: 404 })
+    const index = Number(route.request().url().match(/-(\d)\.svg$/)?.[1])
+    if (index === 1) await coolResponse
+    const [main, secondary, center, accent] = colors[index]
+    await route.fulfill({ contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 100 100"><rect width="100" height="100" fill="${main}"/><circle cx="50" cy="50" r="34" fill="${secondary}"/><circle cx="50" cy="50" r="18" fill="${center}"/>${accent ? `<circle cx="50" cy="50" r="11" fill="${accent}"/>` : ''}</svg>` })
+  })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await signIn(page)
+  await page.getByRole('main').getByRole('button', { name: 'Играть Track 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Открыть полноэкранный плеер' }).click()
+  const player = page.locator('.fullscreen-player')
+  await expect(player).toHaveAttribute('data-artwork-theme', 'cover')
+  await expect(player).toHaveAttribute('data-artwork-tone', 'light')
+  await expect(player.locator('.fullscreen-player-record')).toHaveCSS('background-image', /rgb\(184, 78, 50\)/)
+  const play = player.locator('.fullscreen-player-transport button').filter({ has: page.locator('[data-testid="PauseRoundedIcon"]') })
+  await expect(play).toHaveCSS('background-color', 'rgb(147, 62, 40)')
+  await page.screenshot({ path: '/tmp/gurach-artwork-player-light.png', fullPage: true, style: 'nextjs-portal { display: none }' })
+  await page.getByRole('link', { name: 'Свернуть плеер' }).focus()
+  await page.keyboard.press('Tab')
+  const openQueue = page.getByRole('button', { name: /Открыть очередь/ }).first()
+  await expect(openQueue).toBeFocused()
+  await expect(openQueue).toHaveCSS('outline-width', '2px')
+  await page.keyboard.press('Enter')
+  const queue = page.getByRole('region', { name: 'Очередь воспроизведения' })
+  await expect(page.locator('.MuiDrawer-paper').filter({ has: queue })).toHaveCSS('background-color', 'rgb(251, 244, 243)')
+  await queue.getByRole('button', { name: /Играть: .*Track 2/ }).click()
+  await expect(player.locator('h2')).toHaveText('Track 2')
+  await queue.getByRole('button', { name: /Играть: 2\. Track 1/ }).click()
+  await expect(player).toHaveAttribute('data-artwork-theme', 'default')
+  const lateCover = page.waitForResponse('**/theme-cover-1.svg')
+  releaseCool()
+  await lateCover
+  await expect(player.locator('.fullscreen-player-record')).toHaveCSS('background-image', /rgb\(38, 40, 36\)/)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await player.evaluate(element => {
+    let darkestContrast = Infinity
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d', { willReadFrequently: true })!
+    const luminance = (css: string) => {
+      context.fillStyle = css
+      context.fillRect(0, 0, 1, 1)
+      const [red, green, blue] = Array.from(context.getImageData(0, 0, 1, 1).data, value => {
+        const channel = value / 255
+        return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4
+      })
+      return .2126 * red + .7152 * green + .0722 * blue
+    }
+    const sample = () => {
+      const styles = getComputedStyle(element)
+      const ink = luminance(styles.color) + .05
+      for (const property of ['base', 'glow', 'edge']) {
+        const paper = luminance(styles.getPropertyValue(`--artwork-${property}`).trim()) + .05
+        darkestContrast = Math.min(darkestContrast, Math.max(ink, paper) / Math.min(ink, paper))
+      }
+      element.dataset.minimumContrast = String(darkestContrast)
+      if (!element.dataset.stopContrastSampling) requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  })
+  await queue.getByRole('button', { name: /Играть: .*Track 2/ }).click()
+  await expect(player).toHaveAttribute('data-artwork-tone', 'dark')
+  await queue.getByRole('button', { name: 'Закрыть', exact: true }).click()
+  await expect(queue).toBeHidden()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(player.locator('.fullscreen-player-record')).toHaveCSS('background-image', /rgb\(24, 39, 66\)/)
+  await expect(play).toHaveCSS('background-color', /rgb\(23[0-5], 14[3-7], 6[0-4]\)/)
+  await page.screenshot({ path: '/tmp/gurach-artwork-player-dark.png', fullPage: true, style: 'nextjs-portal { display: none }' })
+  await openQueue.click()
+  await expect(page.locator('.MuiDrawer-paper').filter({ has: queue })).toHaveCSS('background-color', 'rgb(8, 14, 23)')
+  await queue.getByRole('button', { name: /Играть: 1\. Track 1/ }).click()
+  await expect(player).toHaveAttribute('data-artwork-tone', 'light')
+  await queue.getByRole('button', { name: 'Закрыть', exact: true }).click()
+  await expect(queue).toBeHidden()
+  expect(await player.evaluate(element => {
+    element.dataset.stopContrastSampling = 'true'
+    return Number(element.dataset.minimumContrast)
+  })).toBeGreaterThanOrEqual(4.5)
+  await page.getByRole('link', { name: 'Свернуть плеер' }).click()
+  await expect(page.getByRole('contentinfo')).toBeVisible()
+  await expect(player).toHaveCount(0)
 })

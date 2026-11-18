@@ -36,6 +36,7 @@ const accountFavorites = new Map();
 const accountQueues = new Map();
 const accountHistory = new Map();
 const accountPlaybacks = new Map();
+const artworkWearResets = new Map();
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? '/', `http://127.0.0.1:${port}`);
@@ -131,6 +132,15 @@ const server = createServer((request, response) => {
       const rows = url.pathname.endsWith('favorites') ? favorites.map((id) => tracks.find((track) => track._id === id)).filter(Boolean) : url.pathname.endsWith('uploads') ? uploads : history;
       const offset = Number(url.searchParams.get('cursor') ?? 0), count = Number(url.searchParams.get('count') ?? 20);
       response.end(JSON.stringify({ items: rows.slice(offset, offset + count), nextCursor: offset + count < rows.length ? String(offset + count) : null })); return;
+    }
+    const wearTrack = /^\/account\/artwork-wear\/([a-f\d]{24})$/.exec(url.pathname)?.[1];
+    if (wearTrack && ['GET', 'PUT'].includes(request.method)) {
+      if (!tracks.some(track => track._id === wearTrack)) { response.writeHead(404); response.end(); return; }
+      const key = `${accountKey}:${wearTrack}`;
+      if (request.method === 'PUT') artworkWearResets.set(key, new Date().toISOString());
+      const since = artworkWearResets.get(key) ?? '';
+      response.end(JSON.stringify({ count: history.filter(row => row.trackId === wearTrack && row.listenedAt > since).length }));
+      return;
     }
     if (url.pathname === '/account/listens' && request.method === 'POST') {
       let body = '';
@@ -326,6 +336,12 @@ const server = createServer((request, response) => {
     return;
   }
   if (/^\/static\/audio\/track-\d+\.mp3$/.test(url.pathname)) {
+    if (url.searchParams.has('download')) {
+      const track = tracks.find(({ _id, audio }) => _id === url.searchParams.get('download') && new URL(audio).pathname === url.pathname);
+      if (!track) { response.writeHead(404).end(); return; }
+      // Simulate a media origin that returns inline audio even for a download request.
+      response.setHeader('Content-Disposition', 'inline');
+    }
     const samples = 8000 * (url.pathname.endsWith('/track-121.mp3') ? 180 : 20);
     const wav = Buffer.alloc(44 + samples * 2);
     wav.write('RIFF', 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8);

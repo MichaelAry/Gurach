@@ -6,6 +6,10 @@ import { useTheme } from '@mui/material/styles'
 import { usePlayerTransport } from '@/features/player/PlayerProvider'
 import { useQueue, useQueueStore } from '../hooks'
 import { QueueRow } from './QueueRow'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ActionFeedback } from '@/components/ui/ActionFeedback'
+import { useQueueAction } from '../useQueueAction'
+import { message } from '@/i18n/messages'
 
 export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const resolve = useMessage()
@@ -13,9 +17,11 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
   const lt = useText()
 
   const store = useQueueStore(), state = useQueue()
+  const action = useQueueAction()
   const player = usePlayerTransport()
   const theme = useTheme(), mobile = useMediaQuery(theme.breakpoints.down('sm'))
-  const [confirmClear, setConfirmClear] = useState(false)
+  const [clearRevision, setClearRevision] = useState<number | null>(null)
+  const confirmClear = clearRevision !== null
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set())
   const [removeFirstOpen, setRemoveFirstOpen] = useState(false)
   const [firstCount, setFirstCount] = useState('1')
@@ -35,24 +41,24 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
   }
   async function removeChecked() {
     if (!checkedEntries.length) return
-    if (await store.dispatch({ type: 'removeMany', entryIds: checkedEntries.map((entry) => entry.entryId) })) setCheckedIds(new Set())
+    if (await action.run({ type: 'removeMany', entryIds: checkedEntries.map((entry) => entry.entryId) }, message('queueUpdated'))) setCheckedIds(new Set())
   }
   async function removeFirst() {
     if (!validCount) return
-    if (await store.dispatch({ type: 'removeFirst', count })) setRemoveFirstOpen(false)
+    if (await action.run({ type: 'removeFirst', count }, message('queueUpdated'))) setRemoveFirstOpen(false)
   }
   function move(from: number, to: number) {
     if (from === to || disabled) return
     const ids = entries.map((entry) => entry.entryId)
     const [moved] = ids.splice(from, 1)
     ids.splice(to, 0, moved)
-    void store.dispatch({ type: 'reorder', entryIds: ids })
+    void action.run({ type: 'reorder', entryIds: ids }, message('queueUpdated'))
   }
   async function clear() {
-    const saved = await store.dispatch({ type: 'clear' })
+    const saved = await action.run({ type: 'clear' }, message('queueUpdated'), clearRevision ?? undefined)
     if (saved) {
       setCheckedIds(new Set())
-      setConfirmClear(false)
+      setClearRevision(null)
       onClose()
     }
   }
@@ -68,10 +74,10 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
           <Button onClick={onClose}>{lt('close')}</Button>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ my: 1, flexWrap: 'wrap' }}>
-          <Button size="small" disabled={!entries.length || disabled} onClick={() => setConfirmClear(true)}>{lt('clear')}</Button>
+          <Button size="small" disabled={!entries.length || disabled} onClick={() => { action.reset(); setClearRevision(state.canonical.revision) }}>{lt('clear')}</Button>
           <Button size="small" disabled={!entries.length || disabled} onClick={() => { setFirstCount('1'); setRemoveFirstOpen(true) }}>{lt('removeFirst')}</Button>
           <Button size="small" disabled={!entries.some((entry) => entry.availability !== 'playable') || disabled}
-            onClick={() => void store.dispatch({ type: 'removeUnavailable' })}>{lt('removeUnavailable')}</Button>
+            onClick={() => void action.run({ type: 'removeUnavailable' }, message('queueUpdated'))}>{lt('removeUnavailable')}</Button>
           {state.status === 'conflict' && <Button size="small" onClick={() => void store.refresh()}>{lt('refreshQueue')}</Button>}
           {state.status === 'error' && store.hasPendingMutation() && <Button size="small" onClick={() => void store.retry()}>{lt('retrySaving')}</Button>}
           {state.status === 'error' && !store.hasPendingMutation() && <Button size="small" onClick={() => void store.refresh()}>{lt('retryLoading')}</Button>}
@@ -87,23 +93,22 @@ export function QueuePanel({ open, onClose }: { open: boolean; onClose: () => vo
         {state.status === 'loading' && <Typography role="status">{lt('loadingQueue')}</Typography>}
         {state.status === 'pending' && <Typography role="status">{lt('savingQueue')}</Typography>}
         {state.error && <Alert severity={state.status === 'conflict' ? 'warning' : 'error'} role="alert">{resolve(state.error)}</Alert>}
+        {!confirmClear && <ActionFeedback error={state.error ? undefined : action.feedback.error} success={state.error ? undefined : action.feedback.success} />}
         {!entries.length && state.status !== 'loading' && <Typography sx={{ mt: 2 }} color="text.secondary">{lt('theQueueIsEmptyAddTracksFromTheCatalogue')}</Typography>}
         <Box component="ol" aria-label={lt('queuedTracks')} sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 0, mt: 1, overflowY: 'auto', minHeight: 0 }}>
           {entries.map((entry, index) => <QueueRow key={entry.entryId} entry={entry} index={index} total={entries.length} disabled={disabled}
             checked={checkedIds.has(entry.entryId)} onCheck={() => toggleChecked(entry.entryId)}
             current={player.selectedEntryId === entry.entryId} playing={player.playing && player.selectedEntryId === entry.entryId}
-            onSelect={() => player.selectEntry(entry.entryId)} onRemove={() => void store.dispatch({ type: 'remove', entryId: entry.entryId })}
+            onSelect={() => player.selectEntry(entry.entryId)} onRemove={() => void action.run({ type: 'remove', entryId: entry.entryId }, message('queueUpdated'))}
             onMove={(direction) => move(index, index + direction)} onDrop={move} />)}
         </Box>
       </Box>
     </Drawer>
-    <Dialog open={confirmClear} onClose={() => { if (!busy) setConfirmClear(false) }} aria-labelledby="clear-queue-title">
-      <DialogTitle id="clear-queue-title">{lt('clearTheQueue')}</DialogTitle>
-      <DialogContent>
-        {lt('clearQueue', { count: state.canonical.entries.length })}{state.error && <Alert severity="error" sx={{ mt: 2 }}>{resolve(state.error)}</Alert>}
-      </DialogContent>
-      <DialogActions><Button disabled={busy} onClick={() => setConfirmClear(false)}>{lt('cancel')}</Button><Button color="error" onClick={() => void clear()} disabled={disabled || !entries.length}>{lt('clear')}</Button></DialogActions>
-    </Dialog>
+    <ConfirmDialog open={confirmClear} onClose={() => setClearRevision(null)} title={lt('clearTheQueue')} confirmLabel={lt('clear')}
+      busy={busy} disabled={disabled || !entries.length} destructive onConfirm={() => void clear()}>
+      <Typography>{lt('clearQueue', { count: state.canonical.entries.length })}</Typography>
+      <ActionFeedback error={state.error ?? action.feedback.error} />
+    </ConfirmDialog>
     <Dialog open={removeFirstOpen} onClose={() => { if (!busy) setRemoveFirstOpen(false) }} aria-labelledby="remove-first-title" fullWidth maxWidth="xs">
       <Box component="form" onSubmit={(event) => { event.preventDefault(); if (!disabled) void removeFirst() }}>
         <DialogTitle id="remove-first-title">{lt('removeFirstTracks')}</DialogTitle>
