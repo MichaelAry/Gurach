@@ -77,6 +77,17 @@ export default async function TrackPage({ params }: TrackPageProps) {
             <Typography color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
               {track.artist}
             </Typography>
+            {track.album && <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+              <LocalizedText messageKey="metadataAlbum" /> · {track.album}
+            </Typography>}
+            {!!track.genres?.length && <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+              <LocalizedText messageKey="metadataGenres" /> · {track.genres.join(' · ')}
+            </Typography>}
+            {track.provenance?.genreEvidence?.some(({ source }) => source === 'lastfm') && (
+              <Typography component="a" href="https://www.last.fm/" variant="caption" color="text.secondary" sx={{ alignSelf: 'flex-start' }}>
+                {'Last.fm'}
+              </Typography>
+            )}
             <Typography variant="body2" color="text.secondary">
               <ListenCount trackId={track._id} value={track.listens} />
             </Typography>

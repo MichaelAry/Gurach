@@ -1,4 +1,4 @@
-import { revalidateTag } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 
 /** Shared by browser mutations and durable events, including public home data tagged tracks. */
 export function invalidateTrackCaches(trackId?: string, options: { comments?: boolean } = {}) {
@@ -6,6 +6,7 @@ export function invalidateTrackCaches(trackId?: string, options: { comments?: bo
   if (trackId && /^[a-f\d]{24}$/i.test(trackId)) {
     const id = trackId.toLowerCase()
     revalidateTag(`track:${id}`, { expire: 0 })
+    revalidatePath(`/tracks/${id}`)
     if (options.comments) revalidateTag(`track-comments:${id}`, { expire: 0 })
   }
 }

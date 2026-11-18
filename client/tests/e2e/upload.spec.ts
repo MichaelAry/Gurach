@@ -210,3 +210,120 @@ test('publishes through the proxy and exposes the track to another account', asy
     await expect(reader.getByText('Текст песни', { exact: true })).toBeVisible()
   } finally { await other.close() }
 })
+
+const catalogPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=', 'base64')
+const catalogRelease = '20000000-0000-4000-8000-000000000002'
+const showCatalog = async (page: Page) => {
+  await page.getByLabel('Аудиофайл').setInputFiles({ name: 'northbound.mp3', mimeType: 'audio/mpeg', buffer: Buffer.from('track') })
+  await page.getByLabel('Название трека').fill('Northbound')
+  await page.getByLabel('Исполнитель', { exact: true }).fill('Catalog Artist')
+  await expect(page.getByText('Выберите запись и релиз')).toBeVisible()
+}
+
+async function applyDeluxe(page: Page) {
+  await page.getByRole('button', { name: /Deluxe Release/ }).click()
+  await expect(page.getByRole('checkbox', { name: 'Обложка', exact: true })).toBeChecked()
+  await page.getByRole('button', { name: 'Применить выбранные поля' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Применено к черновику' })).toBeVisible()
+}
+
+test('chooses a release, publishes archive bytes and edited metadata, then patches from the account editor', async ({ page }) => {
+  await showCatalog(page)
+  await page.getByRole('button', { name: /Original Release/ }).click()
+  await expect(page.getByText('У этого издания нет обложки.')).toBeVisible()
+  const archive = page.waitForResponse((response) => response.url().endsWith(`/api/metadata/artwork/${catalogRelease}`))
+  await applyDeluxe(page)
+  expect(await (await archive).body()).toEqual(catalogPng)
+  await expect(page.getByText(/Ambient · MusicBrainz · Жанр записи/)).toBeVisible()
+  await expect(page.locator('input[name=picture]')).toHaveValue('')
+  await page.getByLabel('Альбом', { exact: true }).fill('Corrected album')
+  await page.getByRole('textbox', { name: 'Жанры', exact: true }).fill('Ambient\nMy genre')
+  await page.getByRole('checkbox', { name: 'Подобрать метаданные' }).uncheck()
+  await expect(page.getByLabel('Альбом', { exact: true })).toHaveValue('Corrected album')
+  await page.getByRole('button', { name: 'Загрузить трек', exact: true }).click()
+  await expect(page).toHaveURL(/\/tracks\/[0-9a-f]{24}$/, { timeout: 15_000 })
+  const trackUrl = page.url()
+  await page.reload()
+  await expect(page.getByRole('main').getByText('Альбом · Corrected album')).toBeVisible()
+  await expect(page.getByRole('main').getByText('Жанры · Ambient · My genre')).toBeVisible()
+  const id = trackUrl.split('/').at(-1)!
+  const track = await (await page.request.get(`/api/tracks/${id}`)).json()
+  expect(track.provenance.genreEvidence.map(({ genre }: { genre: string }) => genre)).toEqual(['Ambient'])
+  expect(track.provenance).toMatchObject({ albumSource: 'manual', pictureSource: 'cover-art-archive' })
+  expect(await (await page.request.get(track.picture)).body()).toEqual(catalogPng)
+
+  await page.goto('/account')
+  await page.getByRole('button', { name: /Редактировать.*Northbound|Изменить.*Northbound/ }).click()
+  const editor = page.getByRole('dialog')
+  await expect(editor.getByLabel('Альбом')).toHaveValue('Corrected album')
+  await editor.getByLabel('Альбом').fill('')
+  await editor.getByLabel('Жанры').fill('Only manual')
+  const patch = page.waitForResponse((response) => response.request().method() === 'PATCH' && response.url().endsWith(`/api/tracks/${id}`))
+  await editor.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  const updated = await patch
+  expect(updated.request().postDataJSON()).toEqual({ album: '', genres: ['Only manual'] })
+  expect(await updated.json()).toMatchObject({ album: null, genres: ['Only manual'] })
+  await expect(editor).toHaveCount(0)
+  await page.goto(trackUrl)
+  await expect(page.getByRole('main').getByText('Жанры · Only manual').filter({ visible: true })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('main').getByText('Альбом · Corrected album')).toHaveCount(0)
+})
+
+test('keeps an applied cover when choosing another proposal, prefers a manual replacement, and allows empty optional fields', async ({ page }) => {
+  await showCatalog(page)
+  await applyDeluxe(page)
+  await page.getByRole('button', { name: /Original Release/ }).click()
+  await expect(page.getByText('У этого издания нет обложки.')).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Предпросмотр обложки' })).toBeVisible()
+  await page.locator('input[name=picture]').setInputFiles({ name: 'mine.png', mimeType: 'image/png', buffer: catalogPng })
+  await page.getByRole('button', { name: 'Удалить обложку' }).click()
+  await expect(page.getByText(`cover-${catalogRelease}.png`, { exact: true })).toBeVisible()
+  const replacement = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWMoKT1ZUnqSAUIBAC4yBsnhu5lHAAAAAElFTkSuQmCC', 'base64')
+  await page.locator('input[name=picture]').setInputFiles({ name: 'replacement.png', mimeType: 'image/png', buffer: replacement })
+  await page.getByLabel('Альбом', { exact: true }).fill('')
+  await page.getByRole('textbox', { name: 'Жанры', exact: true }).fill('')
+  await page.getByRole('button', { name: 'Загрузить трек', exact: true }).click()
+  await expect(page).toHaveURL(/\/tracks\/[0-9a-f]{24}$/, { timeout: 15_000 })
+  const id = page.url().split('/').at(-1)!
+  const track = await (await page.request.get(`/api/tracks/${id}`)).json()
+  expect(track).toMatchObject({ album: null, genres: [], provenance: { pictureSource: 'manual' } })
+  expect(await (await page.request.get(track.picture)).body()).toEqual(replacement)
+})
+
+test('ignores a late search and makes zero catalog requests when disabled while uploading manually', async ({ page }) => {
+  let releaseSearch!: () => void
+  const hold = new Promise<void>((resolve) => { releaseSearch = resolve })
+  let releasePaused!: () => void
+  const paused = new Promise<void>((resolve) => { releasePaused = resolve })
+  let requests = 0
+  await page.route('**/api/metadata/search', async (route) => {
+    requests++
+    if (route.request().postDataJSON().name === 'Old') {
+      await hold
+      await route.fulfill({ json: { candidates: [{ name: 'Outdated candidate', recordingMbid: 'old' }], recommendedIndex: null } }).catch(() => {})
+    } else if (route.request().postDataJSON().name === 'Paused') {
+      await paused
+      await route.continue().catch(() => {})
+    } else await route.continue()
+  })
+  await page.getByLabel('Исполнитель', { exact: true }).fill('Catalog Artist')
+  await page.getByLabel('Название трека').fill('Old')
+  await expect.poll(() => requests).toBe(1)
+  await page.getByLabel('Название трека').fill('Northbound')
+  await expect(page.getByText('Выберите запись и релиз')).toBeVisible()
+  releaseSearch()
+  await expect(page.getByRole('button', { name: /Deluxe Release/ })).toBeVisible()
+  await expect(page.getByText('Outdated candidate')).toHaveCount(0)
+
+  await page.getByLabel('Название трека').fill('Paused')
+  await expect.poll(() => requests).toBe(3)
+  await page.getByRole('checkbox', { name: 'Подобрать метаданные' }).uncheck()
+  releasePaused()
+  await fillForm(page)
+  await expect(page.getByRole('button', { name: /Deluxe Release/ })).toHaveCount(0)
+  await page.waitForTimeout(850)
+  expect(requests).toBe(3)
+  await page.getByRole('button', { name: 'Загрузить трек', exact: true }).click()
+  await expect(page).toHaveURL(/\/tracks\/[0-9a-f]{24}$/, { timeout: 15_000 })
+  expect(requests).toBe(3)
+})

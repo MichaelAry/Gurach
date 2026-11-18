@@ -3,8 +3,11 @@ import { useText, useMessage, useLocale } from '@/i18n/LocaleProvider'
 import { message as localMessage } from '@/i18n/messages'
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Checkbox, FormControlLabel, LinearProgress, Stack, TextField, Typography } from '@mui/material'
 import Link from 'next/link'
+import { useMetadataLookup, useObjectUrl } from '../hooks/useMetadataLookup'
+import { parseGenreInput, validGenres, type GenreEvidence } from '../catalogMetadata'
+import { MetadataProposal, type ProposalField } from './MetadataProposal'
 import { UploadFileField } from './UploadFileField'
 import { DuplicateTrackError, UploadJobFailedError, uploadTrack, waitForUpload } from '../api/uploadTrack'
 import { useRouter } from 'next/navigation'
@@ -41,7 +44,21 @@ export function UploadTrackForm() {
   const [pending, setPending] = useState(false)
   const [stage, setStage] = useState<'idle' | 'sending' | 'processing' | 'ready'>('idle')
   const [audioBytes, setAudioBytes] = useState<number | null>(null)
-  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [audio, setAudio] = useState<File | null>(null)
+  const [localCover, setLocalCover] = useState<File | null>(null)
+  const [coverInputKey, setCoverInputKey] = useState(0)
+  const [enabled, setEnabled] = useState(true)
+  const [name, setName] = useState('')
+  const [artist, setArtist] = useState('')
+  const [album, setAlbum] = useState('')
+  const [genres, setGenres] = useState('')
+  const [dirty, setDirty] = useState<Partial<Record<ProposalField, boolean>>>({})
+  const [albumFromCatalog, setAlbumFromCatalog] = useState(false)
+  const [evidence, setEvidence] = useState<GenreEvidence[]>([])
+  const [appliedCover, setAppliedCover] = useState<File>()
+  const [ids, setIds] = useState<{ recordingMbid: string; releaseMbid?: string }>()
+  const [applied, setApplied] = useState(false)
+  const coverPreview = useObjectUrl(localCover || appliedCover)
   const [previewFailed, setPreviewFailed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null)
@@ -49,7 +66,61 @@ export function UploadTrackForm() {
   const requestRef = useRef<AbortController | null>(null)
 
   useEffect(() => () => { requestRef.current?.abort() }, [])
-  useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview) }, [coverPreview])
+  const editable = confirmed && !!user && !pending && !uploaded && stage === 'idle'
+  const metadata = useMetadataLookup({ active: editable && enabled, name, artist, audio })
+  const results = metadata.state.status === 'results' ? metadata.state : undefined
+
+  function editIdentity(field: 'name' | 'artist', value: string) {
+    metadata.invalidate()
+    setApplied(false)
+    setDirty((fields) => ({ ...fields, [field]: true }))
+    if (field === 'name') setName(value)
+    else setArtist(value)
+    if (value.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ') ===
+      (field === 'name' ? name : artist).normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ')) return
+    if (albumFromCatalog) setAlbum('')
+    setAlbumFromCatalog(false)
+    if (evidence.length) setGenres(parseGenreInput(genres).filter((genre) => !evidence.some((entry) => entry.genre === genre)).join('\n'))
+    setEvidence([])
+    setAppliedCover(undefined)
+    setPreviewFailed(false)
+    setIds(undefined)
+  }
+
+  function apply(fields: ProposalField[]) {
+    const details = results?.details
+    if (!details) return
+    const changedRelease = ids?.releaseMbid !== (details.releaseMbid ?? undefined) || ids?.recordingMbid !== details.recordingMbid
+    if (fields.includes('name')) setName(details.name)
+    if (fields.includes('artist')) setArtist(details.artist ?? '')
+    if (fields.includes('album')) {
+      setAlbum(details.album ?? '')
+      setAlbumFromCatalog(true)
+    } else if (changedRelease && albumFromCatalog) {
+      setAlbum('')
+      setAlbumFromCatalog(false)
+    }
+    if (fields.includes('genres')) {
+      setGenres(details.genreEvidence.map(({ genre }) => genre).join('\n'))
+      setEvidence(details.genreEvidence)
+    } else if (changedRelease && evidence.length) {
+      setGenres(parseGenreInput(genres).filter((genre) => !evidence.some((entry) => entry.genre === genre)).join('\n'))
+      setEvidence([])
+    }
+    if (fields.includes('picture') && results.artwork) {
+      setAppliedCover(results.artwork)
+      setLocalCover(null)
+      setCoverError('')
+      setCoverInputKey((key) => key + 1)
+      setPreviewFailed(false)
+    } else if (changedRelease) {
+      setAppliedCover(undefined)
+      setPreviewFailed(false)
+    }
+    setDirty((previous) => Object.fromEntries(Object.entries(previous).filter(([field]) => !fields.includes(field as ProposalField))))
+    setIds({ recordingMbid: details.recordingMbid, releaseMbid: details.releaseMbid ?? undefined })
+    setApplied(true)
+  }
 
   useEffect(() => {
     if (!confirmed || !user) return
@@ -92,7 +163,17 @@ export function UploadTrackForm() {
     if (!user || !isConfirmed(user.id) || requestRef.current || uploaded) return
     const saved = sessionStorage.getItem(`gurach-upload:${user.id}`)
     if (!saved && !event.currentTarget.reportValidity()) return
+    const genreValues = parseGenreInput(genres)
+    if (!saved && !validGenres(genreValues)) return
+    metadata.invalidate()
     const body = new FormData(event.currentTarget)
+    if (!localCover && appliedCover) body.set('picture', appliedCover, appliedCover.name)
+    body.set('catalogMetadata', JSON.stringify({
+      album: album.trim(), genres: genreValues, externalIds: ids,
+      albumSource: albumFromCatalog ? 'musicbrainz' : 'manual',
+      pictureSource: !localCover && appliedCover ? 'cover-art-archive' : 'manual',
+      genreEvidence: evidence.filter(({ genre }) => genreValues.includes(genre)),
+    }))
     body.set('name', String(body.get('name') ?? '').trim())
     body.set('artist', String(body.get('artist') ?? '').trim())
     const controller = new AbortController()
@@ -134,32 +215,43 @@ export function UploadTrackForm() {
 
   return (
     <Stack component="form" noValidate spacing={2.5} onSubmit={submit} aria-busy={pending} sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 'var(--wae-radius-panel)', p: { xs: 2.5, md: 4 } }}>
-      <Stack component="fieldset" disabled={!confirmed || pending || uploaded} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
+      <Stack component="fieldset" disabled={!editable} spacing={2.5} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
         <UploadFileField label={lt('audioFile')} name="audio"
           accept={AUDIO_EXTENSIONS.map(extension => `.${extension}`).join(',')}
           error={Boolean(audioError)} helperText={resolve(audioError) || lt('mpWavOggOgaMAFlacAacUp')}
-          disabled={!confirmed || pending || uploaded}
+          disabled={!editable}
           onChange={event => {
             setAudioError(validateFile(event, AUDIO_EXTENSIONS, 50, resolve))
-            setAudioBytes(event.currentTarget.files?.[0]?.size ?? null)
+            metadata.invalidate()
+            const file = event.currentTarget.files?.[0] ?? null
+            setAudio(file)
+            setAudioBytes(file?.size ?? null)
           }} />
         {audioBytes !== null && <Typography variant="body2" color="text.secondary">
           {audioBytes >= 1024 * 1024
             ? lt('selectedAudioSizeMiB', { size: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(audioBytes / (1024 * 1024)) })
             : lt('selectedAudioSizeBytes', { size: new Intl.NumberFormat(locale).format(audioBytes) })}
         </Typography>}
-        <UploadFileField label={lt('cover')} name="picture"
+        <UploadFileField key={coverInputKey} label={lt('cover')} name="picture"
+          required={!appliedCover} appliedFilename={appliedCover?.name}
+          onClear={() => { setLocalCover(null); setCoverError(''); setPreviewFailed(false) }}
           accept={COVER_EXTENSIONS.map(extension => `.${extension}`).join(',')}
           error={Boolean(coverError)} helperText={resolve(coverError) || lt('jpgJpegPngWebpAvifGifUpToMib')}
-          disabled={!confirmed || pending || uploaded}
+          disabled={!editable}
           onChange={event => {
             const error = validateFile(event, COVER_EXTENSIONS, 10, resolve)
             setCoverError(error)
             setPreviewFailed(false)
             const file = event.currentTarget.files?.[0]
-            setCoverPreview(file && !error ? URL.createObjectURL(file) : null)
+            setLocalCover(file ?? null)
+            setDirty((fields) => ({ ...fields, picture: true }))
           }} />
-        {coverPreview && (previewFailed
+        {appliedCover && !localCover && <Button type="button" onClick={() => {
+          setAppliedCover(undefined)
+          setPreviewFailed(false)
+          setDirty((fields) => ({ ...fields, picture: true }))
+        }}>{lt('metadataRemoveCover')}</Button>}
+        {coverPreview && !coverError && (previewFailed
           ? <Typography variant="body2" color="text.secondary">{lt('coverPreviewUnavailable')}</Typography>
           : <Box component="img" src={coverPreview} alt={lt('coverPreview')} width={160} height={160}
               decoding="async" onError={() => setPreviewFailed(true)}
@@ -167,10 +259,12 @@ export function UploadTrackForm() {
         <TextField
           label={lt('trackTitle')}
           name="name"
+          value={name}
           required
           slotProps={{ htmlInput: { maxLength: 200 } }}
           helperText={lt('upToCharacters')}
           onChange={(event) => {
+            editIdentity('name', event.target.value)
             const error = event.target.value.trim() ? '' : localMessage('enterATrackTitle')
             event.target.dataset.gurachValidationMessage = error
             event.target.setCustomValidity(resolve(error))
@@ -179,9 +273,55 @@ export function UploadTrackForm() {
         <TextField
           label={lt('artist')}
           name="artist"
+          value={artist}
+          onChange={(event) => editIdentity('artist', event.target.value)}
           slotProps={{ htmlInput: { maxLength: 200 } }}
           helperText={lt('optionalUpToCharacters')}
         />
+        <FormControlLabel label={lt('metadataEnabled')} control={<Checkbox checked={enabled} onChange={(_, checked) => {
+          metadata.invalidate()
+          setEnabled(checked)
+        }} />} />
+        {enabled && <>
+          {name.trim() && !artist.trim() && <Button type="button" onClick={() => { void metadata.search() }}>{lt('metadataTitleSearch')}</Button>}
+          <Typography role={editable ? 'status' : undefined} variant="body2">
+            {metadata.state.status === 'searching' ? lt('metadataSearching')
+              : metadata.state.status === 'empty' ? lt('metadataEmpty')
+              : metadata.state.status === 'unavailable' || results?.detailError ? lt('metadataUnavailable')
+              : results && results.selected === null ? lt('metadataChooseRelease')
+              : results?.selected != null && !results.details ? lt('metadataSearching') : null}
+          </Typography>
+          {metadata.state.status === 'unavailable' && <Button type="button" onClick={() => { void metadata.search() }}>{lt('tryAgain')}</Button>}
+          {results && <Stack spacing={0.5}>
+            {results.candidates.map((candidate, index) => (
+              <Button key={`${candidate.recordingMbid}:${candidate.releaseMbid}`} type="button"
+                variant={results.selected === index ? 'outlined' : 'text'} aria-pressed={results.selected === index}
+                onClick={() => { void metadata.select(results.candidates, index) }}>
+                {[candidate.name, candidate.artist, candidate.version, candidate.album, candidate.edition ?? candidate.year].filter(Boolean).join(' · ')}
+              </Button>
+            ))}
+          </Stack>}
+          {results?.details && <MetadataProposal key={`${results.details.recordingMbid}:${results.details.releaseMbid}`}
+            details={results.details} artwork={results.artwork} artworkStatus={results.artworkStatus}
+            dirty={dirty} onApply={apply} onRetry={() => {
+              if (results.selected != null) void metadata.select(results.candidates, results.selected)
+            }} />}
+        </>}
+        {applied && editable && <Typography role="status" variant="body2">{lt('metadataApplied')}</Typography>}
+        <TextField label={lt('metadataAlbum')} value={album} slotProps={{ htmlInput: { maxLength: 200 } }}
+          onChange={(event) => {
+            setAlbum(event.target.value)
+            setAlbumFromCatalog(false)
+            setDirty((fields) => ({ ...fields, album: true }))
+          }} />
+        <TextField label={lt('metadataGenres')} value={genres} multiline minRows={2} maxRows={6}
+          error={!validGenres(parseGenreInput(genres))} helperText={lt('metadataGenreHelp')}
+          onChange={(event) => {
+            setGenres(event.target.value)
+            const values = parseGenreInput(event.target.value)
+            setEvidence((previous) => previous.filter(({ genre }) => values.includes(genre)))
+            setDirty((fields) => ({ ...fields, genres: true }))
+          }} />
         <TextField
           label={lt('lyrics105')}
           name="text"
@@ -197,7 +337,7 @@ export function UploadTrackForm() {
       {!uploaded && <Alert severity="info">{lt(stage === 'processing' ? 'uploadBackgroundHint' : 'uploadSendingHint')}</Alert>}
       {error && <Alert severity="error">{resolve(error)}{existingTrackId && <> <Link href={`/tracks/${existingTrackId}`}>{lt('openExistingTrack')}</Link></>}</Alert>}
       {uploaded && <Alert severity="success" role="status">{lt('trackUploadedOpeningTheTrackPage')}</Alert>}
-      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded}>{uploaded ? lt('trackUploaded') : pending ? lt('loading') : stage === 'processing' ? lt('checkUploadStatus') : lt('uploadTrack')}</Button>
+      <Button type="submit" variant="contained" disabled={!confirmed || pending || uploaded || (stage === 'idle' && !validGenres(parseGenreInput(genres)))}>{uploaded ? lt('trackUploaded') : pending ? lt('loading') : stage === 'processing' ? lt('checkUploadStatus') : lt('uploadTrack')}</Button>
     </Stack>
   )
 }

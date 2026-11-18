@@ -71,12 +71,7 @@ export function fetchBackend(
   })
 }
 
-/** Preserve actionable API statuses while hiding upstream server errors. */
-export async function proxyBackend(
-  path: string,
-  init?: BackendRequestInit,
-  sessionToken?: string,
-): Promise<Response> {
+export async function backendHeaders(init?: BackendRequestInit, sessionToken?: string): Promise<Headers> {
   const incomingHeaders = new Headers(init?.headers)
   const requestId = requestIdFrom(incomingHeaders)
   const headers = new Headers()
@@ -101,6 +96,17 @@ export async function proxyBackend(
     } catch { /* Outside a request context, use the API's peer limit. */ }
   }
   if (sessionToken && /^[A-Za-z0-9_-]{43}$/.test(sessionToken)) headers.set('authorization', `Bearer ${sessionToken}`)
+  return headers
+}
+
+/** Preserve actionable API statuses while hiding upstream server errors. */
+export async function proxyBackend(
+  path: string,
+  init?: BackendRequestInit,
+  sessionToken?: string,
+): Promise<Response> {
+  const headers = await backendHeaders(init, sessionToken)
+  const requestId = headers.get('x-request-id')!
   try {
     const response = await fetchBackend(path, { ...init, headers })
     if (response.status >= 500) {

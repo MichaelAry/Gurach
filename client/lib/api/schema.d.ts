@@ -516,6 +516,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metadata/artwork/{releaseMbid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MetadataController_artwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metadata/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MetadataController_details"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metadata/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MetadataController_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications": {
         parameters: {
             query?: never;
@@ -948,6 +996,14 @@ export interface components {
             role: "user" | "admin";
             username: string;
         };
+        CatalogProvenance: {
+            /** @enum {string} */
+            albumSource?: "manual" | "musicbrainz";
+            genreEvidence?: components["schemas"]["GenreEvidence"][];
+            manualGenres?: string[];
+            /** @enum {string} */
+            pictureSource?: "manual" | "cover-art-archive";
+        };
         CommentPage: {
             items: components["schemas"]["CommentResponse"][];
             /** @example eyJ2IjoxLCJhZnRlciI6Ii4uLiJ9 */
@@ -987,6 +1043,12 @@ export interface components {
              */
             status: "accepted";
         };
+        ExternalIds: {
+            /** Format: uuid */
+            recordingMbid?: string;
+            /** Format: uuid */
+            releaseMbid?: string;
+        };
         FriendListItem: {
             displayName: string;
             id: string;
@@ -1013,6 +1075,15 @@ export interface components {
             friendsCount: number;
             incomingRequestsCount: number;
             outgoingRequestsCount: number;
+        };
+        GenreEvidence: {
+            confidence: number;
+            genre: string;
+            rawTag: string;
+            /** @enum {string} */
+            scope: "recording" | "release" | "artist";
+            /** @enum {string} */
+            source: "musicbrainz" | "lastfm";
         };
         HomeActivityItem: {
             /** @enum {string} */
@@ -1065,6 +1136,60 @@ export interface components {
             /** @description Secret session token for the calling server only */
             token: string;
             user: components["schemas"]["AuthUserDto"];
+        };
+        MetadataCandidate: {
+            album: string | null;
+            artist: string | null;
+            confidence: number;
+            durationMs: number | null;
+            edition: string | null;
+            name: string;
+            /** Format: uuid */
+            recordingMbid: string;
+            /** Format: uuid */
+            releaseMbid: string | null;
+            sources: string[];
+            version: string | null;
+            year: number | null;
+        };
+        MetadataDetailsDto: {
+            /** Format: uuid */
+            recordingMbid: string;
+            /** Format: uuid */
+            releaseMbid?: string;
+        };
+        MetadataDetailsResponse: {
+            album: string | null;
+            artist: string | null;
+            artworkUrl: string | null;
+            confidence: number;
+            durationMs: number | null;
+            edition: string | null;
+            genreEvidence: components["schemas"]["GenreEvidence"][];
+            name: string;
+            /** Format: uuid */
+            recordingMbid: string;
+            /** Format: uuid */
+            releaseMbid: string | null;
+            sources: string[];
+            sourceStatuses: components["schemas"]["MetadataSourceStatuses"];
+            version: string | null;
+            year: number | null;
+        };
+        MetadataSearchDto: {
+            artist?: string;
+            durationMs?: number;
+            name: string;
+        };
+        MetadataSearchResponse: {
+            candidates: components["schemas"]["MetadataCandidate"][];
+            recommendedIndex: number | null;
+        };
+        MetadataSourceStatuses: {
+            /** @enum {string} */
+            lastfm: "available" | "disabled" | "unavailable";
+            /** @enum {string} */
+            musicbrainz: "available" | "disabled" | "unavailable";
         };
         NotificationActor: {
             displayName: string;
@@ -1241,12 +1366,15 @@ export interface components {
         TrackDetail: {
             /** @example 507f1f77bcf86cd799439011 */
             _id: string;
+            album: string | null;
             /** @example Artist name */
             artist: string | null;
             /** Format: uri */
             audio: string | null;
             /** @example 180 */
             duration: number | null;
+            externalIds?: components["schemas"]["ExternalIds"];
+            genres: string[];
             /** @example 10 */
             listens: number;
             /** @example Track lyrics */
@@ -1257,6 +1385,7 @@ export interface components {
             ownerId: string | null;
             /** Format: uri */
             picture: string | null;
+            provenance?: components["schemas"]["CatalogProvenance"];
         };
         TrackListItem: {
             /** @example 507f1f77bcf86cd799439011 */
@@ -1297,8 +1426,10 @@ export interface components {
             preferredLocale: "en" | "ru";
         };
         UpdateTrackDto: {
+            album?: string;
             /** @example Artist name */
             artist?: string;
+            genres?: string[];
             /** @example Track title */
             name?: string;
             /** @example Track lyrics */
@@ -3607,6 +3738,275 @@ export interface operations {
             };
         };
     };
+    MetadataController_artwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                releaseMbid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": string;
+                    "image/gif": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": components["schemas"]["ApiErrorDto"];
+                    "image/gif": components["schemas"]["ApiErrorDto"];
+                    "image/jpeg": components["schemas"]["ApiErrorDto"];
+                    "image/png": components["schemas"]["ApiErrorDto"];
+                    "image/webp": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": components["schemas"]["ApiErrorDto"];
+                    "image/gif": components["schemas"]["ApiErrorDto"];
+                    "image/jpeg": components["schemas"]["ApiErrorDto"];
+                    "image/png": components["schemas"]["ApiErrorDto"];
+                    "image/webp": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": components["schemas"]["ApiErrorDto"];
+                    "image/gif": components["schemas"]["ApiErrorDto"];
+                    "image/jpeg": components["schemas"]["ApiErrorDto"];
+                    "image/png": components["schemas"]["ApiErrorDto"];
+                    "image/webp": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": components["schemas"]["ApiErrorDto"];
+                    "image/gif": components["schemas"]["ApiErrorDto"];
+                    "image/jpeg": components["schemas"]["ApiErrorDto"];
+                    "image/png": components["schemas"]["ApiErrorDto"];
+                    "image/webp": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": components["schemas"]["ApiErrorDto"];
+                    "image/gif": components["schemas"]["ApiErrorDto"];
+                    "image/jpeg": components["schemas"]["ApiErrorDto"];
+                    "image/png": components["schemas"]["ApiErrorDto"];
+                    "image/webp": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/avif": components["schemas"]["ApiErrorDto"];
+                    "image/gif": components["schemas"]["ApiErrorDto"];
+                    "image/jpeg": components["schemas"]["ApiErrorDto"];
+                    "image/png": components["schemas"]["ApiErrorDto"];
+                    "image/webp": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MetadataController_details: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetadataDetailsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataDetailsResponse"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Payload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MetadataController_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetadataSearchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataSearchResponse"];
+                };
+            };
+            /** @description Request validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Payload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            /** @description Unexpected server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorDto"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     NotificationsController_list: {
         parameters: {
             query?: {
@@ -4513,6 +4913,8 @@ export interface operations {
                     artist?: string;
                     /** Format: binary */
                     audio: string;
+                    /** @description Optional serialized catalog metadata JSON, up to 16 KiB UTF-8 */
+                    catalogMetadata?: string;
                     /** @example 180 */
                     duration?: string;
                     /** @example Track title */
@@ -5390,6 +5792,8 @@ export interface operations {
                     artist?: string;
                     /** Format: binary */
                     audio: string;
+                    /** @description Optional serialized catalog metadata JSON, up to 16 KiB UTF-8 */
+                    catalogMetadata?: string;
                     /** @example 180 */
                     duration?: string;
                     /** @example Track title */

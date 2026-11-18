@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 vi.mock('next/server', () => ({ connection: async () => undefined }))
-const { revalidateTag } = vi.hoisted(() => ({ revalidateTag: vi.fn() }))
-vi.mock('next/cache', () => ({ revalidateTag }))
+const { revalidatePath, revalidateTag } = vi.hoisted(() => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath, revalidateTag }))
 const { cookieJar } = vi.hoisted(() => ({ cookieJar: { get: vi.fn() } }))
 vi.mock('next/headers', () => ({ cookies: async () => cookieJar }))
 
@@ -43,6 +43,7 @@ describe('track upload proxy', () => {
     expect(revalidateTag.mock.calls).toEqual([
       ['tracks', { expire: 0 }], [`track:${trackId}`, { expire: 0 }],
     ])
+    expect(revalidatePath).toHaveBeenCalledWith(`/tracks/${trackId}`)
     expect(await response.json()).toEqual({ _id: trackId })
   })
   it('streams multipart files and fields intact, authenticating only with the session cookie', async () => {

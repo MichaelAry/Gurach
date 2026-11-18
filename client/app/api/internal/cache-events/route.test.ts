@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { revalidateTag } = vi.hoisted(() => ({ revalidateTag: vi.fn() }))
-vi.mock('next/cache', () => ({ revalidateTag }))
+const { revalidatePath, revalidateTag } = vi.hoisted(() => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath, revalidateTag }))
 
 import { POST } from './route'
 
@@ -24,6 +24,7 @@ describe('internal cache event route', () => {
   beforeEach(() => {
     vi.stubEnv('CACHE_EVENT_SECRET', secret)
     revalidateTag.mockClear()
+    revalidatePath.mockClear()
   })
 
   it('derives activation tags from the fixed event payload and immediately expires them', async () => {
@@ -39,6 +40,7 @@ describe('internal cache event route', () => {
       ['tracks', { expire: 0 }],
       [`track:${trackId}`, { expire: 0 }],
     ])
+    expect(revalidatePath).toHaveBeenCalledWith(`/tracks/${trackId}`)
   })
 
   it('also expires comments for deleted tracks', async () => {
@@ -64,6 +66,7 @@ describe('internal cache event route', () => {
     }))
     expect(response.status).toBe(400)
     expect(revalidateTag).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('rejects bad secrets, malformed shapes, oversized bodies and missing production configuration', async () => {

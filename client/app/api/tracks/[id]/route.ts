@@ -49,8 +49,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       error instanceof RangeError ? 'PAYLOAD_TOO_LARGE' : 'VALIDATION_ERROR', 'Invalid track metadata body', requestId)
   }
   if (!body || typeof body !== 'object' || Array.isArray(body)
-    || Object.keys(body).some((key) => !['name', 'artist', 'text'].includes(key))) {
-    return apiErrorResponse(400, 'VALIDATION_ERROR', 'Only name, artist and text may be edited', requestId)
+    || Object.keys(body).some((key) => !['name', 'artist', 'text', 'album', 'genres'].includes(key))) {
+    return apiErrorResponse(400, 'VALIDATION_ERROR', 'Unexpected track metadata field', requestId)
   }
   const { id } = await params
   const response = await proxySessionBackend(`/tracks/${encodeURIComponent(id)}`, {

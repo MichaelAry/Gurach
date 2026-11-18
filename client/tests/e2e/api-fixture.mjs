@@ -38,6 +38,22 @@ const accountHistory = new Map();
 const accountPlaybacks = new Map();
 const artworkWearResets = new Map();
 
+const metadataArtwork = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=', 'base64');
+const publishedArtwork = new Map();
+const metadataRecording = '10000000-0000-4000-8000-000000000001';
+const metadataReleases = ['20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002'];
+const metadataCandidates = metadataReleases.map((releaseMbid, index) => ({
+  name: 'Northbound', artist: 'Catalog Artist', version: null, durationMs: 180_000, recordingMbid: metadataRecording,
+  releaseMbid, album: index === 0 ? 'Original Release' : 'Deluxe Release', year: 2020 + index, edition: null, confidence: 0.98,
+  sources: ['musicbrainz'],
+}));
+
+async function readJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks));
+}
+
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? '/', `http://127.0.0.1:${port}`);
   response.setHeader('Access-Control-Allow-Origin', '*');
@@ -107,7 +123,8 @@ const server = createServer((request, response) => {
         response.end(JSON.stringify({ preferredLocale: accountLocales.get(sessionUser.id) }));
       }); return;
     }
-    const uploads = sessionUser.id === fixtureUser.id ? tracks.slice(0, 21) : [];
+    const ownUploads = tracks.filter((track) => track.ownerId === sessionUser.id).reverse();
+    const uploads = sessionUser.id === fixtureUser.id ? [...ownUploads, ...tracks.slice(0, 21)] : ownUploads;
     if (!accountHistory.has(accountKey)) accountHistory.set(accountKey, sessionUser.id === fixtureUser.id ? [
       { id: 'history-1', trackId: tracks[0]._id, listenedAt: '2026-01-02T12:00:00.000Z', track: tracks[0] },
       { id: 'history-2', trackId: 'f'.repeat(24), listenedAt: '2026-01-01T12:00:00.000Z', track: null },
@@ -231,6 +248,39 @@ const server = createServer((request, response) => {
     response.end('{"status":"ok"}');
     return;
   }
+  const artworkMatch = /^\/metadata\/artwork\/([0-9a-f-]+)$/.exec(url.pathname);
+  if (artworkMatch && request.method === 'GET') {
+    response.writeHead(!sessionUser ? 401 : artworkMatch[1] === metadataReleases[1] ? 200 : 404,
+      { 'content-type': 'image/png' });
+    response.end(sessionUser && artworkMatch[1] === metadataReleases[1] ? metadataArtwork : undefined);
+    return;
+  }
+  if (['/metadata/search', '/metadata/details'].includes(url.pathname) && request.method === 'POST') {
+    if (!sessionUser) { response.writeHead(401); response.end(); return; }
+    void readJson(request).then((body) => {
+      const candidate = metadataCandidates.find((item) => item.releaseMbid === body.releaseMbid && item.recordingMbid === body.recordingMbid);
+      if (url.pathname.endsWith('/details') && !candidate) { response.writeHead(400); response.end(); return; }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify(url.pathname.endsWith('/search')
+        ? { candidates: body.name === 'Northbound' ? metadataCandidates : [], recommendedIndex: null }
+        : {
+          ...candidate,
+          artworkUrl: `/api/metadata/artwork/${candidate.releaseMbid}`,
+          sourceStatuses: { musicbrainz: 'available', lastfm: 'disabled' },
+          genreEvidence: [
+            { genre: 'Ambient', rawTag: 'ambient', source: 'musicbrainz', scope: 'recording', confidence: 0.9 },
+            { genre: 'Dub techno', rawTag: 'dub techno', source: 'musicbrainz', scope: 'recording', confidence: 0.9 },
+          ],
+        }));
+    }).catch(() => { response.writeHead(400); response.end(); });
+    return;
+  }
+  const publishedImage = publishedArtwork.get(url.pathname);
+  if (publishedImage) {
+    response.writeHead(200, { 'content-type': publishedImage.type });
+    response.end(publishedImage.bytes);
+    return;
+  }
   if (['/tracks', '/tracks/uploads'].includes(url.pathname) && request.method === 'POST') {
     if (!sessionUser) { response.writeHead(401); response.end(); return; }
     const chunks = [];
@@ -243,11 +293,17 @@ const server = createServer((request, response) => {
         if (!form.get('name') || !form.get('audio') || !form.get('picture')) {
           response.writeHead(400); response.end(); return;
         }
+        const catalog = JSON.parse(form.get('catalogMetadata') ?? '{}');
+        const picture = form.get('picture');
+        const imagePath = `/static/picture/${randomUUID()}.png`;
+        publishedArtwork.set(imagePath, { type: picture.type, bytes: Buffer.from(await picture.arrayBuffer()) });
         const track = {
           _id: (total + tracks.length + 1).toString(16).padStart(24, '0'),
           name: String(form.get('name')), artist: String(form.get('artist') ?? ''),
           lyrics: String(form.get('text') ?? ''), ownerId: sessionUser.id,
-          audio: tracks[0].audio, picture: null, duration: 20, listens: 0,
+          audio: tracks[0].audio, picture: `http://127.0.0.1:${port}${imagePath}`, duration: 20, listens: 0,
+          album: catalog.album || null, genres: catalog.genres ?? [], externalIds: catalog.externalIds,
+          provenance: { albumSource: catalog.albumSource, pictureSource: catalog.pictureSource, genreEvidence: catalog.genreEvidence },
         };
         if (url.pathname === '/tracks/uploads') {
           const operationId = randomUUID();
@@ -293,6 +349,20 @@ const server = createServer((request, response) => {
     return;
   }
   const trackMatch = /^\/tracks\/([a-f\d]{24})$/i.exec(url.pathname);
+  if (trackMatch && request.method === 'PATCH') {
+    const track = tracks.find((item) => item._id === trackMatch[1]);
+    if (!sessionUser || track?.ownerId !== sessionUser.id) { response.writeHead(403); response.end(); return; }
+    void readJson(request).then(({ name, artist, text, album, genres }) => {
+      if (name !== undefined) track.name = name;
+      if (artist !== undefined) track.artist = artist;
+      if (text !== undefined) track.lyrics = text;
+      if (album !== undefined) track.album = album || null;
+      if (genres !== undefined) track.genres = genres;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify(track));
+    }).catch(() => { response.writeHead(400); response.end(); });
+    return;
+  }
   if (trackMatch && request.method === 'GET') {
     const track = tracks.find((item) => item._id.toLowerCase() === trackMatch[1].toLowerCase());
     if (!track) {
@@ -301,7 +371,7 @@ const server = createServer((request, response) => {
       return;
     }
     response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ ...track, lyrics: track.lyrics ?? null, ownerId: track.ownerId ?? null }));
+    response.end(JSON.stringify({ ...track, album: track.album ?? null, genres: track.genres ?? [], lyrics: track.lyrics ?? null, ownerId: track.ownerId ?? null }));
     return;
   }
   const commentsMatch = /^\/tracks\/([a-f\d]{24})\/comments$/i.exec(url.pathname);
