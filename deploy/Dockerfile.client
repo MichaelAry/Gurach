@@ -1,0 +1,19 @@
+ARG NODE_VERSION
+FROM node:${NODE_VERSION}-bookworm-slim AS build
+WORKDIR /app
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+ENV NEXT_TELEMETRY_DISABLED=1 API_URL=http://api:5000 APP_ORIGIN=http://localhost:3000
+RUN npm run build && npm prune --omit=dev
+
+FROM node:${NODE_VERSION}-bookworm-slim
+WORKDIR /app
+COPY --from=build --chown=node:node /app/package.json ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/.next ./.next
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/next.config.ts ./
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+USER node
+CMD ["node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0"]

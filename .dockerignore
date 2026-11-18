@@ -1,0 +1,16 @@
+**
+!client/
+!client/**
+!server/
+!server/**
+**/node_modules
+**/.env*
+**/.next*
+**/.local
+**/dist
+**/.tools
+**/*.tsbuildinfo
+**/coverage
+**/playwright-report
+**/test-results
+server/static

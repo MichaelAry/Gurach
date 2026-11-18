@@ -1,0 +1,62 @@
+name: Gurach installer release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Validate installer syntax
+        run: |
+          sh -n install.sh
+          pwsh -NoProfile -Command '
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path (Get-Location) "install.ps1"), [ref]$null, [ref]$errors)
+            if ($errors) { $errors; exit 1 }
+          '
+      - name: Build and start from source
+        run: sh install.sh
+      - name: Push and package tested images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
+          export DOCKER_CONFIG="$(mktemp -d)"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          mkdir -p package/deploy package/docker/mongo
+          for service in api client; do
+            image="$registry-$service:$GITHUB_REF_NAME"
+            docker tag "gurach-$service:local" "$image"
+            docker push "$image"
+            reference=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image" | awk -v repo="$registry-$service" 'index($0, repo "@sha256:") == 1 { print; exit }')
+            test -n "$reference"
+            printf 'GURACH_%s_IMAGE=%s\n' "${service^^}" "$reference" >> package/deploy/images.env
+          done
+          docker logout ghcr.io
+          while IFS='=' read -r key reference; do
+            docker manifest inspect "$reference" >/dev/null || {
+              echo "Make the GHCR package publicly readable before publishing the installer: $reference" >&2
+              exit 1
+            }
+          done < package/deploy/images.env
+          cp install.sh install.cmd install.ps1 package/
+          cp deploy/compose.yml deploy/mongo-ready.js deploy/setup.mjs package/deploy/
+          cp docker/mongo/entrypoint.sh docker/mongo/01-create-app-user.js package/docker/mongo/
+          (cd package && zip -qr ../Gurach-installer.zip .)
+          tar -czf Gurach-installer.tar.gz -C package .
+          sha256sum Gurach-installer.zip Gurach-installer.tar.gz > Gurach-installer.sha256
+          assets=(Gurach-installer.zip Gurach-installer.tar.gz Gurach-installer.sha256)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --generate-notes
+          fi

@@ -1,0 +1,19 @@
+ARG NODE_VERSION
+FROM node:${NODE_VERSION}-bookworm-slim AS build
+WORKDIR /app
+COPY server/package*.json ./
+RUN npm ci
+COPY server/ ./
+RUN npm run build && npm prune --omit=dev
+
+FROM node:${NODE_VERSION}-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libchromaprint-tools util-linux ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && install -d -o node -g node /data /data/static /data/staging
+WORKDIR /app
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+ENV NODE_ENV=production
+USER node
+CMD ["node", "dist/main.js"]

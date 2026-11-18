@@ -1,0 +1,89 @@
+name: gurach
+services:
+  mongodb:
+    image: mongo@sha256:0f64db83d5926400d1cbcbaf35fbf2b0dfa6a4eaa71e04a26481a38cd803b27b
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - -ec
+      - |
+        umask 077
+        printf '%s' "$$GURACH_MONGO_KEY" > /run/mongo-keyfile
+        exec bash /opt/mongo-entrypoint.sh mongod --bind_ip_all --replSet rs0
+    environment:
+      GURACH_MONGO_KEY: ${GURACH_MONGO_KEY:?}
+      MONGO_INITDB_ROOT_USERNAME: gurach_root
+      MONGO_INITDB_ROOT_PASSWORD: ${GURACH_MONGO_ROOT_PASSWORD:?}
+      MONGO_APP_USERNAME: gurach_app
+      MONGO_APP_PASSWORD: ${GURACH_MONGO_APP_PASSWORD:?}
+      MONGO_APP_DATABASE: gurach
+      MONGO_INITDB_DATABASE: gurach
+    volumes:
+      - database:/data/db
+      - ../docker/mongo/entrypoint.sh:/opt/mongo-entrypoint.sh:ro
+      - ../docker/mongo/01-create-app-user.js:/docker-entrypoint-initdb.d/10-create-app-user.js:ro
+      - ./mongo-ready.js:/opt/mongo-ready.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "mongodb://mongodb:27017/?directConnection=true&serverSelectionTimeoutMS=2000", "--quiet", "--file", "/opt/mongo-ready.js"]
+      interval: 4s
+      timeout: 8s
+      retries: 30
+
+  api:
+    image: ${GURACH_API_IMAGE:-gurach-api:local}
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${GURACH_API_PORT:-5000}:5000"
+    environment: &api-environment
+      MONGODB_URI: mongodb://gurach_app:${GURACH_MONGO_APP_PASSWORD:?}@mongodb:27017/gurach?authSource=gurach&replicaSet=rs0
+      PUBLIC_URL: http://localhost:${GURACH_API_PORT:-5000}
+      CORS_ORIGINS: http://localhost:${GURACH_WEB_PORT:-3000}
+      CACHE_EVENT_URL: http://client:3000/api/internal/cache-events
+      CACHE_EVENT_SECRET: ${GURACH_CACHE_SECRET:?}
+      STATIC_DIR: /data/static
+      MEDIA_STAGING_DIR: /data/staging
+    volumes:
+      - media:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 4s
+      timeout: 5s
+      retries: 30
+
+  client:
+    image: ${GURACH_CLIENT_IMAGE:-gurach-client:local}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${GURACH_WEB_PORT:-3000}:3000"
+    environment:
+      API_URL: http://api:5000
+      APP_ORIGIN: http://localhost:${GURACH_WEB_PORT:-3000}
+      CACHE_EVENT_SECRET: ${GURACH_CACHE_SECRET:?}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/',{headers:{Host:'localhost:${GURACH_WEB_PORT:-3000}'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  setup:
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    image: ${GURACH_API_IMAGE:-gurach-api:local}
+    environment:
+      <<: *api-environment
+      GURACH_INITIAL_PASSWORD: ${GURACH_INITIAL_PASSWORD:?}
+    volumes:
+      - media:/data
+      - ./setup.mjs:/app/setup.mjs:ro
+    command: ["node", "setup.mjs"]
+
+volumes:
+  database:
+  media:

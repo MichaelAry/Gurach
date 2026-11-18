@@ -1,0 +1,3 @@
+/install.sh text eol=lf
+/install.cmd text eol=crlf
+/docker/mongo/entrypoint.sh text eol=lf

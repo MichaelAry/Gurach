@@ -1,0 +1,13 @@
+services:
+  client:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.client
+      args:
+        NODE_VERSION: ${GURACH_NODE_VERSION:?}
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+      args:
+        NODE_VERSION: ${GURACH_NODE_VERSION:?}
