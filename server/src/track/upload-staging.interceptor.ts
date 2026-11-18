@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   CallHandler,
   ExecutionContext,
   Injectable,
@@ -94,7 +95,11 @@ export class UploadStagingInterceptor implements NestInterceptor {
 
     try {
       await this.receiveRequest(request, response);
-      validateUploadFields((request.body ?? {}) as Record<string, unknown>);
+      try {
+        validateUploadFields((request.body ?? {}) as Record<string, unknown>);
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'Invalid multipart fields');
+      }
     } catch (error) {
       this.logFailure(reservation.operationId, error);
       await this.cleanup(request, reservation);

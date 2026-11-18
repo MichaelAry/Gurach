@@ -35,6 +35,6 @@ describe('media policy', () => {
     expect(() => validateUploadFields({ other: 'value' })).toThrow(/Unexpected/);
     expect(() => validateUploadFields({ name: ['one', 'two'] })).toThrow(/once/);
     expect(() => validateUploadFields({ name: 'x'.repeat(FILE_POLICY.maxTitleChars + 1) })).toThrow(/too long/);
-    expect(() => validateUploadFields({ name: 'x', artist: 'x', text: 'x', duration: '1', extra: 'x' })).toThrow(/Too many/);
+    expect(() => validateUploadFields({ name: 'x', artist: 'x', text: 'x', duration: '1', catalogMetadata: '{}', extra: 'x' })).toThrow(/Too many/);
   });
 });

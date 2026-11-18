@@ -230,6 +230,37 @@
         ],
         "type": "object"
       },
+      "CatalogProvenance": {
+        "properties": {
+          "albumSource": {
+            "enum": [
+              "manual",
+              "musicbrainz"
+            ],
+            "type": "string"
+          },
+          "genreEvidence": {
+            "items": {
+              "$ref": "#/components/schemas/GenreEvidence"
+            },
+            "type": "array"
+          },
+          "manualGenres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "pictureSource": {
+            "enum": [
+              "manual",
+              "cover-art-archive"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CommentPage": {
         "properties": {
           "items": {
@@ -351,6 +382,19 @@
         ],
         "type": "object"
       },
+      "ExternalIds": {
+        "properties": {
+          "recordingMbid": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "releaseMbid": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "FriendListItem": {
         "properties": {
           "displayName": {
@@ -457,6 +501,44 @@
           "incomingRequestsCount",
           "outgoingRequestsCount",
           "blockedUsersCount"
+        ],
+        "type": "object"
+      },
+      "GenreEvidence": {
+        "properties": {
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "genre": {
+            "type": "string"
+          },
+          "rawTag": {
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "recording",
+              "release",
+              "artist"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "musicbrainz",
+              "lastfm"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "genre",
+          "rawTag",
+          "source",
+          "scope",
+          "confidence"
         ],
         "type": "object"
       },
@@ -636,6 +718,234 @@
           "user",
           "expiresAt",
           "token"
+        ],
+        "type": "object"
+      },
+      "MetadataCandidate": {
+        "properties": {
+          "album": {
+            "nullable": true,
+            "type": "string"
+          },
+          "artist": {
+            "nullable": true,
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "durationMs": {
+            "nullable": true,
+            "type": "number"
+          },
+          "edition": {
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "recordingMbid": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "releaseMbid": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "version": {
+            "nullable": true,
+            "type": "string"
+          },
+          "year": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "artist",
+          "version",
+          "durationMs",
+          "recordingMbid",
+          "releaseMbid",
+          "album",
+          "edition",
+          "year",
+          "confidence",
+          "sources"
+        ],
+        "type": "object"
+      },
+      "MetadataDetailsDto": {
+        "properties": {
+          "recordingMbid": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "releaseMbid": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recordingMbid"
+        ],
+        "type": "object"
+      },
+      "MetadataDetailsResponse": {
+        "properties": {
+          "album": {
+            "nullable": true,
+            "type": "string"
+          },
+          "artist": {
+            "nullable": true,
+            "type": "string"
+          },
+          "artworkUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "durationMs": {
+            "nullable": true,
+            "type": "number"
+          },
+          "edition": {
+            "nullable": true,
+            "type": "string"
+          },
+          "genreEvidence": {
+            "items": {
+              "$ref": "#/components/schemas/GenreEvidence"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "recordingMbid": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "releaseMbid": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sourceStatuses": {
+            "$ref": "#/components/schemas/MetadataSourceStatuses"
+          },
+          "version": {
+            "nullable": true,
+            "type": "string"
+          },
+          "year": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "artist",
+          "version",
+          "durationMs",
+          "recordingMbid",
+          "releaseMbid",
+          "album",
+          "edition",
+          "year",
+          "confidence",
+          "sources",
+          "genreEvidence",
+          "artworkUrl",
+          "sourceStatuses"
+        ],
+        "type": "object"
+      },
+      "MetadataSearchDto": {
+        "properties": {
+          "artist": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "durationMs": {
+            "maximum": 3600000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "MetadataSearchResponse": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/MetadataCandidate"
+            },
+            "maxItems": 5,
+            "type": "array"
+          },
+          "recommendedIndex": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "candidates",
+          "recommendedIndex"
+        ],
+        "type": "object"
+      },
+      "MetadataSourceStatuses": {
+        "properties": {
+          "lastfm": {
+            "enum": [
+              "available",
+              "disabled",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "musicbrainz": {
+            "enum": [
+              "available",
+              "disabled",
+              "unavailable"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "musicbrainz",
+          "lastfm"
         ],
         "type": "object"
       },
@@ -1319,6 +1629,11 @@
             "example": "507f1f77bcf86cd799439011",
             "type": "string"
           },
+          "album": {
+            "maxLength": 200,
+            "nullable": true,
+            "type": "string"
+          },
           "artist": {
             "example": "Artist name",
             "nullable": true,
@@ -1333,6 +1648,16 @@
             "example": 180,
             "nullable": true,
             "type": "number"
+          },
+          "externalIds": {
+            "$ref": "#/components/schemas/ExternalIds"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "type": "array"
           },
           "listens": {
             "example": 10,
@@ -1356,6 +1681,9 @@
             "format": "uri",
             "nullable": true,
             "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CatalogProvenance"
           }
         },
         "required": [
@@ -1366,6 +1694,8 @@
           "picture",
           "listens",
           "duration",
+          "album",
+          "genres",
           "lyrics",
           "ownerId"
         ],
@@ -1503,10 +1833,22 @@
       },
       "UpdateTrackDto": {
         "properties": {
+          "album": {
+            "maxLength": 200,
+            "type": "string"
+          },
           "artist": {
             "example": "Artist name",
             "maxLength": 200,
             "type": "string"
+          },
+          "genres": {
+            "items": {
+              "maxLength": 80,
+              "type": "string"
+            },
+            "maxItems": 16,
+            "type": "array"
           },
           "name": {
             "example": "Track title",
@@ -4442,6 +4784,433 @@
         ]
       }
     },
+    "/metadata/artwork/{releaseMbid}": {
+      "get": {
+        "operationId": "MetadataController_artwork",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "releaseMbid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "429": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "image/avif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "503": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "metadata"
+        ]
+      }
+    },
+    "/metadata/details": {
+      "post": {
+        "operationId": "MetadataController_details",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataDetailsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataDetailsResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "503": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "metadata"
+        ]
+      }
+    },
+    "/metadata/search": {
+      "post": {
+        "operationId": "MetadataController_search",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataSearchDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataSearchResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Unexpected server error"
+          },
+          "503": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "metadata"
+        ]
+      }
+    },
     "/notifications": {
       "get": {
         "operationId": "NotificationsController_list",
@@ -5593,6 +6362,11 @@
                   },
                   "audio": {
                     "format": "binary",
+                    "type": "string"
+                  },
+                  "catalogMetadata": {
+                    "description": "Optional serialized catalog metadata JSON, up to 16 KiB UTF-8",
+                    "maxLength": 16384,
                     "type": "string"
                   },
                   "duration": {
@@ -6779,6 +7553,11 @@
                   },
                   "audio": {
                     "format": "binary",
+                    "type": "string"
+                  },
+                  "catalogMetadata": {
+                    "description": "Optional serialized catalog metadata JSON, up to 16 KiB UTF-8",
+                    "maxLength": 16384,
                     "type": "string"
                   },
                   "duration": {

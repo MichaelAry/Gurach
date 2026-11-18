@@ -16,6 +16,10 @@ function idString(value: unknown): string {
 }
 
 export interface TrackListRecord {
+  album?: TrackDetail['album'];
+  genres?: TrackDetail['genres'];
+  externalIds?: TrackDetail['externalIds'];
+  provenance?: TrackDetail['provenance'];
   _id: unknown;
   name: string;
   artist?: string | null;
@@ -48,6 +52,10 @@ export function toTrackDetail(track: TrackListRecord): TrackDetail {
     picture: staticUrl('picture', track.picture),
     listens: track.listens ?? 0,
     duration: track.duration ?? null,
+    album: track.album || null,
+    genres: track.genres ?? [],
+    ...(track.externalIds && { externalIds: track.externalIds }),
+    ...(track.provenance && { provenance: track.provenance }),
     lyrics: track.text ?? null,
     ownerId: track.ownerId == null ? null : idString(track.ownerId),
   });

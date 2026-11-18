@@ -1,4 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { CatalogProvenance, ExternalIds } from './catalog-metadata.js';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** A track representation safe to pass to the shared audio player. */
 export class PlayableTrack {
@@ -23,6 +24,14 @@ export class TrackListItem extends PlayableTrack {}
 
 /** Complete track resource. Comments are delivered through their own endpoint. */
 export class TrackDetail extends TrackListItem {
+  @ApiProperty({ type: String, nullable: true, maxLength: 200 })
+  album: string | null;
+  @ApiProperty({ type: [String], maxItems: 16 })
+  genres: string[];
+  @ApiPropertyOptional({ type: ExternalIds })
+  externalIds?: ExternalIds;
+  @ApiPropertyOptional({ type: CatalogProvenance })
+  provenance?: CatalogProvenance;
   @ApiProperty({ type: String, nullable: true, example: 'Track lyrics' })
   lyrics: string | null;
   @ApiProperty({ type: String, nullable: true, example: '507f1f77bcf86cd799439012' })

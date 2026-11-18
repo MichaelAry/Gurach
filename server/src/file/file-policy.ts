@@ -1,9 +1,11 @@
+import { MAX_CATALOG_BYTES } from '../contracts/catalog-metadata.js';
+
 export const FILE_POLICY = Object.freeze({
   maxAudioBytes: 50 * 1024 * 1024,
   maxCoverBytes: 10 * 1024 * 1024,
   maxCoverPixels: 40_000_000,
   maxRequestFiles: 2,
-  maxBodyFields: 4,
+  maxBodyFields: 5,
   maxFieldNameChars: 32,
   maxTitleChars: 200,
   maxArtistChars: 200,
@@ -75,6 +77,10 @@ export function validateUploadFields(fields: Record<string, unknown>): void {
     if (name.length > FILE_POLICY.maxFieldNameChars) throw new Error('Multipart field name is too long');
     if (Array.isArray(value)) throw new Error(`Multipart field ${name} must occur once`);
     if (typeof value !== 'string') throw new Error(`Multipart field ${name} must be text`);
+    if (name === 'catalogMetadata') {
+      if (Buffer.byteLength(value) > MAX_CATALOG_BYTES) throw new Error('Catalog metadata is too long');
+      continue;
+    }
     const maximum = name === 'name' ? FILE_POLICY.maxTitleChars
       : name === 'artist' ? FILE_POLICY.maxArtistChars
         : name === 'text' ? FILE_POLICY.maxLyricsChars

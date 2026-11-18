@@ -1,3 +1,4 @@
+import { MetadataModule } from './metadata/metadata.module.js';
 import { MediaAccessMiddleware } from './file/media-access.middleware.js';
 import { BoundaryThrottlerGuard } from './auth/boundary-throttler.guard.js';
 import { PlaylistsModule } from './playlists/playlists.module.js';
@@ -28,6 +29,7 @@ import { AuthModule } from './auth/auth.module.js';
     QueueModule,
     AuthModule,
     TrackModule,
+    MetadataModule,
     CommentModule,
     MaintenanceModule,
     HealthModule,

@@ -4,6 +4,8 @@ import { normalizeTrackIdentity } from '../track-identity.js';
 import { HydratedDocument, Types } from 'mongoose';
 import type { AudioFingerprint } from '../../file/audio-fingerprint.service.js';
 
+import type { CatalogProvenance, ExternalIds } from '../../contracts/catalog-metadata.js';
+
 export type TrackDocument = HydratedDocument<Track>;
 
 export const TRACK_LIFECYCLE = ['active', 'deleting', 'deleted'] as const;
@@ -31,6 +33,18 @@ export class Track {
 
   @Prop()
   artist?: string;
+
+  @Prop({ type: String, maxlength: 200 })
+  album?: string | null;
+
+  @Prop({ type: [String], default: undefined })
+  genres?: string[];
+
+  @Prop({ type: Object })
+  externalIds?: ExternalIds;
+
+  @Prop({ type: Object })
+  provenance?: CatalogProvenance;
 
   @Prop({ type: String })
   nameKey?: string;

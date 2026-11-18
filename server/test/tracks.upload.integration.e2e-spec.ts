@@ -3,8 +3,8 @@ import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 import type { Db } from 'mongodb';
-import { mkdir, mkdtemp, readdir, rm, stat, truncate, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { mkdir, mkdtemp, readdir, rm, stat, truncate, writeFile, readFile } from 'node:fs/promises';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
@@ -27,6 +27,7 @@ import { MediaOperation } from '../src/maintenance/schemas/media-operation.schem
 import { Track } from '../src/track/schemas/track.schema.js';
 import { Comment } from '../src/comment/schemas/comment.schema.js';
 import { UploadAdmissionService } from '../src/file/upload-admission.service.js';
+import { MusicBrainzProvider } from '../src/metadata/musicbrainz.provider.js';
 import { StagingService } from '../src/file/staging.service.js';
 import sharp from 'sharp';
 
@@ -69,7 +70,7 @@ describe('POST /tracks disk staging (Mongo integration)', () => {
 
   beforeAll(async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      callbackRequests.push({
+      if (typeof init?.body === 'string') callbackRequests.push({
         url: typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
         headers: new Headers(init?.headers),
         body: typeof init?.body === 'string' ? init.body : '',
@@ -140,7 +141,8 @@ describe('POST /tracks disk staging (Mongo integration)', () => {
       .attach('audio', audioFixture, { filename: 'song.mp3', contentType: 'text/plain' })
       .expect(201);
 
-    expect(response.body).toMatchObject({ name: 'Valid title', artist: 'Valid artist', lyrics: '  first line\n second line  ', duration: 1.25 });
+    expect(response.body).toMatchObject({ name: 'Valid title', artist: 'Valid artist', lyrics: '  first line\n second line  ', duration: 1.25, album: null, genres: [] });
+    expect(response.body).not.toHaveProperty('provenance');
     createdTrackIds.push(response.body._id as string);
     const operationId = operationIds.at(-1)!;
     expect(response.body.audio).toMatch(/\/static\/audio\/[0-9a-f-]{36}\.mp3$/);
@@ -169,6 +171,108 @@ describe('POST /tracks disk staging (Mongo integration)', () => {
     await app.get(MaintenanceService).runOnce();
     createdTrackIds.splice(createdTrackIds.indexOf(response.body._id), 1);
   }, 30_000);
+
+  it('requires a session for metadata, rejects unexpected fields and shares the MusicBrainz slot across instances', async () => {
+    const notSignedIn = rawRequest(app.getHttpServer());
+    const id = '10000000-0000-4000-8000-000000000001';
+    await notSignedIn.post('/metadata/search').send({ name: 'Track' }).expect(401);
+    await notSignedIn.post('/metadata/details').send({ recordingMbid: id }).expect(401);
+    await notSignedIn.get(`/metadata/artwork/${id}`).expect(401);
+    const authorized = request(app.getHttpServer());
+    await authorized.post('/metadata/search').send({ name: 'Track', unexpected: true }).expect(400);
+    await authorized.post('/metadata/search').send({ name: 'x'.repeat(201) }).expect(400);
+    await authorized.post('/metadata/search').send({ name: 'Track', durationMs: '1000' }).expect(400);
+    await authorized.post('/metadata/details').send({ recordingMbid: 'bad' }).expect(400);
+    await authorized.get('/metadata/artwork/not-a-uuid').expect(400);
+
+    const first = app.get(MusicBrainzProvider);
+    const second = new MusicBrainzProvider(app.get(getConnectionToken()));
+    const fetch = vi.mocked(globalThis.fetch);
+    const starts: number[] = [];
+    for (let i = 0; i < 2; i++) fetch.mockImplementationOnce(async () => {
+      starts.push(performance.now());
+      return Response.json({ recordings: [] });
+    });
+    const signal = new AbortController().signal;
+    await Promise.all([first.get('recording', { query: 'first' }, signal), second.get('recording', { query: 'second' }, signal)]);
+    expect(starts).toHaveLength(2);
+    expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1000);
+
+    for (const status of [429, 503]) {
+      fetch.mockResolvedValueOnce(new Response(null, { status, headers: { 'Retry-After': '2' } }));
+      await expect(first.get('recording', { query: 'limited' }, signal)).rejects.toThrow('throttled');
+      const slot = await database.collection('metadata_provider_slots').findOne({});
+      expect(slot!.next.getTime() - Date.now()).toBeGreaterThan(1500);
+    }
+  }, 15_000);
+
+  it('publishes a catalog snapshot through direct and durable upload, with safe owner edits', async () => {
+    const server = app.getHttpServer();
+    const ownerId = new Types.ObjectId();
+    const token = randomBytes(32).toString('base64url');
+    await database.collection('users').insertOne({ _id: ownerId, username: `owner_${ownerId}`, displayName: 'Owner', role: 'user',
+      disabled: false, quotaReady: true, quotaEntries: [] });
+    await database.collection('sessions').insertOne({ userId: ownerId, tokenHash: createHash('sha256').update(token).digest('hex'),
+      expiresAt: new Date(Date.now() + 600_000), revokedAt: null });
+    const owner = () => rawRequest.agent(server).set('Authorization', `Bearer ${token}`);
+    const releaseMbid = '20000000-0000-4000-8000-000000000001';
+    const recordingMbid = '10000000-0000-4000-8000-000000000001';
+    const bytes = await readFile(pictureFixture);
+    nextCallbackResponse = new Response(new Uint8Array(bytes), { headers: { 'content-type': 'image/png' } });
+    const artwork = await owner().get(`/metadata/artwork/${releaseMbid}`).expect(200);
+    expect(artwork.body).toEqual(bytes);
+    const genreEvidence = [{ genre: 'Ambient', rawTag: 'ambient', source: 'musicbrainz', scope: 'recording', confidence: 0.9 }];
+    const catalog = { album: 'Found release', genres: ['Ambient', 'Custom'], externalIds: { recordingMbid, releaseMbid },
+      albumSource: 'musicbrainz', pictureSource: 'cover-art-archive', genreEvidence };
+    const upload = (url: string, name: string, metadata?: string) => {
+      const form = owner().post(url).field('name', name).field('artist', 'Catalog Artist');
+      if (metadata !== undefined) form.field('catalogMetadata', metadata);
+      return form.attach('audio', audioFixture).attach('picture', artwork.body, { filename: 'archive.png', contentType: 'image/png' });
+    };
+    await upload('/tracks', 'Invalid catalog', '{"unknown":true}').expect(400);
+    await upload('/tracks', 'Invalid catalog', JSON.stringify({ album: 'ю'.repeat(8200) })).expect(400);
+
+    const created = await upload('/tracks', 'Catalog direct', JSON.stringify(catalog)).expect(201);
+    const id = created.body._id as string;
+    createdTrackIds.push(id);
+    expect(created.body).toMatchObject({ album: catalog.album, genres: catalog.genres, externalIds: catalog.externalIds,
+      provenance: { albumSource: 'musicbrainz', pictureSource: 'cover-art-archive', genreEvidence, manualGenres: ['Custom'] } });
+    await upload('/tracks', 'Catalog direct', JSON.stringify(catalog)).expect(409);
+    await rawRequest(server).patch(`/tracks/${id}`).send({ album: 'Unowned' }).expect(401);
+    const otherId = new Types.ObjectId();
+    const otherToken = randomBytes(32).toString('base64url');
+    await database.collection('users').insertOne({ _id: otherId, username: `other_${otherId}`, displayName: 'Other', role: 'user', disabled: false });
+    await database.collection('sessions').insertOne({ userId: otherId, tokenHash: createHash('sha256').update(otherToken).digest('hex'),
+      expiresAt: new Date(Date.now() + 600_000), revokedAt: null });
+    await rawRequest(server).patch(`/tracks/${id}`).set('Authorization', `Bearer ${otherToken}`).send({ album: 'Unowned' }).expect(403);
+    const same = await owner().patch(`/tracks/${id}`).send({ album: catalog.album }).expect(200);
+    expect(same.body.provenance).toEqual(created.body.provenance);
+    const albumEdit = await owner().patch(`/tracks/${id}`).send({ album: '' }).expect(200);
+    expect(albumEdit.body).toMatchObject({ album: null, genres: catalog.genres, externalIds: { recordingMbid }, provenance: { albumSource: 'manual' } });
+    expect(albumEdit.body.externalIds).not.toHaveProperty('releaseMbid');
+    const genresEdit = await owner().patch(`/tracks/${id}`).send({ genres: ['Custom'] }).expect(200);
+    expect(genresEdit.body).toMatchObject({ album: null, genres: ['Custom'], provenance: { genreEvidence: [], manualGenres: ['Custom'] } });
+    const renamed = await owner().patch(`/tracks/${id}`).send({ name: 'Renamed' }).expect(200);
+    expect(renamed.body).not.toHaveProperty('externalIds');
+    await trackService.deleteOne(id, fixtureActor);
+    await app.get(MaintenanceService).runOnce();
+
+    for (const metadata of [JSON.stringify(catalog), undefined]) {
+      const accepted = await upload('/tracks/uploads', metadata ? 'Catalog queued' : 'Legacy queued', metadata).expect(202);
+      const { operationId, trackId } = accepted.body;
+      expect((await owner().get(`/tracks/uploads/${operationId}`).expect(200)).body.status).toBe('queued');
+      const operation = await database.collection('mediaoperations').findOne({ operationId });
+      expect(operation?.upload?.catalogMetadata ?? undefined).toEqual(metadata ? catalog : undefined);
+      await app.get(MaintenanceService).runOnce();
+      expect((await owner().get(`/tracks/uploads/${operationId}`).expect(200)).body.status).toBe('published');
+      const detail = (await owner().get(`/tracks/${trackId}`).expect(200)).body;
+      createdTrackIds.push(trackId);
+      expect(detail).toMatchObject({ album: metadata ? catalog.album : null, genres: metadata ? catalog.genres : [] });
+      expect((await owner().get(new URL(detail.picture).pathname).expect(200)).body).toEqual(bytes);
+      await trackService.deleteOne(trackId, fixtureActor);
+      await app.get(MaintenanceService).runOnce();
+    }
+  }, 35_000);
 
   it('does not expose private staging through the public static mount', async () => {
     const operationId = `private_${randomUUID()}`;

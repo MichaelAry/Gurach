@@ -1,3 +1,5 @@
+import { MetadataService } from '../metadata/metadata.service.js';
+import { ArtworkProvider } from '../metadata/artwork.provider.js';
 import { PlaylistsService } from '../playlists/playlists.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { HomeService } from '../home/home.service.js';
@@ -21,6 +23,8 @@ import { CommentService } from '../comment/comment.service.js';
 @Module({
   controllers: [...API_CONTROLLERS],
   providers: [
+    { provide: MetadataService, useValue: {} },
+    { provide: ArtworkProvider, useValue: {} },
     { provide: PlaylistsService, useValue: {} },
     { provide: NotificationsService, useValue: {} },
     { provide: HomeService, useValue: {} },

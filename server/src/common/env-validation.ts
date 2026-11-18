@@ -62,3 +62,11 @@ export function redactSecrets(value: string): string {
     .replace(/mongodb(?:\+srv)?:\/\/[^\s"'<>]+/gi, '[REDACTED_MONGODB_URI]')
     .replace(/((?:password|passwd|pwd|secret|token)\s*[=:]\s*)[^\s&,;]+/gi, '$1[REDACTED]');
 }
+
+export function musicBrainzUserAgent(value: string | undefined): string {
+  if (!value) return 'Gurach/1.0 (https://github.com/MichaelAry/Gurach/issues)';
+  if (!/^Gurach\/[\w.-]+ \((?:https:\/\/[^\s()]+|[^\s()@]+@[^\s()@]+)\)$/.test(value) || value.length > 200) {
+    throw new Error('MUSICBRAINZ_USER_AGENT must contain Gurach/version and a contact URL or email');
+  }
+  return value;
+}

@@ -12,6 +12,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import mongoose, { Types } from 'mongoose';
 import type { Connection, Model } from 'mongoose';
+import { isDeepStrictEqual } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { open, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -78,7 +79,7 @@ export class TrackService {
       stageDirectory: operationId, state: 'queued', attempts: 0, nextAttemptAt: new Date(),
       audioKey: this.fileService.allocateFile(FileType.AUDIO, 'compatible.mp3').name,
       pictureKey: this.fileService.allocateFile(FileType.PICTURE, picture.originalname).name,
-      upload: { name: dto.name, artist: dto.artist, text: dto.text, audioName: audio.originalname,
+      upload: { catalogMetadata: dto.catalogMetadata, name: dto.name, artist: dto.artist, text: dto.text, audioName: audio.originalname,
         pictureName: picture.originalname, audioSize: audio.size, pictureSize: picture.size },
     });
     return Object.assign(new UploadJobStatus(), { operationId, trackId: String(operation.trackId), status: 'queued' });
@@ -106,7 +107,7 @@ export class TrackService {
     const audio = { path: path.join(directory, 'audio.upload'), originalname: upload.audioName, size: upload.audioSize } as Express.Multer.File;
     const picture = { path: path.join(directory, 'picture.upload'), originalname: upload.pictureName, size: upload.pictureSize } as Express.Multer.File;
     try {
-      await this.create({ name: upload.name, artist: upload.artist, text: upload.text } as CreateTrackDto,
+      await this.create({ name: upload.name, artist: upload.artist, text: upload.text, catalogMetadata: upload.catalogMetadata },
         picture, audio, operation.operationId,
         { id: String(operation.ownerId), role: 'user', username: '', displayName: '' }, { operation, output });
     } finally { await rm(output, { force: true }); }
@@ -244,6 +245,16 @@ export class TrackService {
             artistKey,
             ...audioPrints,
             text: dto.text,
+            album: dto.catalogMetadata?.album || undefined,
+            genres: dto.catalogMetadata?.genres,
+            externalIds: dto.catalogMetadata?.externalIds,
+            provenance: dto.catalogMetadata && {
+              albumSource: dto.catalogMetadata.albumSource ?? (dto.catalogMetadata.album !== undefined ? 'manual' : undefined),
+              pictureSource: dto.catalogMetadata.pictureSource ?? 'manual',
+              genreEvidence: dto.catalogMetadata.genreEvidence,
+              manualGenres: dto.catalogMetadata.genres?.filter((genre) =>
+                !dto.catalogMetadata?.genreEvidence?.some((entry) => entry.genre === genre)),
+            },
             duration: audioMetadata.durationSeconds,
             listens: 0,
             audio: audioFile.name,
@@ -400,7 +411,7 @@ export class TrackService {
 
     const track = (await this.trackModel
       .findOne({ _id: new Types.ObjectId(id), lifecycle: 'active' })
-      .select('_id name artist audio picture duration listens text ownerId')
+      .select('_id name artist audio picture duration listens text ownerId album genres externalIds provenance')
       .lean()
       .exec()) as TrackListRecord | null;
 
@@ -415,8 +426,8 @@ export class TrackService {
     const permissions = new PermissionService();
     const identity = permissions.requireActor(actor);
     this.assertValidId(id);
-    if (dto.name === undefined && dto.artist === undefined && dto.text === undefined) {
-      throw new BadRequestException('Provide at least one of: name, artist, text');
+    if (dto.name === undefined && dto.artist === undefined && dto.text === undefined && dto.album === undefined && dto.genres === undefined) {
+      throw new BadRequestException('Provide at least one of: name, artist, text, album, genres');
     }
     const trackId = new Types.ObjectId(id);
     const eventId = `${randomUUID()}:updated`;
@@ -439,6 +450,20 @@ export class TrackService {
         const duplicate = await this.findDuplicate(nameKey, artistKey, trackId);
         if (duplicate) throw new DuplicateTrackError(duplicate);
 
+        const identityChanged = nameKey !== normalizeTrackIdentity(current.name)
+          || artistKey !== normalizeTrackIdentity(current.artist);
+        const albumChanged = dto.album !== undefined && (dto.album || null) !== (current.album || null);
+        const genresChanged = dto.genres !== undefined && !isDeepStrictEqual(dto.genres, current.genres ?? []);
+        const externalIds = { ...current.externalIds };
+        if (identityChanged) delete externalIds.recordingMbid;
+        if (identityChanged || albumChanged) delete externalIds.releaseMbid;
+        const provenance = { ...current.provenance };
+        if (albumChanged) provenance.albumSource = 'manual';
+        if (genresChanged) {
+          provenance.genreEvidence = provenance.genreEvidence?.filter(({ genre }) => dto.genres!.includes(genre));
+          provenance.manualGenres = dto.genres!.filter((genre) => !provenance.genreEvidence?.some((entry) => entry.genre === genre));
+        }
+
         // An explicit $set keeps media, fingerprints, ownership and counters untouched.
         // The transaction retries against fresh metadata after concurrent edits/deletion.
         const updated = await this.trackModel.findOneAndUpdate(
@@ -447,11 +472,15 @@ export class TrackService {
             ...(dto.name !== undefined ? { name: dto.name } : {}),
             ...(dto.artist !== undefined ? { artist: dto.artist } : {}),
             ...(dto.text !== undefined ? { text: dto.text } : {}),
+            ...(albumChanged ? { album: dto.album || null } : {}),
+            ...(genresChanged ? { genres: dto.genres } : {}),
+            ...(albumChanged || genresChanged ? { provenance } : {}),
             nameKey,
             artistKey,
-          } },
+            ...((identityChanged || albumChanged) && Object.keys(externalIds).length ? { externalIds } : {}),
+          }, ...((identityChanged || albumChanged) && !Object.keys(externalIds).length ? { $unset: { externalIds: '' } } : {}) },
           { session, returnDocument: 'after', runValidators: true },
-        ).select('_id name artist audio picture duration listens text ownerId').lean().exec();
+        ).select('_id name artist audio picture duration listens text ownerId album genres externalIds provenance').lean().exec();
         if (!updated) throw new NotFoundException(`Track with id "${id}" was not found`);
         await this.cacheEventModel.create([{
           eventId,

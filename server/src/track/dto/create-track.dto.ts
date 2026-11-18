@@ -1,4 +1,6 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { parseCatalogMetadata, type CatalogMetadata } from '../../contracts/catalog-metadata.js';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OptionalNonNegativeDecimalString, TrimString } from '../../common/validation/text.decorators.js';
 
@@ -6,6 +8,10 @@ import { OptionalNonNegativeDecimalString, TrimString } from '../../common/valid
 // через FileFieldsInterceptor и заполняются сервисом.
 // Иначе клиент мог бы передать их в body и обойти файловый слой.
 export class CreateTrackDto {
+  @Transform(({ value }) => parseCatalogMetadata(value))
+  @IsOptional()
+  readonly catalogMetadata?: CatalogMetadata;
+
   @ApiProperty({ maxLength: 200, example: 'Track title' })
   @TrimString()
   @IsString()

@@ -1,3 +1,4 @@
+import type { CatalogMetadata } from '../../contracts/catalog-metadata.js';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
@@ -72,7 +73,16 @@ export class MediaOperation {
 
   /** Durable request data; paths are reconstructed from the operation ID. */
   @Prop({ type: Object })
-  upload?: { name: string; artist?: string; text?: string; audioName: string; pictureName: string; audioSize: number; pictureSize: number };
+  upload?: {
+    name: string;
+    artist?: string;
+    text?: string;
+    catalogMetadata?: CatalogMetadata;
+    audioName: string;
+    pictureName: string;
+    audioSize: number;
+    pictureSize: number;
+  };
 
   @Prop({ type: String, maxlength: 24 })
   existingTrackId?: string;
