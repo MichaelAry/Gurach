@@ -327,3 +327,66 @@ test('ignores a late search and makes zero catalog requests when disabled while 
   await expect(page).toHaveURL(/\/tracks\/[0-9a-f]{24}$/, { timeout: 15_000 })
   expect(requests).toBe(3)
 })
+
+test('queries only selected catalogs and keeps successful results when another catalog fails', async ({ page }) => {
+  const calls: string[] = []
+  const candidate = { catalogId: '1234', sources: ['theaudiodb'], name: 'Northbound', artist: 'Catalog Artist',
+    album: 'Source Album', releaseMbid: null, year: null, edition: null, version: null, durationMs: null, confidence: 0 }
+  await page.route('**/api/metadata/search', async route => {
+    const { source } = route.request().postDataJSON()
+    calls.push(source)
+    if (source === 'discogs') return route.fulfill({ status: 429 })
+    await route.fulfill({ json: { candidates: [candidate], recommendedIndex: null } })
+  })
+  await page.route('**/api/metadata/details', async route => {
+    expect(route.request().postDataJSON()).toMatchObject({ source: 'theaudiodb', catalogId: '1234' })
+    await route.fulfill({ json: { ...candidate, artworkUrl: null, genreEvidence: [] } })
+  })
+  await page.getByRole('checkbox', { name: 'MusicBrainz', exact: true }).uncheck()
+  await fillForm(page)
+  await page.waitForTimeout(850)
+  expect(calls).toEqual([])
+  await page.getByRole('checkbox', { name: 'TheAudioDB', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'Discogs', exact: true }).check()
+  await page.getByRole('button', { name: /Source Album/ }).click()
+  await page.getByRole('button', { name: 'Применить выбранные поля' }).click()
+  await expect(page.getByLabel('Альбом', { exact: true })).toHaveValue('Source Album')
+  expect(calls.sort()).toEqual(['discogs', 'theaudiodb'])
+  await page.getByRole('button', { name: 'Загрузить трек', exact: true }).click()
+  await expect(page).toHaveURL(/\/tracks\/[0-9a-f]{24}$/, { timeout: 15_000 })
+  const track = await (await page.request.get('/api/tracks/' + page.url().split('/').at(-1))).json()
+  expect(track).toMatchObject({ album: 'Source Album', externalIds: { audioDbTrackId: '1234' }, provenance: { albumSource: 'theaudiodb' } })
+})
+
+test('publishes album and genres selected from different catalogs', async ({ page }) => {
+  const identity = { name: 'Мой трек', artist: 'Исполнитель', releaseMbid: null, year: null,
+    edition: null, version: null, durationMs: null, confidence: 1 }
+  const album = { ...identity, catalogId: '41', sources: ['theaudiodb'], album: 'AudioDB Album', genreEvidence: [] }
+  const genres = { ...identity, catalogId: '42', sources: ['discogs'], album: 'Discogs Album',
+    genreEvidence: [{ genre: 'Indie Rock', rawTag: 'Indie Rock', source: 'discogs', scope: 'release', confidence: 1 }] }
+  const resultFor = (source: string) => source === 'discogs' ? genres : album
+  await page.route('**/api/metadata/search', route => route.fulfill({
+    json: { candidates: [resultFor(route.request().postDataJSON().source)], recommendedIndex: null },
+  }))
+  await page.route('**/api/metadata/details', route => route.fulfill({
+    json: { ...resultFor(route.request().postDataJSON().source), artworkUrl: null },
+  }))
+  await page.getByRole('checkbox', { name: 'MusicBrainz', exact: true }).uncheck()
+  await page.getByRole('checkbox', { name: 'TheAudioDB', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'Discogs', exact: true }).check()
+  await fillForm(page)
+  const audioDb = page.getByRole('group', { name: 'TheAudioDB', exact: true })
+  const discogs = page.getByRole('group', { name: 'Discogs', exact: true })
+  await audioDb.getByRole('button', { name: /AudioDB Album/ }).click()
+  await audioDb.getByRole('button', { name: 'Применить выбранные поля' }).click()
+  await discogs.getByRole('button', { name: /Discogs Album/ }).click()
+  await discogs.getByRole('checkbox', { name: /Discogs Album/ }).uncheck()
+  await discogs.getByRole('button', { name: 'Применить выбранные поля' }).click()
+  await expect(page.getByLabel('Альбом', { exact: true })).toHaveValue('AudioDB Album')
+  await page.getByRole('button', { name: 'Загрузить трек', exact: true }).click()
+  await expect(page).toHaveURL(/\/tracks\/[0-9a-f]{24}$/, { timeout: 15_000 })
+  const track = await (await page.request.get('/api/tracks/' + page.url().split('/').at(-1))).json()
+  expect(track).toMatchObject({ album: 'AudioDB Album', genres: ['Indie Rock'],
+    externalIds: { audioDbTrackId: '41', discogsReleaseId: '42' },
+    provenance: { albumSource: 'theaudiodb', genreEvidence: genres.genreEvidence } })
+})

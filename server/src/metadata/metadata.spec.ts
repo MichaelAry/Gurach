@@ -61,7 +61,7 @@ describe('catalog ranking and metadata', () => {
     })));
     try {
       const service = new MetadataService({ get } as unknown as MusicBrainzProvider, new LastFmProvider());
-      await expect(service.details({ recordingMbid: recordingId, releaseMbid: releaseId }, signal())).resolves.toMatchObject({
+      await expect(service.details({ recordingMbid: recordingId, releaseMbid: releaseId, lastfm: true }, signal())).resolves.toMatchObject({
         sourceStatuses: { musicbrainz: 'available', lastfm: 'unavailable' },
         genreEvidence: [{ genre: 'Ambient', source: 'musicbrainz' }],
       });
@@ -139,5 +139,33 @@ describe('provider cache and artwork', () => {
     } });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { headers: { 'content-type': 'image/jpeg' } })));
     await expect(new ArtworkProvider().get(releaseId, signal())).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('additional catalogs', () => {
+  it('reuses TheAudioDB search data for details and checks the selected track ID', async () => {
+    const request = vi.fn().mockResolvedValue({ track: [{ idTrack: '45', strTrack: 'Song', strArtist: 'Band', strAlbum: 'Album', strGenre: 'House' },
+      { idTrack: '46', strTrack: 'Song (Live)', strArtist: 'Band' },
+      { idTrack: '47', strTrack: 'Song', strArtist: 'Another Band' }] });
+    const service = new MetadataService({ request } as unknown as MusicBrainzProvider, new LastFmProvider());
+    const query = { source: 'theaudiodb' as const, artist: 'Band', name: 'Song' };
+    expect((await service.search(query, signal())).candidates).toMatchObject([{ catalogId: '45', album: 'Album' }]);
+    const details = await service.details({ ...query, catalogId: '45' }, signal());
+    expect(details.genreEvidence[0]).toMatchObject({ genre: 'House', source: 'theaudiodb', scope: 'recording' });
+    await expect(service.details({ ...query, catalogId: '46' }, signal())).rejects.toThrow('Unknown track');
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks the credited track on Discogs compilations, distinguishes versions and labels release genres', async () => {
+    const request = vi.fn().mockResolvedValue({ id: 12, title: 'Compilation', artists: [{ name: 'Various' }],
+      tracklist: [{ title: 'Song', artists: [{ name: 'Band (2)' }] }], genres: ['Rock'], styles: ['Rock', 'Indie Rock'] });
+    const service = new MetadataService({ request } as unknown as MusicBrainzProvider, new LastFmProvider());
+    const query = { source: 'discogs' as const, catalogId: '12', artist: 'Band', name: 'Song' };
+    const details = await service.details(query, signal());
+    expect(details.genreEvidence.map(entry => entry.genre)).toEqual(['Rock', 'Indie Rock']);
+    expect(details.genreEvidence[0]).toMatchObject({ scope: 'release', source: 'discogs' });
+    for (const change of [{ artist: 'Other' }, { name: 'Song (Live)' }, { catalogId: '13' }]) {
+      await expect(service.details({ ...query, ...change }, signal())).rejects.toThrow('matched');
+    }
   });
 });

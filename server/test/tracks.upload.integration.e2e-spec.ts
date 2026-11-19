@@ -257,17 +257,24 @@ describe('POST /tracks disk staging (Mongo integration)', () => {
     await trackService.deleteOne(id, fixtureActor);
     await app.get(MaintenanceService).runOnce();
 
-    for (const metadata of [JSON.stringify(catalog), undefined]) {
+    const discogs = { ...catalog, externalIds: { discogsReleaseId: '12' }, pictureSource: 'manual', albumSource: 'discogs',
+      genreEvidence: [{ ...genreEvidence[0], source: 'discogs', scope: 'release' }] };
+    const audioDb = { ...catalog, externalIds: { audioDbTrackId: '34' }, pictureSource: 'manual', albumSource: 'theaudiodb',
+      genreEvidence: [{ ...genreEvidence[0], source: 'theaudiodb' }] };
+    for (const snapshot of [catalog, discogs, audioDb, undefined]) {
+      const metadata = snapshot && JSON.stringify(snapshot);
       const accepted = await upload('/tracks/uploads', metadata ? 'Catalog queued' : 'Legacy queued', metadata).expect(202);
       const { operationId, trackId } = accepted.body;
       expect((await owner().get(`/tracks/uploads/${operationId}`).expect(200)).body.status).toBe('queued');
       const operation = await database.collection('mediaoperations').findOne({ operationId });
-      expect(operation?.upload?.catalogMetadata ?? undefined).toEqual(metadata ? catalog : undefined);
+      expect(operation?.upload?.catalogMetadata ?? undefined).toEqual(snapshot);
       await app.get(MaintenanceService).runOnce();
       expect((await owner().get(`/tracks/uploads/${operationId}`).expect(200)).body.status).toBe('published');
       const detail = (await owner().get(`/tracks/${trackId}`).expect(200)).body;
       createdTrackIds.push(trackId);
       expect(detail).toMatchObject({ album: metadata ? catalog.album : null, genres: metadata ? catalog.genres : [] });
+      if (snapshot) expect(detail).toMatchObject({ externalIds: snapshot.externalIds,
+        provenance: { albumSource: snapshot.albumSource, genreEvidence: snapshot.genreEvidence } });
       expect((await owner().get(new URL(detail.picture).pathname).expect(200)).body).toEqual(bytes);
       await trackService.deleteOne(trackId, fixtureActor);
       await app.get(MaintenanceService).runOnce();

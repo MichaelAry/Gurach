@@ -1,3 +1,4 @@
+import { CatalogLookup } from './catalog-lookup.js';
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { genreKey, MBID } from '../contracts/catalog-metadata.js';
 import { genreRecommendations } from './genres.js';
@@ -18,26 +19,43 @@ export class MetadataService {
     return value.genreEvidence.length ? successTtl : 60_000;
   }, cacheEntriesPerEndpoint);
 
-  constructor(private readonly musicbrainz: MusicBrainzProvider, private readonly lastfm: LastFmProvider) {}
+  private readonly catalogs: CatalogLookup;
+  constructor(private readonly musicbrainz: MusicBrainzProvider, private readonly lastfm: LastFmProvider) {
+    this.catalogs = new CatalogLookup(musicbrainz);
+  }
 
   async search(dto: MetadataSearchDto, signal: AbortSignal) {
-    const key = JSON.stringify([genreKey(dto.name), genreKey(dto.artist ?? ''), dto.durationMs]);
+    const source = dto.source ?? 'musicbrainz';
+    const key = JSON.stringify([source, genreKey(dto.name), genreKey(dto.artist ?? ''),
+      source === 'musicbrainz' ? dto.durationMs : undefined]);
     return this.searches.get(key, signal, async (sharedSignal) => {
       const deadline = AbortSignal.any([sharedSignal, AbortSignal.timeout(8000)]);
       const query = `recording:"${escapeLucene(recordingSearchTitle(dto.name))}"` + (dto.artist ? ` AND artist:"${escapeLucene(dto.artist)}"` : '');
       try {
+        if (dto.source && dto.source !== 'musicbrainz') return await this.catalogs.search(dto, deadline);
         const data = await this.musicbrainz.get<{ recordings: Recording[] }>('recording', { query, limit: '20' }, deadline);
         return rankRecordings(dto, data.recordings);
       } catch {
-        throw new ServiceUnavailableException('MusicBrainz unavailable');
+        throw new ServiceUnavailableException(dto.source && dto.source !== 'musicbrainz' ? 'Catalog unavailable' : 'MusicBrainz unavailable');
       }
     });
   }
 
   async details(dto: MetadataDetailsDto, signal: AbortSignal) {
+    if (dto.source && dto.source !== 'musicbrainz') {
+      const key = JSON.stringify([dto.source, dto.catalogId, dto.name, dto.artist]);
+      return this.detailsCache.get(key, signal, async shared => {
+        try { return await this.catalogs.details(dto, shared); }
+        catch (error) {
+          if (error instanceof BadRequestException) throw error;
+          throw new ServiceUnavailableException('Catalog unavailable');
+        }
+      });
+    }
+    if (!dto.recordingMbid) throw new BadRequestException('Missing recording MBID');
     const recordingMbid = dto.recordingMbid.toLowerCase();
     const releaseMbid = dto.releaseMbid?.toLowerCase();
-    return this.detailsCache.get(JSON.stringify([recordingMbid, releaseMbid]), signal, async (sharedSignal) => {
+    return this.detailsCache.get(JSON.stringify([recordingMbid, releaseMbid, dto.lastfm]), signal, async (sharedSignal) => {
       const deadline = AbortSignal.any([sharedSignal, AbortSignal.timeout(9000)]);
       let recording: Recording;
       try {
@@ -68,9 +86,9 @@ export class MetadataService {
         if (releases.length === 1) release = releases[0];
       }
       let musicbrainz: SourceStatus = 'available';
-      let lastfm: SourceStatus = this.lastfm.enabled ? 'available' : 'disabled';
+      let lastfm: SourceStatus = this.lastfm.enabled && dto.lastfm === true ? 'available' : 'disabled';
       const fromLastFm = async (load: () => Promise<Tag[]>) => {
-        if (!this.lastfm.enabled || lastfm === 'unavailable') return [];
+        if (lastfm === 'disabled' || !this.lastfm.enabled || lastfm === 'unavailable') return [];
         try { return await load(); } catch { lastfm = 'unavailable'; return []; }
       };
       const recordingTags = { musicbrainz: recording.genres ?? [], lastfm: await fromLastFm(() => this.lastfm.recording(recording, deadline)) };

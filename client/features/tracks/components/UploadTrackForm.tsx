@@ -5,8 +5,8 @@ import { message as localMessage } from '@/i18n/messages'
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Alert, Box, Button, Checkbox, FormControlLabel, LinearProgress, Stack, TextField, Typography } from '@mui/material'
 import Link from 'next/link'
-import { useMetadataLookup, useObjectUrl } from '../hooks/useMetadataLookup'
-import { parseGenreInput, validGenres, type GenreEvidence } from '../catalogMetadata'
+import { useDuration, useMetadataLookup, useObjectUrl } from '../hooks/useMetadataLookup'
+import { parseGenreInput, validGenres, type GenreEvidence, type MetadataDetails } from '../catalogMetadata'
 import { MetadataProposal, type ProposalField } from './MetadataProposal'
 import { UploadFileField } from './UploadFileField'
 import { DuplicateTrackError, UploadJobFailedError, uploadTrack, waitForUpload } from '../api/uploadTrack'
@@ -15,6 +15,10 @@ import { useViewer } from '@/features/auth/ViewerProvider'
 
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac']
 const COVER_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']
+
+function normalizeIdentity(value: string) {
+  return value.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ')
+}
 
 function validateFile(event: ChangeEvent<HTMLInputElement>, extensions: string[], maxMiB: number, resolve: ReturnType<typeof useMessage>) {
   const input = event.currentTarget
@@ -53,10 +57,12 @@ export function UploadTrackForm() {
   const [album, setAlbum] = useState('')
   const [genres, setGenres] = useState('')
   const [dirty, setDirty] = useState<Partial<Record<ProposalField, boolean>>>({})
-  const [albumFromCatalog, setAlbumFromCatalog] = useState(false)
+  const [albumSource, setAlbumSource] = useState<'manual' | 'musicbrainz' | 'theaudiodb' | 'discogs'>('manual')
   const [evidence, setEvidence] = useState<GenreEvidence[]>([])
   const [appliedCover, setAppliedCover] = useState<File>()
-  const [ids, setIds] = useState<{ recordingMbid: string; releaseMbid?: string }>()
+  const [sources, setSources] = useState({ musicbrainz: true, theaudiodb: false, discogs: false })
+  const [lastfm, setLastfm] = useState(false)
+  const [ids, setIds] = useState<{ discogsReleaseId?: string; audioDbTrackId?: string; recordingMbid?: string; releaseMbid?: string }>()
   const [applied, setApplied] = useState(false)
   const coverPreview = useObjectUrl(localCover || appliedCover)
   const [previewFailed, setPreviewFailed] = useState(false)
@@ -67,19 +73,28 @@ export function UploadTrackForm() {
 
   useEffect(() => () => { requestRef.current?.abort() }, [])
   const editable = confirmed && !!user && !pending && !uploaded && stage === 'idle'
-  const metadata = useMetadataLookup({ active: editable && enabled, name, artist, audio })
-  const results = metadata.state.status === 'results' ? metadata.state : undefined
+  const duration = useDuration(enabled && editable ? audio : null)
+  const inputs = { name, artist, audio, duration }
+  const musicbrainz = useMetadataLookup({ ...inputs, active: editable && enabled && sources.musicbrainz, source: 'musicbrainz', lastfm })
+  const theaudiodb = useMetadataLookup({ ...inputs, active: editable && enabled && sources.theaudiodb, source: 'theaudiodb' })
+  const discogs = useMetadataLookup({ ...inputs, active: editable && enabled && sources.discogs, source: 'discogs' })
+  const catalogs = { musicbrainz, theaudiodb, discogs }
+  const labels = { musicbrainz: 'MusicBrainz', theaudiodb: 'TheAudioDB', discogs: 'Discogs' }
+  const keys = Object.keys(labels) as (keyof typeof labels)[]
+  const selectedSources = keys.filter(key => sources[key])
+  function invalidate() {
+    for (const catalog of Object.values(catalogs)) catalog.invalidate()
+  }
 
   function editIdentity(field: 'name' | 'artist', value: string) {
-    metadata.invalidate()
+    invalidate()
     setApplied(false)
     setDirty((fields) => ({ ...fields, [field]: true }))
     if (field === 'name') setName(value)
     else setArtist(value)
-    if (value.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ') ===
-      (field === 'name' ? name : artist).normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ')) return
-    if (albumFromCatalog) setAlbum('')
-    setAlbumFromCatalog(false)
+    if (normalizeIdentity(value) === normalizeIdentity(field === 'name' ? name : artist)) return
+    if (albumSource !== 'manual') setAlbum('')
+    setAlbumSource('manual')
     if (evidence.length) setGenres(parseGenreInput(genres).filter((genre) => !evidence.some((entry) => entry.genre === genre)).join('\n'))
     setEvidence([])
     setAppliedCover(undefined)
@@ -87,38 +102,49 @@ export function UploadTrackForm() {
     setIds(undefined)
   }
 
-  function apply(fields: ProposalField[]) {
-    const details = results?.details
-    if (!details) return
-    const changedRelease = ids?.releaseMbid !== (details.releaseMbid ?? undefined) || ids?.recordingMbid !== details.recordingMbid
+  function apply(fields: ProposalField[], details: MetadataDetails, artwork?: File) {
+    const source = details.sources.includes('discogs') ? 'discogs'
+      : details.sources.includes('theaudiodb') ? 'theaudiodb' : 'musicbrainz'
+    const selectedIds = source === 'discogs' ? { discogsReleaseId: details.catalogId }
+      : source === 'theaudiodb' ? { audioDbTrackId: details.catalogId }
+      : { recordingMbid: details.recordingMbid, releaseMbid: details.releaseMbid ?? undefined }
+    const changedRelease = (Object.keys(selectedIds) as (keyof NonNullable<typeof ids>)[])
+      .some(key => ids?.[key] !== undefined && ids[key] !== selectedIds[key])
+    const nextName = fields.includes('name') ? details.name : name
+    const nextArtist = fields.includes('artist') ? details.artist ?? '' : artist
+    const changedIdentity = normalizeIdentity(nextName) !== normalizeIdentity(name) ||
+      normalizeIdentity(nextArtist) !== normalizeIdentity(artist)
+    if (nextName !== name || nextArtist !== artist) invalidate()
     if (fields.includes('name')) setName(details.name)
     if (fields.includes('artist')) setArtist(details.artist ?? '')
     if (fields.includes('album')) {
       setAlbum(details.album ?? '')
-      setAlbumFromCatalog(true)
-    } else if (changedRelease && albumFromCatalog) {
+      setAlbumSource(source)
+    } else if (albumSource !== 'manual' && (changedIdentity || (changedRelease && albumSource === source))) {
       setAlbum('')
-      setAlbumFromCatalog(false)
+      setAlbumSource('manual')
     }
     if (fields.includes('genres')) {
       setGenres(details.genreEvidence.map(({ genre }) => genre).join('\n'))
       setEvidence(details.genreEvidence)
-    } else if (changedRelease && evidence.length) {
-      setGenres(parseGenreInput(genres).filter((genre) => !evidence.some((entry) => entry.genre === genre)).join('\n'))
-      setEvidence([])
+    } else if (changedIdentity || changedRelease) {
+      const obsolete = (entry: GenreEvidence) => changedIdentity || entry.source === source ||
+        (source === 'musicbrainz' && entry.source === 'lastfm')
+      setGenres(parseGenreInput(genres).filter(genre => !evidence.some(entry => entry.genre === genre && obsolete(entry))).join('\n'))
+      setEvidence(evidence.filter(entry => !obsolete(entry)))
     }
-    if (fields.includes('picture') && results.artwork) {
-      setAppliedCover(results.artwork)
+    if (fields.includes('picture') && artwork) {
+      setAppliedCover(artwork)
       setLocalCover(null)
       setCoverError('')
       setCoverInputKey((key) => key + 1)
       setPreviewFailed(false)
-    } else if (changedRelease) {
+    } else if (changedIdentity || (changedRelease && source === 'musicbrainz')) {
       setAppliedCover(undefined)
       setPreviewFailed(false)
     }
     setDirty((previous) => Object.fromEntries(Object.entries(previous).filter(([field]) => !fields.includes(field as ProposalField))))
-    setIds({ recordingMbid: details.recordingMbid, releaseMbid: details.releaseMbid ?? undefined })
+    setIds(changedIdentity ? selectedIds : { ...ids, ...selectedIds })
     setApplied(true)
   }
 
@@ -165,12 +191,12 @@ export function UploadTrackForm() {
     if (!saved && !event.currentTarget.reportValidity()) return
     const genreValues = parseGenreInput(genres)
     if (!saved && !validGenres(genreValues)) return
-    metadata.invalidate()
+    invalidate()
     const body = new FormData(event.currentTarget)
     if (!localCover && appliedCover) body.set('picture', appliedCover, appliedCover.name)
     body.set('catalogMetadata', JSON.stringify({
       album: album.trim(), genres: genreValues, externalIds: ids,
-      albumSource: albumFromCatalog ? 'musicbrainz' : 'manual',
+      albumSource,
       pictureSource: !localCover && appliedCover ? 'cover-art-archive' : 'manual',
       genreEvidence: evidence.filter(({ genre }) => genreValues.includes(genre)),
     }))
@@ -222,7 +248,7 @@ export function UploadTrackForm() {
           disabled={!editable}
           onChange={event => {
             setAudioError(validateFile(event, AUDIO_EXTENSIONS, 50, resolve))
-            metadata.invalidate()
+            invalidate()
             const file = event.currentTarget.files?.[0] ?? null
             setAudio(file)
             setAudioBytes(file?.size ?? null)
@@ -279,39 +305,55 @@ export function UploadTrackForm() {
           helperText={lt('optionalUpToCharacters')}
         />
         <FormControlLabel label={lt('metadataEnabled')} control={<Checkbox checked={enabled} onChange={(_, checked) => {
-          metadata.invalidate()
+          invalidate()
           setEnabled(checked)
         }} />} />
         {enabled && <>
-          {name.trim() && !artist.trim() && <Button type="button" onClick={() => { void metadata.search() }}>{lt('metadataTitleSearch')}</Button>}
-          <Typography role={editable ? 'status' : undefined} variant="body2">
-            {metadata.state.status === 'searching' ? lt('metadataSearching')
-              : metadata.state.status === 'empty' ? lt('metadataEmpty')
-              : metadata.state.status === 'unavailable' || results?.detailError ? lt('metadataUnavailable')
-              : results && results.selected === null ? lt('metadataChooseRelease')
-              : results?.selected != null && !results.details ? lt('metadataSearching') : null}
-          </Typography>
-          {metadata.state.status === 'unavailable' && <Button type="button" onClick={() => { void metadata.search() }}>{lt('tryAgain')}</Button>}
-          {results && <Stack spacing={0.5}>
-            {results.candidates.map((candidate, index) => (
-              <Button key={`${candidate.recordingMbid}:${candidate.releaseMbid}`} type="button"
-                variant={results.selected === index ? 'outlined' : 'text'} aria-pressed={results.selected === index}
-                onClick={() => { void metadata.select(results.candidates, index) }}>
-                {[candidate.name, candidate.artist, candidate.version, candidate.album, candidate.edition ?? candidate.year].filter(Boolean).join(' · ')}
-              </Button>
-            ))}
-          </Stack>}
-          {results?.details && <MetadataProposal key={`${results.details.recordingMbid}:${results.details.releaseMbid}`}
-            details={results.details} artwork={results.artwork} artworkStatus={results.artworkStatus}
-            dirty={dirty} onApply={apply} onRetry={() => {
-              if (results.selected != null) void metadata.select(results.candidates, results.selected)
-            }} />}
+          {keys.map(key => <FormControlLabel key={key} label={labels[key]} control={<Checkbox checked={sources[key]} onChange={(_, checked) => {
+            catalogs[key].invalidate()
+            setSources(previous => ({ ...previous, [key]: checked }))
+          }} />} />)}
+          {sources.musicbrainz && <FormControlLabel label="Last.fm" control={<Checkbox checked={lastfm} onChange={(_, checked) => {
+            musicbrainz.invalidate()
+            setLastfm(checked)
+          }} />} />}
+          {name.trim() && selectedSources.length > 0 && !artist.trim() && <Button type="button" onClick={() => { selectedSources.forEach(key => void catalogs[key].search()) }}>{lt('metadataTitleSearch')}</Button>}
+          {selectedSources.map(key => {
+            const metadata = catalogs[key]
+            const results = metadata.state.status === 'results' ? metadata.state : undefined
+            return <Stack key={key} role="group" aria-label={labels[key]}>
+              {selectedSources.length > 1 && <Typography variant="subtitle2">{labels[key]}</Typography>}
+              <Typography role={editable ? 'status' : undefined} variant="body2">
+                {metadata.state.status === 'searching' ? lt('metadataSearching')
+                  : metadata.state.status === 'empty' ? lt('metadataEmpty')
+                  : results?.detailError === 'mismatch' ? lt('metadataMismatch')
+                  : metadata.state.status === 'unavailable' || results?.detailError ? lt('metadataUnavailable')
+                  : results && results.selected === null ? lt('metadataChooseRelease')
+                  : results?.selected != null && !results.details ? lt('metadataSearching') : null}
+              </Typography>
+              {metadata.state.status === 'unavailable' && <Button type="button" onClick={() => { void metadata.search() }}>{lt('tryAgain')}</Button>}
+              {results && <Stack spacing={0.5}>
+                {results.candidates.map((candidate, index) => (
+                  <Button key={`${candidate.catalogId ?? candidate.recordingMbid}:${candidate.releaseMbid}`} type="button"
+                    variant={results.selected === index ? 'outlined' : 'text'} aria-pressed={results.selected === index}
+                    onClick={() => { void metadata.select(results.candidates, index) }}>
+                    {[labels[key], candidate.name, candidate.artist, candidate.version, candidate.album, candidate.edition ?? candidate.year].filter(Boolean).join(' · ')}
+                  </Button>
+                ))}
+              </Stack>}
+              {results?.details && <MetadataProposal key={`${results.details.catalogId ?? results.details.recordingMbid}:${results.details.releaseMbid}`}
+                details={results.details} artwork={results.artwork} artworkStatus={results.artworkStatus}
+                dirty={dirty} onApply={fields => apply(fields, results.details!, results.artwork)} onRetry={() => {
+                  if (results.selected != null) void metadata.select(results.candidates, results.selected)
+                }} />}
+            </Stack>
+          })}
         </>}
         {applied && editable && <Typography role="status" variant="body2">{lt('metadataApplied')}</Typography>}
         <TextField label={lt('metadataAlbum')} value={album} slotProps={{ htmlInput: { maxLength: 200 } }}
           onChange={(event) => {
             setAlbum(event.target.value)
-            setAlbumFromCatalog(false)
+            setAlbumSource('manual')
             setDirty((fields) => ({ ...fields, album: true }))
           }} />
         <TextField label={lt('metadataGenres')} value={genres} multiline minRows={2} maxRows={6}

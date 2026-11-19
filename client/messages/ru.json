@@ -515,6 +515,8 @@
     "metadataTitleSearch": "Найти по названию",
     "metadataSearching": "Ищем…",
     "metadataEmpty": "Совпадений нет. Уточните название или исполнителя.",
+    "discogsCredit": "Данные предоставлены Discogs",
+    "metadataMismatch": "Каталог не подтвердил запись в этом издании. Выберите другой результат.",
     "metadataUnavailable": "Источник метаданных временно недоступен.",
     "metadataChooseRelease": "Выберите запись и релиз",
     "metadataApplied": "Применено к черновику",

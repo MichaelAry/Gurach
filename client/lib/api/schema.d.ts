@@ -998,7 +998,7 @@ export interface components {
         };
         CatalogProvenance: {
             /** @enum {string} */
-            albumSource?: "manual" | "musicbrainz";
+            albumSource?: "manual" | "musicbrainz" | "discogs" | "theaudiodb";
             genreEvidence?: components["schemas"]["GenreEvidence"][];
             manualGenres?: string[];
             /** @enum {string} */
@@ -1044,6 +1044,8 @@ export interface components {
             status: "accepted";
         };
         ExternalIds: {
+            audioDbTrackId?: string;
+            discogsReleaseId?: string;
             /** Format: uuid */
             recordingMbid?: string;
             /** Format: uuid */
@@ -1083,7 +1085,7 @@ export interface components {
             /** @enum {string} */
             scope: "recording" | "release" | "artist";
             /** @enum {string} */
-            source: "musicbrainz" | "lastfm";
+            source: "musicbrainz" | "lastfm" | "theaudiodb" | "discogs";
         };
         HomeActivityItem: {
             /** @enum {string} */
@@ -1140,12 +1142,13 @@ export interface components {
         MetadataCandidate: {
             album: string | null;
             artist: string | null;
+            catalogId?: string;
             confidence: number;
             durationMs: number | null;
             edition: string | null;
             name: string;
             /** Format: uuid */
-            recordingMbid: string;
+            recordingMbid?: string;
             /** Format: uuid */
             releaseMbid: string | null;
             sources: string[];
@@ -1153,22 +1156,29 @@ export interface components {
             year: number | null;
         };
         MetadataDetailsDto: {
+            artist?: string;
+            catalogId?: string;
+            lastfm?: boolean;
+            name?: string;
             /** Format: uuid */
-            recordingMbid: string;
+            recordingMbid?: string;
             /** Format: uuid */
             releaseMbid?: string;
+            /** @enum {string} */
+            source?: "musicbrainz" | "theaudiodb" | "discogs";
         };
         MetadataDetailsResponse: {
             album: string | null;
             artist: string | null;
             artworkUrl: string | null;
+            catalogId?: string;
             confidence: number;
             durationMs: number | null;
             edition: string | null;
             genreEvidence: components["schemas"]["GenreEvidence"][];
             name: string;
             /** Format: uuid */
-            recordingMbid: string;
+            recordingMbid?: string;
             /** Format: uuid */
             releaseMbid: string | null;
             sources: string[];
@@ -1180,6 +1190,8 @@ export interface components {
             artist?: string;
             durationMs?: number;
             name: string;
+            /** @enum {string} */
+            source?: "musicbrainz" | "theaudiodb" | "discogs";
         };
         MetadataSearchResponse: {
             candidates: components["schemas"]["MetadataCandidate"][];
@@ -1187,9 +1199,13 @@ export interface components {
         };
         MetadataSourceStatuses: {
             /** @enum {string} */
+            discogs?: "available" | "disabled" | "unavailable";
+            /** @enum {string} */
             lastfm: "available" | "disabled" | "unavailable";
             /** @enum {string} */
             musicbrainz: "available" | "disabled" | "unavailable";
+            /** @enum {string} */
+            theaudiodb?: "available" | "disabled" | "unavailable";
         };
         NotificationActor: {
             displayName: string;

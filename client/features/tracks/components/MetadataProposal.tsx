@@ -17,6 +17,10 @@ export function MetadataProposal({ details, artwork, artworkStatus, dirty, onApp
   onRetry: () => void
 }) {
   const lt = useText()
+  const source = details.sources[0]
+  const credit = source === 'discogs' ? ['Discogs', 'https://www.discogs.com/release/' + details.catalogId]
+    : source === 'theaudiodb' ? ['TheAudioDB', 'https://www.theaudiodb.com/track/' + details.catalogId]
+    : ['MusicBrainz', 'https://musicbrainz.org/recording/' + details.recordingMbid]
   const preview = useObjectUrl(artwork)
   const [choices, setChoices] = useState<Partial<Record<ProposalField, boolean>>>({})
   const available: { field: ProposalField; label: string; value: string | boolean | null }[] = [
@@ -34,7 +38,7 @@ export function MetadataProposal({ details, artwork, artworkStatus, dirty, onApp
       <Typography variant="subtitle1">{details.name} — {details.artist}</Typography>
       <Typography variant="body2">{[details.version, details.album, details.edition ?? details.year, details.durationMs == null ? null
         : new Date(details.durationMs).toISOString().slice(11, 19)].filter(Boolean).join(' · ')}</Typography>
-      <Typography variant="body2" color="text.secondary"><Link target="_blank" rel="noreferrer" href={`https://musicbrainz.org/recording/${details.recordingMbid}`}>{'MusicBrainz'}</Link>{preview && ' · Cover Art Archive'}</Typography>
+      <Typography variant="body2" color="text.secondary"><Link target="_blank" rel="noreferrer" href={credit[1]}>{credit[0]}</Link>{preview && ' · Cover Art Archive'}</Typography>
       {details.sourceStatuses && Object.values(details.sourceStatuses).includes('unavailable')
         && <Typography role="status" variant="body2">{lt('metadataUnavailable')}</Typography>}
       {preview && <Box component="img" src={preview} alt={lt('coverPreview')} width={120} height={120} sx={{ objectFit: 'contain' }} />}
@@ -49,7 +53,7 @@ export function MetadataProposal({ details, artwork, artworkStatus, dirty, onApp
       </Stack>
       {!!details.genreEvidence.length && <Box component="ul" sx={{ my: 0, pl: 3 }}>
         {details.genreEvidence.map(({ genre, rawTag, source, scope }) => <li key={genre}>
-          {genre} · {source === 'musicbrainz' ? 'MusicBrainz' : <Link target="_blank" rel="noreferrer" href="https://www.last.fm/">{'Last.fm'}</Link>} · {lt(scope === 'recording' ? 'metadataGenreRecording' : scope === 'release' ? 'metadataGenreRelease' : 'metadataGenreArtist')}{rawTag !== genre && ` · ${rawTag}`}
+          {genre} · {source !== 'lastfm' ? credit[0] : <Link target="_blank" rel="noreferrer" href="https://www.last.fm/">{'Last.fm'}</Link>} · {lt(scope === 'recording' ? 'metadataGenreRecording' : scope === 'release' ? 'metadataGenreRelease' : 'metadataGenreArtist')}{rawTag !== genre && ` · ${rawTag}`}
         </li>)}
       </Box>}
       <Button type="button" variant="outlined" disabled={!selected.length} onClick={() => onApply(selected)}>{lt('metadataApply')}</Button>

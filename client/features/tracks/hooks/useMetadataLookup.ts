@@ -8,10 +8,12 @@ type LookupState = { status: 'idle' | 'searching' | 'empty' | 'unavailable' } | 
   candidates: MetadataCandidate[]
   selected: number | null
   details?: MetadataDetails
-  detailError?: boolean
+  detailError?: 'unavailable' | 'mismatch'
   artwork?: File
   artworkStatus?: 'loading' | 'missing' | 'unavailable'
 }
+
+class CatalogMismatch extends Error {}
 
 async function lookup<T>(endpoint: string, body: object, signal: AbortSignal): Promise<T> {
   const response = await fetch(`/api/metadata/${endpoint}`, {
@@ -19,11 +21,12 @@ async function lookup<T>(endpoint: string, body: object, signal: AbortSignal): P
     headers: { 'Content-Type': 'application/json', 'X-Gurach-Request': '1' },
     body: JSON.stringify(body),
   })
+  if (endpoint === 'details' && response.status === 400) throw new CatalogMismatch()
   if (!response.ok) throw new Error('Metadata unavailable')
   return response.json() as Promise<T>
 }
 
-function useDuration(file: File | null) {
+export function useDuration(file: File | null) {
   const duration = useRef<{ file: File; ms: number } | null>(null)
   useEffect(() => {
     if (!file) return
@@ -60,13 +63,18 @@ export function useObjectUrl(file: File | null | undefined) {
   return preview?.file === file ? preview?.url : undefined
 }
 
-export function useMetadataLookup({ active, name, artist, audio }: {
-  active: boolean; name: string; artist: string; audio: File | null
+export function useMetadataLookup({ active, name, artist, audio, duration, source, lastfm = false }: {
+  duration: ReturnType<typeof useDuration>
+  source: 'musicbrainz' | 'theaudiodb' | 'discogs'
+  lastfm?: boolean
+  active: boolean
+  name: string
+  artist: string
+  audio: File | null
 }) {
   const [state, setState] = useState<LookupState>({ status: 'idle' })
   const current = useRef<{ controller: AbortController; timer?: ReturnType<typeof setTimeout> }>(null)
   const artworkCache = useRef(new Map<string, File | null>())
-  const duration = useDuration(audio)
 
   function cancel() {
     current.current?.controller.abort()
@@ -92,12 +100,15 @@ export function useMetadataLookup({ active, name, artist, audio }: {
   async function select(candidates: MetadataCandidate[], selected: number, signal = start()) {
     if (!active || signal.aborted) return
     setState({ status: 'results', candidates, selected })
-    const { recordingMbid, releaseMbid } = candidates[selected]
+    const { recordingMbid, releaseMbid, catalogId } = candidates[selected]
     let details: MetadataDetails
     try {
-      details = await lookup<MetadataDetails>('details', { recordingMbid, releaseMbid: releaseMbid ?? undefined }, signal)
-    } catch {
-      if (!signal.aborted) setState({ status: 'results', candidates, selected, detailError: true })
+      const identity = catalogId ? { catalogId, name: name.trim(), artist: artist.trim() || undefined }
+        : { recordingMbid, releaseMbid: releaseMbid ?? undefined, lastfm }
+      details = await lookup<MetadataDetails>('details', { source, ...identity }, signal)
+    } catch (error) {
+      if (!signal.aborted) setState({ status: 'results', candidates, selected,
+        detailError: error instanceof CatalogMismatch ? 'mismatch' : 'unavailable' })
       return
     }
     if (signal.aborted) return
@@ -138,7 +149,7 @@ export function useMetadataLookup({ active, name, artist, audio }: {
     setState({ status: 'searching' })
     try {
       const durationMs = duration.current?.file === audio ? duration.current.ms : undefined
-      const result = await lookup<MetadataSearch>('search', { name: name.trim(), artist: artist.trim() || undefined, durationMs }, signal)
+      const result = await lookup<MetadataSearch>('search', { source, name: name.trim(), artist: artist.trim() || undefined, durationMs }, signal)
       if (signal.aborted) return
       if (!result.candidates.length) setState({ status: 'empty' })
       else if (result.recommendedIndex !== null && result.candidates[result.recommendedIndex]) {
@@ -156,7 +167,7 @@ export function useMetadataLookup({ active, name, artist, audio }: {
     return cancel
     // The timer owns a snapshot of the inputs for this lookup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, name, artist, audio])
+  }, [active, name, artist, audio, source, lastfm])
 
   return { state: active ? state : { status: 'idle' as const }, invalidate, search, select }
 }

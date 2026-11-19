@@ -83,6 +83,8 @@ export default async function TrackPage({ params }: TrackPageProps) {
             {!!track.genres?.length && <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
               <LocalizedText messageKey="metadataGenres" /> · {track.genres.join(' · ')}
             </Typography>}
+            {track.externalIds?.discogsReleaseId && <Typography component="a" variant="caption" href={`https://www.discogs.com/release/${track.externalIds.discogsReleaseId}`}><LocalizedText messageKey="discogsCredit" /></Typography>}
+            {track.externalIds?.audioDbTrackId && <Typography component="a" variant="caption" href={`https://www.theaudiodb.com/track/${track.externalIds.audioDbTrackId}`}>{'TheAudioDB'}</Typography>}
             {track.provenance?.genreEvidence?.some(({ source }) => source === 'lastfm') && (
               <Typography component="a" href="https://www.last.fm/" variant="caption" color="text.secondary" sx={{ alignSelf: 'flex-start' }}>
                 {'Last.fm'}

@@ -15,21 +15,22 @@ export class MusicBrainzProvider {
     return this.connection.collection<{ _id: string; next: Date; token: string }>('metadata_provider_slots');
   }
 
-  private async acquire(signal: AbortSignal): Promise<void> {
-    const id = 'musicbrainz';
+  private async acquire(id: string, interval: number, signal: AbortSignal): Promise<void> {
     const token = randomUUID();
     const available = { $lte: [{ $ifNull: ['$next', new Date(0)] }, '$$NOW'] };
     while (!signal.aborted) {
       const slot = await this.slots.findOneAndUpdate({ _id: id }, [{ $set: {
         token: { $cond: [available, token, '$token'] },
-        next: { $cond: [available, { $add: ['$$NOW', 1050] }, '$next'] },
+        next: { $cond: [available, { $add: ['$$NOW', interval] }, '$next'] },
       } }], { upsert: true, returnDocument: 'after', timeoutMS: 1000 }).catch((error: { code?: number }) => {
         if (error.code !== 11000) throw error;
         return null;
       });
       signal.throwIfAborted();
       if (slot?.token === token) return;
-      await sleep(150, undefined, { signal });
+      // MongoDB decides eligibility, while its returned timestamp helps pace polling.
+      const delay = slot ? slot.next.getTime() - Date.now() : 150;
+      await sleep(Math.max(150, Math.min(delay, 1000)), undefined, { signal });
     }
     signal.throwIfAborted();
   }
@@ -38,20 +39,34 @@ export class MusicBrainzProvider {
     const userAgent = musicBrainzUserAgent(process.env.MUSICBRAINZ_USER_AGENT);
     const url = new URL(`https://musicbrainz.org/ws/2/${path}`);
     url.search = new URLSearchParams({ ...query, fmt: 'json' }).toString();
+    return this.request('musicbrainz', url, 1050, { 'User-Agent': userAgent }, parent);
+  }
+
+  async request<T>(source: string, url: URL, interval: number, headers: Record<string, string>, parent: AbortSignal): Promise<T> {
     const queueSignal = AbortSignal.any([parent, AbortSignal.timeout(4000)]);
-    await this.acquire(queueSignal);
+    await this.acquire(source, interval, queueSignal);
     parent.throwIfAborted();
     const response = await fetch(url, {
       signal: AbortSignal.any([parent, AbortSignal.timeout(4000)]),
-      redirect: 'error', headers: { 'User-Agent': userAgent, Accept: 'application/json' },
+      redirect: 'error', headers: { ...headers, Accept: 'application/json' },
     });
-    if (response.status === 429 || response.status === 503) {
-      const delay = retryAfter(response.headers.get('retry-after'));
+    const limited = response.status === 429 || response.status === 503;
+    const limit = Number(response.headers.get('x-discogs-ratelimit'));
+    const headerInterval = source === 'discogs' && limit > 0 ? Math.ceil(60_000 / limit) : 0;
+    const delay = limited ? retryAfter(response.headers.get('retry-after')) : 0;
+    if (limited || headerInterval > interval) {
+      try {
+        await this.slots.updateOne({ _id: source }, [{ $set: {
+          next: { $max: ['$next', { $add: ['$$NOW', Math.max(headerInterval, delay)] }] },
+        } }], { timeoutMS: 1000 });
+      } catch (error) {
+        await response.body?.cancel().catch(() => {});
+        throw error;
+      }
+    }
+    if (limited) {
       await response.body?.cancel();
-      await this.slots.updateOne({ _id: 'musicbrainz' }, [{ $set: {
-        next: { $max: ['$next', { $add: ['$$NOW', delay] }] },
-      } }], { timeoutMS: 1000 });
-      throw new Error('MusicBrainz throttled the lookup');
+      throw new Error(source + ' throttled the lookup');
     }
     return providerJson<T>(response);
   }

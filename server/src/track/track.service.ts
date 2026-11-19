@@ -455,7 +455,11 @@ export class TrackService {
         const albumChanged = dto.album !== undefined && (dto.album || null) !== (current.album || null);
         const genresChanged = dto.genres !== undefined && !isDeepStrictEqual(dto.genres, current.genres ?? []);
         const externalIds = { ...current.externalIds };
-        if (identityChanged) delete externalIds.recordingMbid;
+        if (identityChanged) {
+          delete externalIds.discogsReleaseId;
+          delete externalIds.audioDbTrackId;
+          delete externalIds.recordingMbid;
+        }
         if (identityChanged || albumChanged) delete externalIds.releaseMbid;
         const provenance = { ...current.provenance };
         if (albumChanged) provenance.albumSource = 'manual';

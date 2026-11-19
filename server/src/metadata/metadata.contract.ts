@@ -1,10 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { MBID, GenreEvidence } from '../contracts/catalog-metadata.js';
 import { TrimString } from '../common/validation/text.decorators.js';
 import { FILE_POLICY } from '../file/file-policy.js';
 
-export class MetadataSearchDto {
+const catalogs = ['musicbrainz', 'theaudiodb', 'discogs'] as const;
+class CatalogRequest {
+  @ApiPropertyOptional({ enum: catalogs })
+  @ValidateIf((_, v) => v !== undefined) @IsIn(catalogs)
+  source?: typeof catalogs[number];
+}
+export class MetadataSearchDto extends CatalogRequest {
   @ApiProperty({ maxLength: FILE_POLICY.maxTitleChars })
   @TrimString() @IsString() @IsNotEmpty() @MaxLength(FILE_POLICY.maxTitleChars)
   name: string;
@@ -18,10 +24,14 @@ export class MetadataSearchDto {
   durationMs?: number;
 }
 
-export class MetadataDetailsDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsString() @Matches(MBID)
-  recordingMbid: string;
+export class MetadataDetailsDto extends CatalogRequest {
+  @ApiPropertyOptional() @ValidateIf((_, v) => v !== undefined) @IsBoolean() lastfm?: boolean;
+  @ApiPropertyOptional() @ValidateIf((_, v) => v !== undefined) @Matches(/^[1-9]\d{0,11}$/) catalogId?: string;
+  @ApiPropertyOptional() @ValidateIf((_, v) => v !== undefined) @IsString() @MaxLength(200) name?: string;
+  @ApiPropertyOptional() @ValidateIf((_, v) => v !== undefined) @IsString() @MaxLength(200) artist?: string;
+  @ApiPropertyOptional({ format: 'uuid' })
+  @ValidateIf((dto, v) => !dto.source || dto.source === 'musicbrainz' || v !== undefined) @IsString() @Matches(MBID)
+  recordingMbid?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @ValidateIf((_, value) => value !== undefined) @IsString() @Matches(MBID)
@@ -33,7 +43,8 @@ export class MetadataCandidate {
   @ApiProperty({ type: String, nullable: true }) artist: string | null;
   @ApiProperty({ type: String, nullable: true }) version: string | null;
   @ApiProperty({ type: Number, nullable: true }) durationMs: number | null;
-  @ApiProperty({ format: 'uuid' }) recordingMbid: string;
+  @ApiPropertyOptional() catalogId?: string;
+  @ApiPropertyOptional({ format: 'uuid' }) recordingMbid?: string;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) releaseMbid: string | null;
   @ApiProperty({ type: String, nullable: true }) album: string | null;
   @ApiProperty({ type: String, nullable: true }) edition: string | null;
@@ -50,6 +61,8 @@ const sourceStatuses = ['available', 'disabled', 'unavailable'] as const;
 export type SourceStatus = typeof sourceStatuses[number];
 
 export class MetadataSourceStatuses {
+  @ApiPropertyOptional({ enum: sourceStatuses }) theaudiodb?: SourceStatus;
+  @ApiPropertyOptional({ enum: sourceStatuses }) discogs?: SourceStatus;
   @ApiProperty({ enum: sourceStatuses }) musicbrainz: SourceStatus;
   @ApiProperty({ enum: sourceStatuses }) lastfm: SourceStatus;
 }

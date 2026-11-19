@@ -40,7 +40,7 @@ export class MetadataController {
   @ApiOkResponse({ type: MetadataSearchResponse })
   @ApiStandardErrors({ authenticated: true, rateLimited: true, payloadTooLarge: true })
   search(@Body() dto: MetadataSearchDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    validateKeys(request, ['name', 'artist', 'durationMs']);
+    validateKeys(request, ['name', 'artist', 'durationMs', 'source']);
     return untilDisconnected(response, (signal) => this.metadata.search(dto, signal));
   }
 
@@ -49,7 +49,7 @@ export class MetadataController {
   @ApiOkResponse({ type: MetadataDetailsResponse })
   @ApiStandardErrors({ authenticated: true, rateLimited: true, payloadTooLarge: true })
   details(@Body() dto: MetadataDetailsDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    validateKeys(request, ['recordingMbid', 'releaseMbid']);
+    validateKeys(request, ['recordingMbid', 'releaseMbid', 'source', 'catalogId', 'name', 'artist', 'lastfm']);
     return untilDisconnected(response, (signal) => this.metadata.details(dto, signal));
   }
 

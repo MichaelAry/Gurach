@@ -235,7 +235,9 @@
           "albumSource": {
             "enum": [
               "manual",
-              "musicbrainz"
+              "musicbrainz",
+              "discogs",
+              "theaudiodb"
             ],
             "type": "string"
           },
@@ -384,6 +386,12 @@
       },
       "ExternalIds": {
         "properties": {
+          "audioDbTrackId": {
+            "type": "string"
+          },
+          "discogsReleaseId": {
+            "type": "string"
+          },
           "recordingMbid": {
             "format": "uuid",
             "type": "string"
@@ -528,7 +536,9 @@
           "source": {
             "enum": [
               "musicbrainz",
-              "lastfm"
+              "lastfm",
+              "theaudiodb",
+              "discogs"
             ],
             "type": "string"
           }
@@ -731,6 +741,9 @@
             "nullable": true,
             "type": "string"
           },
+          "catalogId": {
+            "type": "string"
+          },
           "confidence": {
             "maximum": 1,
             "minimum": 0,
@@ -776,7 +789,6 @@
           "artist",
           "version",
           "durationMs",
-          "recordingMbid",
           "releaseMbid",
           "album",
           "edition",
@@ -788,6 +800,18 @@
       },
       "MetadataDetailsDto": {
         "properties": {
+          "artist": {
+            "type": "string"
+          },
+          "catalogId": {
+            "type": "string"
+          },
+          "lastfm": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
           "recordingMbid": {
             "format": "uuid",
             "type": "string"
@@ -795,11 +819,16 @@
           "releaseMbid": {
             "format": "uuid",
             "type": "string"
+          },
+          "source": {
+            "enum": [
+              "musicbrainz",
+              "theaudiodb",
+              "discogs"
+            ],
+            "type": "string"
           }
         },
-        "required": [
-          "recordingMbid"
-        ],
         "type": "object"
       },
       "MetadataDetailsResponse": {
@@ -814,6 +843,9 @@
           },
           "artworkUrl": {
             "nullable": true,
+            "type": "string"
+          },
+          "catalogId": {
             "type": "string"
           },
           "confidence": {
@@ -870,7 +902,6 @@
           "artist",
           "version",
           "durationMs",
-          "recordingMbid",
           "releaseMbid",
           "album",
           "edition",
@@ -896,6 +927,14 @@
           },
           "name": {
             "maxLength": 200,
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "musicbrainz",
+              "theaudiodb",
+              "discogs"
+            ],
             "type": "string"
           }
         },
@@ -926,6 +965,14 @@
       },
       "MetadataSourceStatuses": {
         "properties": {
+          "discogs": {
+            "enum": [
+              "available",
+              "disabled",
+              "unavailable"
+            ],
+            "type": "string"
+          },
           "lastfm": {
             "enum": [
               "available",
@@ -935,6 +982,14 @@
             "type": "string"
           },
           "musicbrainz": {
+            "enum": [
+              "available",
+              "disabled",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "theaudiodb": {
             "enum": [
               "available",
               "disabled",

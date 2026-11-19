@@ -515,6 +515,8 @@
     "metadataTitleSearch": "Search by title",
     "metadataSearching": "Searching…",
     "metadataEmpty": "No matches. Try a more specific title or artist.",
+    "discogsCredit": "Data provided by Discogs",
+    "metadataMismatch": "The catalog could not confirm this track on the release. Choose another result.",
     "metadataUnavailable": "A metadata source is temporarily unavailable.",
     "metadataChooseRelease": "Choose a recording and release",
     "metadataApplied": "Applied to the draft",
