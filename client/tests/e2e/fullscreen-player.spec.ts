@@ -130,8 +130,12 @@ test('opens directly with an empty queue, fits mobile and returns to the catalog
   await page.screenshot({ path: '/tmp/gurach-player-mobile.png', fullPage: true })
 })
 
-test('preserves the source filters and shows retry after an audio error', async ({ page }) => {
-  await page.goto('/tracks?search=Track')
+test('restores the catalogue search after closing the player and shows retry after an audio error', async ({ page }) => {
+  const catalogueUrl = '/tracks?query=Track%201'
+  const search = page.getByRole('searchbox', { name: 'Поиск по названию или исполнителю' })
+  const catalogue = page.getByRole('main')
+  await page.goto(catalogueUrl)
+  await expect(search).toHaveValue('Track 1')
   await page.getByRole('button', { name: 'Играть Track 1', exact: true }).click()
   await page.getByRole('button', { name: 'Открыть полноэкранный плеер' }).click()
   await page.locator('audio').evaluate((node) => node.dispatchEvent(new Event('error')))
@@ -140,7 +144,10 @@ test('preserves the source filters and shows retry after an audio error', async 
   await expect.poll(() => page.locator('audio').evaluate((node: HTMLAudioElement) => !node.paused)).toBe(true)
   await page.screenshot({ path: '/tmp/gurach-player-desktop.png', fullPage: true })
   await page.getByRole('link', { name: 'Свернуть плеер' }).click()
-  await expect(page).toHaveURL(/\/tracks\?search=Track$/)
+  await expect(page).toHaveURL(catalogueUrl)
+  await expect(search).toHaveValue('Track 1')
+  await expect(catalogue.getByRole('link', { name: 'Track 1', exact: true })).toBeVisible()
+  await expect(catalogue.getByRole('link', { name: 'Track 2', exact: true })).toHaveCount(0)
 })
 
 
